@@ -15,8 +15,8 @@ Petri is a planner built around one idea: test small before you commit big, and 
 run more at once than you can actually carry. A "tiny experiment" is a cheap,
 time-boxed test of a hypothesis ("if I walk after lunch, then my focus holds longer").
 If it works, it can grow into a full goal with real milestones, not just stay a
-habit tracker forever. If it doesn't, ending it early is a normal, honest outcome, not
-a failure to hide.
+habit tracker forever. If it doesn't, ending it early is simply recorded as an
+outcome, not concealed as a failure.
 
 ## Functionality
 
@@ -55,7 +55,7 @@ At most 2 experiments and 1 goal can be active at the same time, enforced by the
 system, not just suggested by the UI. The product is built around working through
 things one at a time rather than juggling several at once.
 
-### Honest endings
+### Transparent endings
 Ending or deleting anything before its cadence or duration is up requires a one-line
 reason, which is kept permanently on that item's record. The dashboard shows a plain,
 always-visible count of completed versus abandoned items, so the pattern stays

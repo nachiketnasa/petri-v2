@@ -342,7 +342,7 @@ A single public landing page for unauthenticated visitors, separate from the sig
 
 ## Acceptance criteria
 - An unauthenticated visitor at the root URL sees this page, never the dashboard or a bare login form.
-- Explains the product (tiny experiments that can grow into goals, PACT, the work-in-progress limit, honest endings) in plain language.
+- Explains the product (tiny experiments that can grow into goals, PACT, the work-in-progress limit, transparent endings) in plain language.
 - One clear action: sign in or create an account. No pricing tiers, feature-comparison grid, or testimonials.
 - Same restrained, neumorphic design direction as the rest of the product — not a typical SaaS gradient-hero page.
 

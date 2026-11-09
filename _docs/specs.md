@@ -127,7 +127,7 @@ An optional feature, off by default, turned on from **Settings**. Once enabled:
 A visitor with no account, hitting the site's root URL, sees a single public page —
 not the app, not a login wall. It explains the product in plain language (tiny
 experiments that can grow into goals, the PACT shape, the work-in-progress limit,
-honest endings) and offers one clear action: sign in or create an account. No pricing
+transparent endings) and offers one clear action: sign in or create an account. No pricing
 tiers, no feature-comparison grid, no testimonials — the same restrained,
 neumorphic "natural makeup" direction as the rest of the product, not a typical SaaS
 page with a big gradient hero. This is separate from, and seen by a different
