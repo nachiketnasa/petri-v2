@@ -245,4 +245,173 @@ text{font-family:var(--mono);fill:currentColor}
       specs.md) would read; nothing else needs to change to build it later.
     </figcaption>
   </figure>
+
+  <figure>
+    <h2>Database schema (ER diagram)</h2>
+    <p class="fig-sub">Every table in <code>_docs/schema.sql</code>, with its real columns, keys, and foreign keys.</p>
+    <pre class="mermaid">
+erDiagram
+    USERS ||--o{ AUTH_IDENTITIES : "has"
+    USERS ||--o{ EMAIL_VERIFICATIONS : "has"
+    USERS ||--o{ PASSWORD_RESETS : "has"
+    USERS ||--o{ SESSIONS : "has"
+    USERS ||--o{ EXPERIMENTS : "owns, max 2 active"
+    USERS ||--o{ GOALS : "owns, max 1 active"
+    USERS ||--o{ OTHER_TASKS : "owns"
+    USERS ||--o{ PUSH_SUBSCRIPTIONS : "registers"
+    USERS ||--o{ COMMENTS : "writes"
+    USERS ||--o{ LIKES : "gives"
+    GOALS ||--o{ MILESTONES : "ordered list, one active"
+    EXPERIMENTS ||--o{ CHECK_INS : "logs"
+    MILESTONES ||--o{ CHECK_INS : "logs"
+    EXPERIMENTS |o--o| RETROS : "on archive"
+    MILESTONES |o--o| RETROS : "on archive"
+    GOALS |o--o| RETROS : "on archive"
+    EXPERIMENTS |o--o| GOALS : "evolves into"
+    EXPERIMENTS |o--o| EXPERIMENTS : "branches into"
+    GOALS |o--o| GOALS : "branches into"
+    EXPERIMENTS |o--o| SHARES : "shared as"
+    GOALS |o--o| SHARES : "shared as"
+    SHARES ||--o{ COMMENTS : "has"
+    SHARES ||--o{ LIKES : "has"
+
+    USERS {
+        uuid id PK
+        citext email UK "one account, every signup method"
+        text password_hash "null if OAuth-only"
+        text display_name
+        text timezone
+        text theme
+        bool sound_effects_enabled
+        bool other_tasks_enabled
+        text default_landing
+    }
+    AUTH_IDENTITIES {
+        uuid id PK
+        uuid user_id FK
+        text provider
+        text provider_user_id
+        text provider_email
+    }
+    EMAIL_VERIFICATIONS {
+        uuid id PK
+        uuid user_id FK
+        text code_hash
+        timestamptz expires_at
+    }
+    PASSWORD_RESETS {
+        uuid id PK
+        uuid user_id FK
+        text token_hash
+        timestamptz expires_at
+    }
+    SESSIONS {
+        uuid id PK
+        uuid user_id FK
+        timestamptz expires_at
+        timestamptz revoked_at
+    }
+    EXPERIMENTS {
+        uuid id PK
+        uuid user_id FK
+        text title
+        text hypothesis
+        text cadence_type
+        text check_in_kind
+        date start_date
+        int target_days
+        text status
+        bool ended_early
+        text abandon_reason "required if ended_early"
+        uuid evolved_into_goal_id FK
+        uuid branched_into_experiment_id FK
+        uuid branched_from_experiment_id FK
+    }
+    GOALS {
+        uuid id PK
+        uuid user_id FK
+        text title
+        text why_text
+        date start_date
+        date target_date
+        text status
+        bool ended_early
+        text abandon_reason "required if ended_early"
+        uuid evolved_from_experiment_id FK
+        uuid branched_into_goal_id FK
+        uuid branched_from_goal_id FK
+    }
+    MILESTONES {
+        uuid id PK
+        uuid goal_id FK
+        smallint order_index "locked at creation"
+        text title
+        text cadence_type
+        text check_in_kind
+        date target_date
+        text status
+        bool ended_early
+        text abandon_reason "required if ended_early"
+    }
+    CHECK_INS {
+        uuid id PK
+        uuid experiment_id FK "exactly one of these two"
+        uuid milestone_id FK "exactly one of these two"
+        bool value_bool "exactly one of these two"
+        smallint value_rating "exactly one of these two"
+        text note
+        timestamptz checked_in_at
+    }
+    RETROS {
+        uuid id PK
+        uuid experiment_id FK "exactly one of these three"
+        uuid milestone_id FK "exactly one of these three"
+        uuid goal_id FK "exactly one of these three"
+        text what_worked
+        text what_didnt
+        text decision
+    }
+    OTHER_TASKS {
+        uuid id PK
+        uuid user_id FK
+        text title
+        text schedule_type
+        date one_time_date
+        int repeat_interval_days
+        date repeat_end_date
+        bool push_reminder_enabled
+    }
+    PUSH_SUBSCRIPTIONS {
+        uuid id PK
+        uuid user_id FK
+        text endpoint UK
+        text p256dh_key
+        text auth_key
+    }
+    SHARES {
+        uuid id PK
+        uuid experiment_id FK "exactly one of these two"
+        uuid goal_id FK "exactly one of these two"
+        text token UK "unguessable, not the row id"
+    }
+    COMMENTS {
+        uuid id PK
+        uuid share_id FK
+        uuid user_id FK
+        text body
+    }
+    LIKES {
+        uuid id PK
+        uuid share_id FK
+        uuid user_id FK
+    }
+    </pre>
+    <figcaption>
+      <code>created_at</code>/<code>updated_at</code> audit columns are left off every
+      table here for legibility; they're in <code>_docs/schema.sql</code> on all of them.
+      <b>CHECK_INS</b>, <b>RETROS</b>, and <b>SHARES</b> each use a mutually-exclusive
+      pair or triple of nullable foreign keys rather than a polymorphic parent column,
+      enforced by a <code>num_nonnulls(...) = 1</code> constraint in the schema.
+    </figcaption>
+  </figure>
 </div>
