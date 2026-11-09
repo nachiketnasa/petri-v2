@@ -25,11 +25,12 @@ milestones move through the five columns above, one at a time, in order.
 - **User**: account owner. Each user sees only their own board.
 - **Experiment**: title, hypothesis, cadence (daily/weekly/custom interval, set at
   creation), start date, target duration, status (maps to column), optional pointer to
-  a successor experiment (set when this experiment branches into a new one on
-  conclusion).
+  a successor experiment (branch) and an optional pointer to the goal it evolved into,
+  if either happened.
 - **Goal**: title, why-this-goal text, start date, target date, status (maps to its
   own lifecycle), ordered list of milestones, optional pointer to a successor goal
-  (set when this goal branches into a new one on conclusion).
+  (branch), and an optional pointer to the experiment it evolved from, if it was
+  created that way.
 - **Milestone**: belongs to a goal, runs exactly like a tiny experiment (own cadence,
   own check-ins) under a different label. Milestones are defined in full when the goal
   is created and locked once the goal is Active — changing the list after that requires
@@ -53,13 +54,25 @@ milestones move through the five columns above, one at a time, in order.
 - An experiment can **evolve** into a goal, one way only. The experiment's title and
   history carry over; its single cadence is replaced by the goal's milestone structure.
   An evolved experiment leaves the WIP experiment count and the new goal occupies the
-  goal slot.
+  goal slot. The source experiment stays on record (not deleted or merged away) with a
+  stored pointer to the goal it became, and the goal stores the pointer back.
 - A concluded experiment or a concluded goal can optionally **branch** into a
   successor of the same kind (a fresh experiment with its own cadence, or a fresh goal
   with its own new milestones). The source item is simply Archived either way —
-  branching just adds an optional pointer to the item that follows it. Not everything
-  branches, and branching never changes kind (an experiment branches to an experiment;
-  evolving to a goal is the separate operation above).
+  branching just adds a stored pointer to the item that follows it, on both ends. Not
+  everything branches, and branching never changes kind (an experiment branches to an
+  experiment; evolving to a goal is the separate operation above).
+
+### Lineage, for a future branch diagram
+
+Every evolve and every branch is written as a real, persisted, two-way pointer between
+the two items involved, not just copied field values with the trail discarded. This is
+a deliberate architectural commitment, made now, for a **future** node-based diagram
+view showing the full lineage of branches and evolutions, either across every
+experiment and goal a user has, or filtered to a chosen few. That diagram is explicit
+non-goal of v2 (see Non-goals) and is not being designed or built now — but the data
+model is shaped so that building it later only means reading edges that already exist,
+never a migration or a breaking change to how evolve/branch work.
 
 ## Work in progress limits
 
@@ -224,6 +237,7 @@ moodboard/reference images pulled from other designers' work.
 - Signing up with an email already registered under a different method never reveals that method on screen, only by email to that address.
 - A day's total (other tasks + check-ins + current milestone cadence) past 8 shows the warning; it never blocks the user from proceeding.
 - The month calendar always renders complete weeks (Monday start), including faded days from the adjacent month.
+- Every evolve or branch operation writes a pointer on both the source and the result, even though no diagram view reads it yet.
 
 ## Non-goals (v2)
 
@@ -237,6 +251,7 @@ moodboard/reference images pulled from other designers' work.
 - No analytics/insights dashboard beyond what's specified here (WIP counts, the completed/abandoned ratio, streaks).
 - No offline support / local-first sync.
 - No literal reuse of reference/moodboard images as shipped product assets.
+- No node-based lineage/branch diagram view in v2 — planned for later. The evolve/branch pointers it would read are stored from the start (see "Lineage, for a future branch diagram"), so building the diagram later is additive, not a data model change.
 
 ## Tech stack
 

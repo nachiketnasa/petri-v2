@@ -39,7 +39,10 @@ in order. A tiny experiment that proves itself out can **evolve** into a goal
 (one-way). Separately, any concluded experiment or goal can optionally **branch**
 into a fresh successor of the same kind, an experiment into a new experiment, a goal
 into a new goal, so a result can lead straight into the next round without starting
-from a blank backlog.
+from a blank backlog. Every evolve and branch is stored as a real link between the two
+items involved, not just copied data, laying the groundwork for a future node-based
+diagram showing that lineage across all or selected experiments and goals. That
+diagram itself isn't built in v2, but the data it would need already is.
 
 ### Work in progress limits
 At most 2 experiments and 1 goal can be active at the same time, enforced by the
