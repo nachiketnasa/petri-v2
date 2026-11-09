@@ -20,6 +20,12 @@ a failure to hide.
 
 ## Functionality
 
+### Public landing page
+Anyone without an account who hits the site sees one public page explaining what
+Petri does, not the app and not a login wall, with a single action: sign in or create
+an account. No pricing tiers, no testimonials, same restrained design as the rest of
+the product. This is separate from the signed-in greeting screen described below.
+
 ### Tiny experiments
 A hypothesis, a cadence (daily, weekly, or a custom interval), and a target duration,
 set once at creation. Check in on schedule with a structured value (done/not done, or

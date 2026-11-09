@@ -330,3 +330,22 @@ CI/CD pipeline.
 Ref: conversation history — "hold for now" on CI/CD.
 
 ---
+
+## #19 — Public landing page
+
+- **Status**: OPEN
+- **Labels**: frontend, design
+- **Link**: https://github.com/nachiketnasa/petri-v2/issues/19
+
+## What
+A single public landing page for unauthenticated visitors, separate from the signed-in greeting screen.
+
+## Acceptance criteria
+- An unauthenticated visitor at the root URL sees this page, never the dashboard or a bare login form.
+- Explains the product (tiny experiments that can grow into goals, PACT, the work-in-progress limit, honest endings) in plain language.
+- One clear action: sign in or create an account. No pricing tiers, feature-comparison grid, or testimonials.
+- Same restrained, neumorphic design direction as the rest of the product — not a typical SaaS gradient-hero page.
+
+Ref: `_docs/specs.md` → Public landing page.
+
+---

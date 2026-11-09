@@ -122,6 +122,18 @@ An optional feature, off by default, turned on from **Settings**. Once enabled:
   Developer account skipped for Sign in with Apple). Not needed for v2's web-only scope,
   noted here so the backend stays API-first and portable.
 
+## Public landing page
+
+A visitor with no account, hitting the site's root URL, sees a single public page —
+not the app, not a login wall. It explains the product in plain language (tiny
+experiments that can grow into goals, the PACT shape, the work-in-progress limit,
+honest endings) and offers one clear action: sign in or create an account. No pricing
+tiers, no feature-comparison grid, no testimonials — the same restrained,
+neumorphic "natural makeup" direction as the rest of the product, not a typical SaaS
+page with a big gradient hero. This is separate from, and seen by a different
+audience than, the calm post-login greeting screen below, which only a signed-in
+user ever reaches.
+
 ## Landing screen and dashboard
 
 - Immediately after signing in, the user lands on a calm greeting screen: a time-of-day
@@ -239,25 +251,27 @@ moodboard/reference images pulled from other designers' work.
 ## User stories
 
 1. As a user, I can sign up and sign in (OAuth or email/password) so my board is private to me.
-2. As a user, I land on a calm greeting first, and open the full dashboard when I choose to (or set it as my default in Settings).
-3. As a user, I can create an experiment with a hypothesis, cadence, and target duration, through a short step-by-step flow.
-4. As a user, I can create a goal, give it milestones up front, and have it run one milestone at a time like a sequence of tiny experiments.
-5. As a user, I can evolve a successful experiment into a goal, and later branch a concluded experiment or goal into a new one of the same kind.
-6. As a user, I can see my active experiments and goals on a dashboard, filtered by type, with my WIP limits and my completed-vs-abandoned ratio visible.
-7. As a user, I can log a check-in (structured value + optional note) against anything Active.
-8. As a user, I can see what's due today or overdue, visually flagged.
-9. As a user, when something's duration ends, or I end it early, I'm prompted for a retro (or a mandatory abandon reason) before it closes.
-10. As a user, I can view full history and retro after something's archived.
-11. As a user, I can turn on Other tasks in Settings, add obligations with a one-time or repeating schedule, and get warned if a day holds more than 8 things total.
-12. As a user, I can view my calendar by week or month, with the month showing complete weeks even where they spill into neighboring months.
-13. As a user, I can toggle public sharing, get a link, and others can like or comment once signed in; I can delete any comment on my own shared page.
-14. As a user, I can turn sharing off, which clears likes/comments and invalidates the old link.
-15. As a user, I can pick a theme in Settings that applies everywhere.
-16. As a user, I can delete my account or just log out.
-17. As a user, I can turn on two-factor authentication with my own authenticator app, get recovery codes, and be asked for a code at sign-in from then on.
+2. As a visitor with no account, I can read what Petri does and sign in or create an account from a single public landing page, before I'm asked to log in.
+3. As a user, I land on a calm greeting first, and open the full dashboard when I choose to (or set it as my default in Settings).
+4. As a user, I can create an experiment with a hypothesis, cadence, and target duration, through a short step-by-step flow.
+5. As a user, I can create a goal, give it milestones up front, and have it run one milestone at a time like a sequence of tiny experiments.
+6. As a user, I can evolve a successful experiment into a goal, and later branch a concluded experiment or goal into a new one of the same kind.
+7. As a user, I can see my active experiments and goals on a dashboard, filtered by type, with my WIP limits and my completed-vs-abandoned ratio visible.
+8. As a user, I can log a check-in (structured value + optional note) against anything Active.
+9. As a user, I can see what's due today or overdue, visually flagged.
+10. As a user, when something's duration ends, or I end it early, I'm prompted for a retro (or a mandatory abandon reason) before it closes.
+11. As a user, I can view full history and retro after something's archived.
+12. As a user, I can turn on Other tasks in Settings, add obligations with a one-time or repeating schedule, and get warned if a day holds more than 8 things total.
+13. As a user, I can view my calendar by week or month, with the month showing complete weeks even where they spill into neighboring months.
+14. As a user, I can toggle public sharing, get a link, and others can like or comment once signed in; I can delete any comment on my own shared page.
+15. As a user, I can turn sharing off, which clears likes/comments and invalidates the old link.
+16. As a user, I can pick a theme in Settings that applies everywhere.
+17. As a user, I can delete my account or just log out.
+18. As a user, I can turn on two-factor authentication with my own authenticator app, get recovery codes, and be asked for a code at sign-in from then on.
 
 ## Acceptance criteria (examples)
 
+- An unauthenticated visitor at the root URL sees the public landing page, never the dashboard or a bare login form; signing in or creating an account is the only action it offers besides reading it.
 - Creating an experiment requires title, hypothesis, cadence, target duration; a goal requires title, why-this-goal text, start/target date, and at least one milestone. Missing any → validation error, nothing created.
 - A check-in cannot be logged against anything in Backlog, Reflect, or Archived — only Active.
 - Activating a 3rd experiment or a 2nd goal is blocked by the WIP limit.
