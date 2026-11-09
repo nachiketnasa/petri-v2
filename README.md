@@ -151,6 +151,10 @@ criterion, and explicit non-goal, lives in [`_docs/specs.md`](_docs/specs.md). I
 
 - [`_docs/specs.md`](_docs/specs.md) — product specification: entities, user stories,
   acceptance criteria, non-goals, and the technical plan.
+- [`_docs/architecture.html`](_docs/architecture.html) — data flow diagram, backend
+  layering, and the core entity/lineage relationships.
+- [`_docs/schema.sql`](_docs/schema.sql) — the PostgreSQL schema, verified against a
+  real `postgres:16` instance.
 - Task tracker and agent team docs: in progress.
 
 ## Status
