@@ -170,7 +170,10 @@ criterion, and explicit non-goal, lives in [`_docs/specs.md`](_docs/specs.md). I
   layering, and the core entity/lineage relationships.
 - [`_docs/schema.sql`](_docs/schema.sql) — the PostgreSQL schema, verified against a
   real `postgres:16` instance.
-- Task tracker and agent team docs: in progress.
+- [Issue tracker](https://github.com/nachiketnasa/petri-v2/issues) — every acceptance
+  criterion above broken into tasks; [`_docs/backlog.md`](_docs/backlog.md) is a
+  generated snapshot of it, committed for convenience (the tracker is authoritative).
+- Agent team docs: in progress.
 
 ## Status
 
