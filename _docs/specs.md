@@ -245,6 +245,10 @@ Dark, Solarized Light, Solarized Dark (Solarized is an open, permissively licens
 palette, safe to ship). The choice applies across the whole app, saved to the account
 rather than the browser.
 
+**Sound**: a Settings toggle, off by default, plays short synthesized tones (Web Audio,
+no audio files to ship or license) on starting or finishing the creation wizard, logging
+a check-in, and pausing or removing a cadence. Minimal and professional, not game-like.
+
 Illustrations are original line art in a thin single-stroke style, not literal reuse of
 moodboard/reference images pulled from other designers' work.
 
