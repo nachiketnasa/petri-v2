@@ -183,6 +183,26 @@ app). The item's owner can delete any comment on their own page.
   address.
 - The site sits behind **Cloudflare** for DDoS mitigation, and auth forms are protected
   by **Cloudflare Turnstile or reCAPTCHA** against bots.
+- **Sessions are server-side**, not JWT: an opaque token backed by the `sessions`
+  table, sent as an httpOnly cookie to the web client and (once a native app exists)
+  as a `Bearer` header to mobile. Chosen over JWT because explicit logout and real
+  session expiry, both already required above, are awkward with JWTs (revoking one
+  early means a blocklist, which just reinvents server-side sessions), and JWT's real
+  advantage — stateless verification across many independent services — doesn't apply
+  to one backend talking to one Postgres.
+- **Verification and reset email** goes through **Resend**, chosen for now for its
+  simple setup; sending is wrapped behind a small interface
+  (`send_verification_email`, `send_password_reset_email`) so switching providers
+  later (Brevo's free tier, or Amazon SES for cost at real scale) is a new
+  implementation of that interface, not a rewrite, the same pattern the repository
+  interface gives the data store.
+- **Cookie notice**: the only cookies this product sets are strictly necessary ones
+  (the session cookie above, plus whatever Cloudflare's bot/security checks set) —
+  nothing optional, no analytics or marketing cookies (see Non-goals). Strictly
+  necessary cookies are exempt from opt-in consent under GDPR/ePrivacy, so the site
+  shows a simple notice ("this site uses cookies necessary for sign-in and security;
+  by using it you accept this"), not a multi-category consent manager. Revisit this
+  if a future, genuinely optional cookie (analytics, etc.) is ever added.
 - **Optional two-factor authentication**, off by default, turned on from Settings:
   standard TOTP (RFC 6238) codes from an authenticator app of the user's choice (Google
   Authenticator, Authy, 1Password, etc.), not SMS. This is a genuinely free addition —
@@ -285,6 +305,17 @@ moodboard/reference images pulled from other designers' work.
   repeated here.
 - **Infra**: Cloudflare in front for DDoS mitigation; Turnstile/reCAPTCHA on auth
   endpoints; Web Push via a service worker for Other task reminders.
+- **Hosting**: a single VPS — **Oracle Cloud's Always Free tier** first choice (a real
+  always-free instance, not a 12-month trial that starts billing, so it fits a fixed
+  "no surprise cost" budget indefinitely); **Hetzner Cloud** as the fallback if Oracle's
+  free-instance provisioning proves unreliable in practice. Frontend and backend run as
+  separate containers via Docker Compose (mirroring v1's `docker-compose.prod.yml`
+  shape), talking to each other over the compose network, with Postgres as a third
+  container. `petri.nachiketnasa.com` points at the VPS; since it's a VPS the domain
+  costs nothing extra either way. The backend being API-first (already the case for the
+  OpenAPI contract) is what keeps a later native mobile app possible without a backend
+  rewrite.
+- **Session storage**, **email**, and **cookies**: see "Authentication" above.
 
 ## Technical plan
 

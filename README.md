@@ -115,7 +115,9 @@ Two-factor authentication is optional, off by default, and uses a standard
 authenticator app of the user's choice (Google Authenticator, Authy, 1Password, and
 the like) rather than SMS, a genuinely free addition since TOTP is an open protocol
 with no carrier cost behind it. Turning it on shows a QR code and a set of one-time
-recovery codes.
+recovery codes. The only cookies the site sets are strictly necessary ones (sign-in,
+security), disclosed with a simple notice rather than a cookie-category picker, since
+there's nothing optional to pick between.
 
 ### Settings
 Theme (a choice of four: Petri Light, Petri Dark, Solarized Light, Solarized Dark,
@@ -152,6 +154,13 @@ criterion, and explicit non-goal, lives in [`_docs/specs.md`](_docs/specs.md). I
 - **Infra**: Cloudflare in front for DDoS mitigation and bot protection (Turnstile/
   reCAPTCHA) on auth forms; Web Push for the one notification type the product sends
   (Other task reminders).
+- **Hosting**: a single VPS (Oracle Cloud's Always Free tier, Hetzner as the paid
+  fallback), frontend and backend as separate Docker Compose containers talking to
+  each other, Postgres as a third. `petri.nachiketnasa.com` points at it.
+- **Sessions**: server-side, not JWT — an httpOnly cookie for the web client now, a
+  `Bearer` token for a native mobile app later, both backed by the same session store.
+- **Email**: Resend for now, behind a swappable interface so moving to Brevo or
+  Amazon SES later needs no rewrite.
 
 ## Project docs
 
