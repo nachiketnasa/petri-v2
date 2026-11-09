@@ -160,8 +160,16 @@ screen) are done; the OpenAPI contract and backend come next.
 
 ## Credits and disclaimers
 
-Petri's design borrows structure and language from a few outside frameworks, named
-here for attribution:
+**This project builds on prior work of my own.** Petri started as a homework
+submission for the AI DevTools Zoomcamp (the original: [nachiketnasa/petri](https://github.com/nachiketnasa/petri)).
+This repository is a deliberate v2: the same product idea, substantially redesigned
+and extended (goals and milestones, branching, Other tasks, a new design system, and
+more, as this document describes) rather than a copy resubmitted unchanged. It's
+noted here explicitly so the overlap with that earlier submission is never mistaken
+for undisclosed self-plagiarism.
+
+Petri's design also borrows structure and language from a few outside frameworks,
+named here for attribution:
 
 - The **PACT** methodology (Purposeful, Actionable, Continuous, Trackable), the term
   "tiny experiments," and the retro's what-worked/what-didn't/decision shape (which
