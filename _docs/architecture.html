@@ -109,7 +109,10 @@ text{font-family:var(--mono);fill:currentColor}
       The backend is the only thing that talks to Postgres. <b>Web Push is the one flow
       that reaches the browser directly</b> (via its own service worker), skipping
       Cloudflare and the API entirely once a device has subscribed, which is why it needs
-      its own trust boundary rather than riding the main request path.
+      its own trust boundary rather than riding the main request path. Two-factor
+      authentication adds no new box here on purpose: a TOTP code is checked against a
+      secret already sitting in Postgres, entirely inside the existing Backend ↔
+      PostgreSQL hop, no external service involved.
     </figcaption>
   </figure>
 
@@ -261,6 +264,7 @@ erDiagram
     USERS ||--o{ PUSH_SUBSCRIPTIONS : "registers"
     USERS ||--o{ COMMENTS : "writes"
     USERS ||--o{ LIKES : "gives"
+    USERS ||--o{ TOTP_RECOVERY_CODES : "has, if 2FA enabled"
     GOALS ||--o{ MILESTONES : "ordered list, one active"
     EXPERIMENTS ||--o{ CHECK_INS : "logs"
     MILESTONES ||--o{ CHECK_INS : "logs"
@@ -285,6 +289,13 @@ erDiagram
         bool sound_effects_enabled
         bool other_tasks_enabled
         text default_landing
+        text totp_secret "encrypted at rest, null until enrolled"
+        bool totp_enabled "false until one code is confirmed"
+    }
+    TOTP_RECOVERY_CODES {
+        uuid id PK
+        uuid user_id FK
+        text code_hash
     }
     AUTH_IDENTITIES {
         uuid id PK

@@ -111,13 +111,18 @@ password (email sign-up requires a verification code, and gets a real forgot-pas
 flow). Only one account exists per email address, no matter which method it was
 created with. Explicit logout, and full account deletion on request. The site sits
 behind Cloudflare for DDoS mitigation, and auth forms are protected against bots.
+Two-factor authentication is optional, off by default, and uses a standard
+authenticator app of the user's choice (Google Authenticator, Authy, 1Password, and
+the like) rather than SMS, a genuinely free addition since TOTP is an open protocol
+with no carrier cost behind it. Turning it on shows a QR code and a set of one-time
+recovery codes.
 
 ### Settings
 Theme (a choice of four: Petri Light, Petri Dark, Solarized Light, Solarized Dark,
 applied across the whole app and saved to the account), a sound effects toggle (short
 tones on starting or finishing setup, logging a check-in, and pausing or removing a
-cadence), the Other tasks feature toggle, the landing-screen preference, and account
-deletion.
+cadence), the Other tasks feature toggle, the landing-screen preference, two-factor
+authentication, and account deletion.
 
 ## Expected behavior
 
@@ -136,7 +141,8 @@ criterion, and explicit non-goal, lives in [`_docs/specs.md`](_docs/specs.md). I
 ## Tech stack
 
 - **Backend**: FastAPI (Python), OpenAPI-first — `openapi.yaml` is the contract every
-  endpoint is built and tested against.
+  endpoint is built and tested against. Two-factor auth uses `pyotp` (open source,
+  MIT licensed, no external service) for TOTP generation/verification.
 - **Data store**: PostgreSQL from the start, behind a repository interface so
   route/service code never depends on it directly.
 - **Frontend**: React 18 (no meta-framework), Vite, TypeScript, React Router for

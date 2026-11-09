@@ -22,7 +22,9 @@ milestones move through the five columns above, one at a time, in order.
 
 ## Core entities
 
-- **User**: account owner. Each user sees only their own board.
+- **User**: account owner. Each user sees only their own board. Optional two-factor
+  enrollment (a TOTP secret and a set of one-time recovery codes) lives on the user,
+  off by default.
 - **Experiment**: title, hypothesis, cadence (daily/weekly/custom interval, set at
   creation), start date, target duration, status (maps to column), optional pointer to
   a successor experiment (branch) and an optional pointer to the goal it evolved into,
@@ -181,6 +183,16 @@ app). The item's owner can delete any comment on their own page.
   address.
 - The site sits behind **Cloudflare** for DDoS mitigation, and auth forms are protected
   by **Cloudflare Turnstile or reCAPTCHA** against bots.
+- **Optional two-factor authentication**, off by default, turned on from Settings:
+  standard TOTP (RFC 6238) codes from an authenticator app of the user's choice (Google
+  Authenticator, Authy, 1Password, etc.), not SMS. This is a genuinely free addition —
+  TOTP is an open protocol with no SMS carrier or third-party verification cost — so it
+  carries no caveat the way Apple Sign In does. Enabling it shows a QR code (and the
+  secret as text, for apps that can't scan) and requires one correct code to confirm
+  before it actually turns on. A set of one-time recovery codes is generated at the same
+  time, shown once, so losing the authenticator device doesn't lock the user out
+  permanently. 2FA applies to email/password sign-in; OAuth sign-in defers to the
+  provider's own security (Google/LinkedIn/Microsoft already offer their own 2FA).
 - Explicit **logout**. Sessions expire; this isn't left implicit.
 - **Account deletion** removes the user's board, check-ins, retros, other tasks, and
   their own comments elsewhere.
@@ -222,6 +234,7 @@ moodboard/reference images pulled from other designers' work.
 14. As a user, I can turn sharing off, which clears likes/comments and invalidates the old link.
 15. As a user, I can pick a theme in Settings that applies everywhere.
 16. As a user, I can delete my account or just log out.
+17. As a user, I can turn on two-factor authentication with my own authenticator app, get recovery codes, and be asked for a code at sign-in from then on.
 
 ## Acceptance criteria (examples)
 
@@ -235,6 +248,8 @@ moodboard/reference images pulled from other designers' work.
 - The share link uses an unguessable token, not a sequential ID; disabling and re-enabling sharing issues a new token and resets likes/comments to zero.
 - Liking or commenting requires auth; viewing a shared page does not.
 - Signing up with an email already registered under a different method never reveals that method on screen, only by email to that address.
+- Enabling 2FA requires one correct TOTP code before it actually turns on; it isn't considered enabled off the QR code alone.
+- A recovery code can be used exactly once; using one invalidates it immediately.
 - A day's total (other tasks + check-ins + current milestone cadence) past 8 shows the warning; it never blocks the user from proceeding.
 - The month calendar always renders complete weeks (Monday start), including faded days from the adjacent month.
 - Every evolve or branch operation writes a pointer on both the source and the result, even though no diagram view reads it yet.
@@ -242,6 +257,7 @@ moodboard/reference images pulled from other designers' work.
 ## Non-goals (v2)
 
 - No Apple Sign In (cost).
+- No SMS-based 2FA (per-message carrier cost, and SIM-swap risk besides) — authenticator-app TOTP only.
 - No email notifications anywhere in the app except auth (verification codes, password reset, the "already registered elsewhere" notice). Other tasks use Web Push, nothing else gets push or email.
 - No streak freezes, streak purchases, or social/friend streak features.
 - No native mobile app in this phase — web only, kept API-first so one can follow later.
@@ -258,7 +274,8 @@ moodboard/reference images pulled from other designers' work.
 - **Frontend**: React 18, plain (no meta-framework), built with Vite, written in
   TypeScript. Routing via React Router. Tests with Vitest and React Testing Library.
   Same choice v1 used, carried forward.
-- **Backend**: FastAPI (Python), OpenAPI-first.
+- **Backend**: FastAPI (Python), OpenAPI-first. Two-factor auth via `pyotp`
+  (open source, MIT licensed, no external service — plain RFC 6238 TOTP).
 - **Data store**: PostgreSQL from the start, behind a repository interface.
 - **Runtime**: Node.js **24 LTS, pinned to ≥24.22.1** — the patched line from the
   October 21, 2026 Node.js security release, which fixed a critical Brotli-decoder

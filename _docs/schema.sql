@@ -26,6 +26,15 @@ create table users (
   other_tasks_enabled   boolean not null default false,
   default_landing       text not null default 'greeting'
                          check (default_landing in ('greeting','dashboard')),
+
+  -- two-factor auth: off by default; totp_secret is set as soon as the user starts
+  -- enrollment, but totp_enabled only flips to true once they've confirmed one
+  -- correct code (see specs.md "Authentication"). Encrypt totp_secret at the
+  -- application layer before it lands here — this column stores ciphertext, not a
+  -- plaintext secret.
+  totp_secret  text,
+  totp_enabled boolean not null default false,
+
   created_at            timestamptz not null default now(),
   deleted_at            timestamptz -- account deletion is a hard delete; see cascades below
 );
@@ -69,6 +78,17 @@ create table sessions (
   revoked_at timestamptz -- set on explicit logout
 );
 create index sessions_user_id_idx on sessions(user_id);
+
+-- One-time 2FA recovery codes, generated as a batch when TOTP is first confirmed.
+-- A code is deleted (not just flagged) once used, so "still present" is itself the
+-- unused check — no separate used_at column to keep in sync.
+create table totp_recovery_codes (
+  id         uuid primary key default gen_random_uuid(),
+  user_id    uuid not null references users(id) on delete cascade,
+  code_hash  text not null,
+  created_at timestamptz not null default now()
+);
+create index totp_recovery_codes_user_idx on totp_recovery_codes(user_id);
 
 -- ─── Experiments, goals, milestones ─────────────────────────────────────────
 
