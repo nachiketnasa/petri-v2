@@ -26,11 +26,14 @@ as subagents and runs the lifecycle below. It does not groom, implement, or
 test itself. Full detail lives in `_docs/process.md`; this is the summary.
 
 1. Pick the next open issue from the backlog
-2. PM grooms it (never skipped)
-3. Engineer implements it (doesn't close it)
-4. QA verifies it — PASS or FAIL only, never fixes code
+2. PM grooms it — one unchecked checklist line at a time if the issue has
+   several, via a `## Groomed: ...` comment, not the whole issue at once
+3. Engineer implements exactly that groomed task (doesn't close the issue)
+4. QA verifies it against that same scope — PASS or FAIL only, never fixes code
 5. FAIL → back to step 3 with the QA comment as input
-6. PASS → the orchestrator closes the issue
+6. PASS → check off that checklist line, regenerate `_docs/backlog.md`
+   (`scripts/regenerate_backlog.py`), commit. Close the issue only once
+   every line on it is checked — most issues take several loops.
 7. Repeat until the backlog is empty
 
 The **UX Validator** sits outside this lifecycle — run it directly against
