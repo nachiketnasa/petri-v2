@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useParams } from 'react-router-dom'
 
 const BASE_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8000'
 
@@ -29,13 +30,10 @@ type CheckIn = {
   checked_in_at: string
 }
 
-type Props = {
-  experimentId: string
-}
-
 type ArchiveMode = 'retro' | 'abandon'
 
-function ExperimentDetail({ experimentId }: Props) {
+function ExperimentDetail() {
+  const { id: experimentId } = useParams<{ id: string }>()
   const [experiment, setExperiment] = useState<Experiment | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
 

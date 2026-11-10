@@ -1,17 +1,10 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 const BASE_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8000'
 
-type Experiment = {
-  id: string
-  title: string
-  cadence_type: string
-  cadence_days: number | null
-  status: string
-  target_days: number
-}
-
 function NewExperimentForm() {
+  const navigate = useNavigate()
   const [title, setTitle] = useState('')
   const [hypothesis, setHypothesis] = useState('')
   const [cadenceType, setCadenceType] = useState('')
@@ -21,7 +14,6 @@ function NewExperimentForm() {
   const [startDate, setStartDate] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [created, setCreated] = useState<Experiment | null>(null)
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -58,22 +50,10 @@ function NewExperimentForm() {
       .then(async (res) => {
         const data = await res.json()
         if (!res.ok) throw new Error(data.detail)
-        setCreated(data)
+        navigate('/dashboard')
       })
       .catch((err: Error) => setError(err.message))
       .finally(() => setSubmitting(false))
-  }
-
-  if (created) {
-    return (
-      <div>
-        <h3>Experiment created</h3>
-        <p>{created.title}</p>
-        <p>{created.cadence_type}</p>
-        <p>Status: {created.status}</p>
-        <p>Target days: {created.target_days}</p>
-      </div>
-    )
   }
 
   return (

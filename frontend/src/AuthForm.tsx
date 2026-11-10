@@ -12,14 +12,17 @@ type User = {
   created_at: string
 }
 
-function AuthForm() {
+type Props = {
+  onAuthenticated: (user: User) => void
+}
+
+function AuthForm({ onAuthenticated }: Props) {
   const [mode, setMode] = useState<Mode>('signup')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [displayName, setDisplayName] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [user, setUser] = useState<User | null>(null)
 
   function toggleMode() {
     setMode((m) => (m === 'signup' ? 'signin' : 'signup'))
@@ -27,7 +30,6 @@ function AuthForm() {
     setPassword('')
     setDisplayName('')
     setError(null)
-    setUser(null)
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -50,14 +52,10 @@ function AuthForm() {
       .then(async (res) => {
         const data = await res.json()
         if (!res.ok) throw new Error(data.detail)
-        setUser(data)
+        onAuthenticated(data)
       })
       .catch((err: Error) => setError(err.message))
       .finally(() => setLoading(false))
-  }
-
-  if (user) {
-    return <p>Signed in as {user.email}</p>
   }
 
   return (

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 
 const BASE_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8000'
 
@@ -23,20 +24,24 @@ function Dashboard() {
       .catch((err: Error) => setError(err.message))
   }, [])
 
-  if (error) return <p role="alert">{error}</p>
-  if (!experiments) return <p>Loading…</p>
-  if (experiments.length === 0) return <p>No experiments yet.</p>
-
   return (
-    <ul>
-      {experiments.map((experiment) => (
-        <li key={experiment.id}>
-          <p>{experiment.title}</p>
-          <p>{experiment.cadence_type}</p>
-          <p>{experiment.status}</p>
-        </li>
-      ))}
-    </ul>
+    <div>
+      <Link to="/experiments/new">New experiment</Link>
+      {error && <p role="alert">{error}</p>}
+      {!error && !experiments && <p>Loading…</p>}
+      {!error && experiments && experiments.length === 0 && <p>No experiments yet.</p>}
+      {!error && experiments && experiments.length > 0 && (
+        <ul>
+          {experiments.map((experiment) => (
+            <li key={experiment.id}>
+              <Link to={`/experiments/${experiment.id}`}>{experiment.title}</Link>
+              <p>{experiment.cadence_type}</p>
+              <p>{experiment.status}</p>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   )
 }
 

@@ -1,6 +1,17 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import ExperimentDetail from './ExperimentDetail'
+
+function renderDetail(id: string) {
+  return render(
+    <MemoryRouter initialEntries={[`/experiments/${id}`]}>
+      <Routes>
+        <Route path="/experiments/:id" element={<ExperimentDetail />} />
+      </Routes>
+    </MemoryRouter>,
+  )
+}
 
 const experiment = {
   id: 'exp-1',
@@ -32,7 +43,7 @@ describe('ExperimentDetail', () => {
       vi.fn().mockResolvedValue({ ok: true, json: async () => experiment }),
     )
 
-    render(<ExperimentDetail experimentId="exp-1" />)
+    renderDetail("exp-1")
 
     await waitFor(() => expect(screen.getByText('Drink more water')).toBeInTheDocument())
     expect(screen.getByText('I will feel better')).toBeInTheDocument()
@@ -53,7 +64,7 @@ describe('ExperimentDetail', () => {
       }),
     )
 
-    render(<ExperimentDetail experimentId="missing" />)
+    renderDetail("missing")
 
     await waitFor(() =>
       expect(screen.getByRole('alert')).toHaveTextContent('Experiment not found'),
@@ -75,7 +86,7 @@ describe('ExperimentDetail', () => {
       .mockResolvedValueOnce({ ok: true, status: 201, json: async () => checkIn })
     vi.stubGlobal('fetch', fetchMock)
 
-    render(<ExperimentDetail experimentId="exp-1" />)
+    renderDetail("exp-1")
     await waitFor(() => expect(screen.getByText('Drink more water')).toBeInTheDocument())
 
     fireEvent.change(screen.getByPlaceholderText('Note'), { target: { value: 'felt good' } })
@@ -101,7 +112,7 @@ describe('ExperimentDetail', () => {
       vi.fn().mockResolvedValue({ ok: true, json: async () => ({ ...experiment, status: 'backlog' }) }),
     )
 
-    render(<ExperimentDetail experimentId="exp-1" />)
+    renderDetail("exp-1")
 
     await waitFor(() => expect(screen.getByText('Drink more water')).toBeInTheDocument())
     expect(screen.queryByRole('button', { name: 'Log check-in' })).not.toBeInTheDocument()
@@ -121,7 +132,7 @@ describe('ExperimentDetail', () => {
       })
     vi.stubGlobal('fetch', fetchMock)
 
-    render(<ExperimentDetail experimentId="exp-1" />)
+    renderDetail("exp-1")
     await waitFor(() => expect(screen.getByText('Drink more water')).toBeInTheDocument())
 
     fireEvent.click(screen.getByRole('button', { name: 'Log check-in' }))
@@ -139,7 +150,7 @@ describe('ExperimentDetail', () => {
       .mockResolvedValueOnce({ ok: true, status: 200, json: async () => archived })
     vi.stubGlobal('fetch', fetchMock)
 
-    render(<ExperimentDetail experimentId="exp-1" />)
+    renderDetail("exp-1")
     await waitFor(() => expect(screen.getByText('Drink more water')).toBeInTheDocument())
 
     fireEvent.change(screen.getByPlaceholderText('What worked'), { target: { value: 'consistency' } })
@@ -169,7 +180,7 @@ describe('ExperimentDetail', () => {
       .mockResolvedValueOnce({ ok: true, status: 200, json: async () => archived })
     vi.stubGlobal('fetch', fetchMock)
 
-    render(<ExperimentDetail experimentId="exp-1" />)
+    renderDetail("exp-1")
     await waitFor(() => expect(screen.getByText('Drink more water')).toBeInTheDocument())
 
     fireEvent.click(screen.getByRole('button', { name: 'Switch to abandon early' }))
@@ -191,7 +202,7 @@ describe('ExperimentDetail', () => {
     const fetchMock = vi.fn().mockResolvedValueOnce({ ok: true, json: async () => experiment })
     vi.stubGlobal('fetch', fetchMock)
 
-    render(<ExperimentDetail experimentId="exp-1" />)
+    renderDetail("exp-1")
     await waitFor(() => expect(screen.getByText('Drink more water')).toBeInTheDocument())
 
     fireEvent.change(screen.getByPlaceholderText('What worked'), { target: { value: 'consistency' } })
@@ -212,7 +223,7 @@ describe('ExperimentDetail', () => {
       })
     vi.stubGlobal('fetch', fetchMock)
 
-    render(<ExperimentDetail experimentId="exp-1" />)
+    renderDetail("exp-1")
     await waitFor(() => expect(screen.getByText('Drink more water')).toBeInTheDocument())
 
     fireEvent.change(screen.getByPlaceholderText('What worked'), { target: { value: 'consistency' } })

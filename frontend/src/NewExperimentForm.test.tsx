@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import NewExperimentForm from './NewExperimentForm'
 
 const created = {
@@ -18,13 +19,24 @@ function fillRequiredFields() {
   fireEvent.change(screen.getByPlaceholderText('Target days'), { target: { value: '30' } })
 }
 
+function renderForm() {
+  return render(
+    <MemoryRouter initialEntries={['/experiments/new']}>
+      <Routes>
+        <Route path="/experiments/new" element={<NewExperimentForm />} />
+        <Route path="/dashboard" element={<p>Dashboard view</p>} />
+      </Routes>
+    </MemoryRouter>,
+  )
+}
+
 describe('NewExperimentForm', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
     cleanup()
   })
 
-  it('submits the required fields and shows the created experiment on success', async () => {
+  it('submits the required fields and navigates to the dashboard on success', async () => {
     const fetchMock = vi.fn().mockResolvedValueOnce({
       ok: true,
       status: 201,
@@ -32,13 +44,11 @@ describe('NewExperimentForm', () => {
     })
     vi.stubGlobal('fetch', fetchMock)
 
-    render(<NewExperimentForm />)
+    renderForm()
     fillRequiredFields()
     fireEvent.click(screen.getByRole('button', { name: 'Create experiment' }))
 
-    await waitFor(() => expect(screen.getByText('Experiment created')).toBeInTheDocument())
-    expect(screen.getByText('Drink more water')).toBeInTheDocument()
-    expect(screen.getByText('Status: active')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByText('Dashboard view')).toBeInTheDocument())
 
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining('/experiments'),
@@ -59,7 +69,7 @@ describe('NewExperimentForm', () => {
     const fetchMock = vi.fn()
     vi.stubGlobal('fetch', fetchMock)
 
-    render(<NewExperimentForm />)
+    renderForm()
     fillRequiredFields()
     fireEvent.change(screen.getByPlaceholderText('Cadence type'), { target: { value: 'custom' } })
     fireEvent.click(screen.getByRole('button', { name: 'Create experiment' }))
@@ -76,7 +86,7 @@ describe('NewExperimentForm', () => {
     })
     vi.stubGlobal('fetch', fetchMock)
 
-    render(<NewExperimentForm />)
+    renderForm()
     fillRequiredFields()
     fireEvent.click(screen.getByRole('button', { name: 'Create experiment' }))
 

@@ -1,4 +1,5 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import Dashboard from './Dashboard'
 
@@ -20,7 +21,7 @@ describe('Dashboard', () => {
       }),
     )
 
-    render(<Dashboard />)
+    render(<Dashboard />, { wrapper: MemoryRouter })
 
     await waitFor(() => expect(screen.getByText('Cold showers')).toBeInTheDocument())
     expect(screen.getByText('daily')).toBeInTheDocument()
@@ -43,7 +44,7 @@ describe('Dashboard', () => {
       }),
     )
 
-    render(<Dashboard />)
+    render(<Dashboard />, { wrapper: MemoryRouter })
 
     await waitFor(() =>
       expect(screen.getByText('No experiments yet.')).toBeInTheDocument(),
@@ -60,7 +61,7 @@ describe('Dashboard', () => {
       }),
     )
 
-    render(<Dashboard />)
+    render(<Dashboard />, { wrapper: MemoryRouter })
 
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Not authenticated'))
   })
