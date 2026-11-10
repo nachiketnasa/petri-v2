@@ -338,7 +338,7 @@ Split out while auditing #2's full scope against its MVP checklist.
 
 ## order-05 · #4 — Experiments: CRUD + lifecycle + check-ins + retro gate
 
-- **Status**: CLOSED
+- **Status**: OPEN
 - **Labels**: backend
 - **Link**: https://github.com/nachiketnasa/petri-v2/issues/4
 
@@ -419,6 +419,54 @@ Auditing #4's Implementation tasks checklist against its own top-level AC (same 
 - Any backend endpoint change beyond adding a computed field (if that's the path chosen) — no new persisted column, no migration.
 
 Ref: `_docs/specs.md` → Board model (item 3).
+
+---
+
+## order-05c · #28 — Check-ins: no GET endpoint to list an experiment's check-in history
+
+- **Status**: OPEN
+- **Labels**: backend
+- **Link**: https://github.com/nachiketnasa/petri-v2/issues/28
+
+## What
+
+`openapi.yaml` only has `POST /experiments/{id}/check-ins` (create). There is
+no `GET /experiments/{id}/check-ins` (or any other route) that returns the
+list of check-ins already logged for an experiment. `GET /experiments/{id}`
+returns only the `Experiment` schema — it has no `check_ins` field.
+
+**Label note:** this should carry an `order-05c` label (slots right after
+#26/#27, which are `order-05`/`order-05b`), but that label doesn't exist yet
+and this session couldn't create it. Tagged `order-05` for now — please
+create `order-05c` and move this issue to it, then regenerate
+`_docs/backlog.md`.
+
+## Why it's split out
+
+Noticed while grooming #4's "Frontend: experiment detail page + check-in
+form" checklist line. That task was asked to show "check-in history" on the
+detail page, but there is nothing in `openapi.yaml` or the repository
+interface to fetch it from — `repository.add_check_in` writes a check-in but
+nothing reads them back as a list. Inventing a history endpoint wasn't in
+scope for a frontend-only task, so the detail page instead shows only the
+check-in(s) made during the current browser session (from each successful
+`POST`'s own response body), not true persisted history across reloads.
+
+## Suggested acceptance criteria
+
+- [ ] A way to fetch an experiment's check-ins (e.g. `GET
+      /experiments/{id}/check-ins`, scoped to the signed-in owner, 404 for a
+      nonexistent/foreign id — same pattern as `GET /experiments/{id}`).
+- [ ] Added to `openapi.yaml` first, then implemented, per this repo's
+      contract-first workflow.
+- [ ] The frontend experiment detail page (#4) is updated to call it instead
+      of only showing same-session check-ins.
+
+## Out of scope
+
+- The check-in creation route and its Active-only gate — already on #4.
+
+Ref: `_docs/specs.md` → Core entities (check-ins).
 
 ---
 

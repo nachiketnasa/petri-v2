@@ -19,11 +19,15 @@ Lifecycle
 3. Engineer implements it
 4. QA verifies it
 5. On FAIL, back to step 3 with the QA comment as input
-6. On PASS: check off the groomed checklist line on the issue (if PM
-   groomed one line rather than the whole issue), regenerate
-   `_docs/backlog.md` with `scripts/regenerate_backlog.py`, and commit.
-   Close the issue only once every line/criterion on it is checked —
-   most issues take several passes through this loop before that's true.
+6. On PASS: check the issue is still OPEN before anything else — a
+   commit using a GitHub closing keyword (`Fix #4`, `Closes #4`, etc.)
+   auto-closes it on push regardless of how much is actually done; if so,
+   reopen it immediately. Then check off the groomed checklist line on
+   the issue (if PM groomed one line rather than the whole issue),
+   regenerate `_docs/backlog.md` with `scripts/regenerate_backlog.py`,
+   and commit. Close the issue only once every line/criterion on it is
+   checked — most issues take several passes through this loop before
+   that's true.
 7. Before moving to the next order number: if this pass named anything
    as out of scope or deferred (per PM's rule below), check it already
    has an `order-NN` (or lettered `order-NNx`) label somewhere. If not,
