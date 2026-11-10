@@ -524,7 +524,7 @@ Ref: `_docs/specs.md` → Landing screen and dashboard, Streaks.
 
 ## Implementation tasks (MVP slice)
 
-- [ ] Frontend: dashboard card grid listing the signed-in user's experiments (MVP: list + stage only, filters/streak/ratio tiles can follow once data exists).
+- [x] Frontend: dashboard card grid listing the signed-in user's experiments (MVP: list + stage only, filters/streak/ratio tiles can follow once data exists).
 
 ---
 
