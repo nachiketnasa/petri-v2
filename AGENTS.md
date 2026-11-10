@@ -11,7 +11,7 @@ of rules that apply everywhere.
 | [`_docs/specs.md`](_docs/specs.md) | The product spec: entities, user stories, acceptance criteria, non-goals, tech stack, technical plan. Read this before touching behavior. |
 | [`_docs/architecture.html`](_docs/architecture.html) | Data flow diagram, backend layering, core entity/lineage relationships. |
 | [`_docs/schema.sql`](_docs/schema.sql) | The PostgreSQL schema, verified against a real `postgres:16` instance. |
-| [`_docs/backlog.md`](_docs/backlog.md) | Generated snapshot of the [issue tracker](https://github.com/nachiketnasa/petri-v2/issues), sorted by each issue's `order-NN` label — build order, not issue-number order. Regenerate it, don't hand-edit it; give any new issue an `order-NN` label before filing it. |
+| [`_docs/backlog.md`](_docs/backlog.md) | Generated snapshot of the [issue tracker](https://github.com/nachiketnasa/petri-v2/issues), sorted by each issue's `order-NN` label — build order, not issue-number order. Run `python3 scripts/regenerate_backlog.py` after any issue change; don't hand-edit the file. Give any new issue an `order-NN` label before filing it. |
 | [`_docs/process.md`](_docs/process.md) | The team roles, the orchestrator, and the PM → Engineer → QA lifecycle every issue goes through. |
 | [`_docs/team/pm.md`](_docs/team/pm.md) | The PM role: grooms an issue into `_docs/task-template.md`'s shape before anyone implements it. |
 | [`_docs/team/software-engineer.md`](_docs/team/software-engineer.md) | The Engineer role: implements one groomed issue, writes tests, does not close it. |

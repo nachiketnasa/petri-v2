@@ -2,7 +2,7 @@
 
 A local mirror of the public task tracker: https://github.com/nachiketnasa/petri-v2/issues
 
-Generated from the tracker on 2026-11-11. The tracker is the source of truth; this file is a readable snapshot committed alongside the spec, not edited independently — re-generate it instead of hand-editing when issues change.
+Generated from the tracker on 2026-11-11. The tracker is the source of truth; this file is a readable snapshot committed alongside the spec, not edited independently — regenerate it with `scripts/regenerate_backlog.py` instead of hand-editing when issues change.
 
 **Listed in build order, not issue-number order.** Each issue carries an `order-NN` label marking when work on it should start; issues sharing a number are meant to start together (e.g. the two project-setup scaffolds). Give any new issue an `order-NN` label before filing it, placed at the point in the sequence where it belongs — otherwise it sorts last, below. Issues #1, #16, and #17 span the whole product (the contract and the two test suites), so their own Acceptance criteria is a checklist of the other issues that complete them, not a bounded task on its own.
 
