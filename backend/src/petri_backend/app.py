@@ -1,11 +1,11 @@
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from petri_backend.repository import Repository, User
+from petri_backend.repository import Experiment, Repository, User
 from petri_backend.repository_memory import InMemoryRepository
 from petri_backend.security import (
     hash_password,
@@ -68,6 +68,54 @@ class ForgotPasswordRequest(BaseModel):
 class ResetPasswordRequest(BaseModel):
     token: str
     password: str
+
+
+class CreateExperimentRequest(BaseModel):
+    title: str
+    hypothesis: str
+    cadence_type: str
+    cadence_days: int | None = None
+    check_in_kind: str | None = None
+    start_date: date | None = None
+    target_days: int
+
+
+class ExperimentOut(BaseModel):
+    id: str
+    user_id: str
+    title: str
+    hypothesis: str
+    cadence_type: str
+    cadence_days: int | None
+    check_in_kind: str
+    start_date: date
+    target_days: int
+    status: str
+    ended_early: bool
+    abandon_reason: str | None
+    created_at: datetime
+    updated_at: datetime
+    archived_at: datetime | None
+
+    @classmethod
+    def from_experiment(cls, experiment: Experiment) -> "ExperimentOut":
+        return cls(
+            id=experiment.id,
+            user_id=experiment.user_id,
+            title=experiment.title,
+            hypothesis=experiment.hypothesis,
+            cadence_type=experiment.cadence_type,
+            cadence_days=experiment.cadence_days,
+            check_in_kind=experiment.check_in_kind,
+            start_date=experiment.start_date,
+            target_days=experiment.target_days,
+            status=experiment.status,
+            ended_early=experiment.ended_early,
+            abandon_reason=experiment.abandon_reason,
+            created_at=experiment.created_at,
+            updated_at=experiment.updated_at,
+            archived_at=experiment.archived_at,
+        )
 
 
 class UserOut(BaseModel):
@@ -171,3 +219,28 @@ def reset_password(
             del _sessions[session_token]
 
     return {"status": "ok"}
+
+
+@app.post("/experiments", status_code=201, response_model=ExperimentOut)
+def create_experiment(
+    body: CreateExperimentRequest,
+    current_user: User = Depends(get_current_user),
+    repository: Repository = Depends(get_repository),
+) -> ExperimentOut:
+    # check_in_kind isn't required by CreateExperimentRequest in openapi.yaml,
+    # but the Experiment dataclass has no default - default it to "boolean" here.
+    if body.cadence_type == "custom" and body.cadence_days is None:
+        raise HTTPException(
+            status_code=400, detail="cadence_days is required when cadence_type is 'custom'."
+        )
+    experiment = repository.create_experiment(
+        user_id=current_user.id,
+        title=body.title,
+        hypothesis=body.hypothesis,
+        cadence_type=body.cadence_type,
+        cadence_days=body.cadence_days,
+        check_in_kind=body.check_in_kind or "boolean",
+        start_date=body.start_date or datetime.now(timezone.utc).date(),
+        target_days=body.target_days,
+    )
+    return ExperimentOut.from_experiment(experiment)
