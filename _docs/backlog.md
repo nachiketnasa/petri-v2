@@ -578,7 +578,7 @@ Ref: `_docs/specs.md` → Technical plan, `_docs/schema.sql`, `_docs/architectur
 
 ## order-08c · #30 — Wire frontend into one signed-in app flow (router + shared auth state)
 
-- **Status**: OPEN
+- **Status**: CLOSED
 - **Labels**: frontend
 - **Link**: https://github.com/nachiketnasa/petri-v2/issues/30
 
@@ -609,31 +609,31 @@ task anywhere -- this is that concrete task.
 
 ## Acceptance criteria
 
-- [ ] A router is installed (react-router-dom -- the one deliberate new
+- [x] A router is installed (react-router-dom -- the one deliberate new
       dependency this task adds) with at least these routes: a
       signed-out view (shows AuthForm), a dashboard view (Dashboard),
       an experiment detail view reading its id from the URL (not a
       hardcoded prop), and some way to reach NewExperimentForm from the
       dashboard (a route or a toggle -- implementer's call, state it).
-- [ ] A shared auth state (minimal context, no new state-management
+- [x] A shared auth state (minimal context, no new state-management
       dependency) tracks whether the user is signed in, derived once
       (e.g. a `/auth/me`-equivalent check on load -- check whether such
       an endpoint exists in openapi.yaml; if not, deciding how to derive
       "am I signed in" cheaply is part of this task) and updated on
       sign-in/sign-out, so Dashboard/ExperimentDetail don't each
       independently discover auth state via a failed fetch.
-- [ ] Signing in via AuthForm transitions to the dashboard view and
+- [x] Signing in via AuthForm transitions to the dashboard view and
       Dashboard's list is fetched with the now-valid session.
-- [ ] Clicking a Dashboard card navigates to that experiment's real
+- [x] Clicking a Dashboard card navigates to that experiment's real
       detail page (via its real id, through the router), not a
       hardcoded id.
-- [ ] Creating an experiment via NewExperimentForm returns the user to
+- [x] Creating an experiment via NewExperimentForm returns the user to
       (or otherwise updates) the dashboard view, and the new experiment
       appears in the list without a manual page reload.
-- [ ] The leftover Vite scaffold content (hero images, counter button,
+- [x] The leftover Vite scaffold content (hero images, counter button,
       "Explore Vite"/docs/social sections) is removed from App.tsx --
       this is the actual product now, not the starter template.
-- [ ] Existing component-level tests for AuthForm/Dashboard/
+- [x] Existing component-level tests for AuthForm/Dashboard/
       ExperimentDetail/NewExperimentForm still pass unmodified in their
       standalone form where reasonable; new integration-level tests
       (Vitest + RTL) cover at least: sign up -> land on dashboard,
