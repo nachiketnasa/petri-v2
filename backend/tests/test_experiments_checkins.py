@@ -82,18 +82,9 @@ def test_check_in_rejected_for_non_active_status(
     assert response.status_code == 400
 
 
-def test_check_in_404_for_nonexistent_experiment(client: TestClient):
-    token = _signup_and_login(client, email="user@example.com")
-
-    response = client.post(
-        "/experiments/does-not-exist/check-ins",
-        cookies={"session_id": token},
-        json={},
-    )
-    assert response.status_code == 404
-
-
-def test_check_in_404_for_another_users_experiment(client: TestClient, repo: InMemoryRepository):
+def test_check_in_404_identical_for_nonexistent_and_other_users_id(
+    client: TestClient, repo: InMemoryRepository
+):
     token_owner = _signup_and_login(client, email="owner@example.com")
     experiment = _create_experiment(client, token_owner)
     repo.update_experiment(
@@ -101,12 +92,21 @@ def test_check_in_404_for_another_users_experiment(client: TestClient, repo: InM
     )
 
     token_other = _signup_and_login(client, email="other@example.com")
-    response = client.post(
+
+    response_other_user = client.post(
         f"/experiments/{experiment['id']}/check-ins",
         cookies={"session_id": token_other},
         json={},
     )
-    assert response.status_code == 404
+    response_nonexistent = client.post(
+        "/experiments/does-not-exist/check-ins",
+        cookies={"session_id": token_other},
+        json={},
+    )
+
+    assert response_other_user.status_code == 404
+    assert response_nonexistent.status_code == 404
+    assert response_other_user.json() == response_nonexistent.json()
 
 
 def test_check_in_unauthenticated_returns_401(client: TestClient):
@@ -134,32 +134,54 @@ def test_check_in_defaults_checked_in_at_to_utc_now(client: TestClient, repo: In
     assert before <= checked_in_at <= after
 
 
-def test_add_check_in_raises_value_error_for_mismatched_user_and_route_maps_to_404(
-    client: TestClient, repo: InMemoryRepository
+def test_repository_add_check_in_raises_value_error_for_mismatched_user(
+    repo: InMemoryRepository, client: TestClient
 ):
+    # Repository-level confirmation of #14's documented behavior:
+    # add_check_in raises ValueError when the experiment doesn't exist for
+    # the given user (as opposed to the None-returning get_experiment).
     token_owner = _signup_and_login(client, email="owner@example.com")
     experiment = _create_experiment(client, token_owner)
     repo.update_experiment(
         experiment_id=experiment["id"], user_id=experiment["user_id"], status="active"
     )
 
-    token_other = _signup_and_login(client, email="other@example.com")
-    other_user_id = repo.get_user_by_email(email="other@example.com").id
+    _signup_and_login(client, email="other@example.com")
+    other_user = repo.get_user_by_email(email="other@example.com")
 
-    # Repository layer: add_check_in raises ValueError for a mismatched user
-    # (per #14), confirmed directly against the repository.
     with pytest.raises(ValueError):
         repo.add_check_in(
             experiment_id=experiment["id"],
-            user_id=other_user_id,
+            user_id=other_user.id,
             checked_in_at=datetime.now(timezone.utc),
         )
 
-    # Route layer: the pre-check via get_experiment already turns this into
-    # a 404 before add_check_in would ever be called with a mismatched user.
+
+def test_check_in_route_maps_repository_value_error_to_404(
+    client: TestClient, repo: InMemoryRepository, monkeypatch: pytest.MonkeyPatch
+):
+    # The route's get_experiment pre-check uses the identical existence/
+    # ownership check as add_check_in's internal check, so a mismatched user
+    # or nonexistent id never reaches add_check_in - that path is already
+    # covered by the pre-check's own 404 tests. To actually drive execution
+    # through the route's `except ValueError` branch, bypass the pre-check
+    # by making add_check_in itself raise, for an experiment that *passes*
+    # the pre-check (owned, active).
+    token = _signup_and_login(client, email="user@example.com")
+    experiment = _create_experiment(client, token)
+    repo.update_experiment(
+        experiment_id=experiment["id"], user_id=experiment["user_id"], status="active"
+    )
+
+    def _raise_value_error(**kwargs):
+        raise ValueError("simulated repository failure")
+
+    monkeypatch.setattr(repo, "add_check_in", _raise_value_error)
+
     response = client.post(
         f"/experiments/{experiment['id']}/check-ins",
-        cookies={"session_id": token_other},
+        cookies={"session_id": token},
         json={},
     )
     assert response.status_code == 404
+    assert response.json() == {"detail": "Experiment not found."}
