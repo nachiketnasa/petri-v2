@@ -108,3 +108,14 @@ def login(
     _sessions[token] = user.id
     response.set_cookie(SESSION_COOKIE_NAME, token, httponly=True)
     return UserOut.from_user(user)
+
+
+@app.post("/auth/logout", status_code=204)
+def logout(
+    request: Request,
+    response: Response,
+    current_user: User = Depends(get_current_user),
+) -> None:
+    token = request.cookies.get(SESSION_COOKIE_NAME)
+    _sessions.pop(token, None)
+    response.delete_cookie(SESSION_COOKIE_NAME)
