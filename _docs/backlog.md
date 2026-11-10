@@ -547,7 +547,7 @@ Ref: `_docs/specs.md` → Creating an experiment or a goal.
 
 ## Implementation tasks (MVP slice)
 
-- [ ] Frontend: plain new-experiment form (hypothesis, cadence, target duration) wired to `POST /experiments`. The multi-step wizard + side progress rail is a follow-up polish pass once the fields and the request round-trip work.
+- [x] Frontend: plain new-experiment form (hypothesis, cadence, target duration) wired to `POST /experiments`. The multi-step wizard + side progress rail is a follow-up polish pass once the fields and the request round-trip work.
 
 ---
 
