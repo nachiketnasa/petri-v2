@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.exceptions import RequestValidationError
@@ -7,7 +7,12 @@ from pydantic import BaseModel
 
 from petri_backend.repository import Repository, User
 from petri_backend.repository_memory import InMemoryRepository
-from petri_backend.security import hash_password, new_session_token, verify_password
+from petri_backend.security import (
+    hash_password,
+    new_reset_token,
+    new_session_token,
+    verify_password,
+)
 
 app = FastAPI()
 
@@ -16,7 +21,11 @@ _repository: Repository = InMemoryRepository()
 # ponytail: module-level dict, no TTL/expiry (that's #20); fine for in-memory MVP.
 _sessions: dict[str, str] = {}
 
+# ponytail: module-level dict, no persistence; fine for in-memory MVP.
+_reset_tokens: dict[str, tuple[str, datetime]] = {}
+
 SESSION_COOKIE_NAME = "session_id"
+RESET_TOKEN_TTL = timedelta(minutes=15)
 
 
 def get_repository() -> Repository:
@@ -49,6 +58,15 @@ class SignupRequest(BaseModel):
 
 class LoginRequest(BaseModel):
     email: str
+    password: str
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
     password: str
 
 
@@ -119,3 +137,37 @@ def logout(
     token = request.cookies.get(SESSION_COOKIE_NAME)
     _sessions.pop(token, None)
     response.delete_cookie(SESSION_COOKIE_NAME)
+
+
+@app.post("/auth/forgot-password")
+def forgot_password(
+    body: ForgotPasswordRequest, repository: Repository = Depends(get_repository)
+) -> dict[str, str]:
+    user = repository.get_user_by_email(email=body.email)
+    if user is not None:
+        token = new_reset_token()
+        _reset_tokens[token] = (user.id, datetime.now(timezone.utc) + RESET_TOKEN_TTL)
+        print(f"PASSWORD_RESET_TOKEN email={user.email} token={token}")
+    # Always the same response, registered or not - no email enumeration.
+    return {"status": "ok"}
+
+
+@app.post("/auth/reset-password")
+def reset_password(
+    body: ResetPasswordRequest, repository: Repository = Depends(get_repository)
+) -> dict[str, str]:
+    entry = _reset_tokens.pop(body.token, None)  # one-time use: gone either way.
+    if entry is None:
+        raise HTTPException(status_code=400, detail="Invalid or expired token.")
+
+    user_id, expires_at = entry
+    user = repository.get_user_by_id(user_id=user_id)
+    if datetime.now(timezone.utc) > expires_at or user is None:
+        raise HTTPException(status_code=400, detail="Invalid or expired token.")
+
+    user.password_hash = hash_password(body.password)
+    for session_token, session_user_id in list(_sessions.items()):
+        if session_user_id == user_id:
+            del _sessions[session_token]
+
+    return {"status": "ok"}

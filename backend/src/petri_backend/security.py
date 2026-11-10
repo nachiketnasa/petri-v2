@@ -32,3 +32,7 @@ def verify_password(password: str, password_hash: str) -> bool:
 
 def new_session_token() -> str:
     return secrets.token_urlsafe(32)
+
+
+def new_reset_token() -> str:
+    return secrets.token_urlsafe(32)
