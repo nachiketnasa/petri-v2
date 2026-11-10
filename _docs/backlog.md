@@ -2,7 +2,7 @@
 
 A local mirror of the public task tracker: https://github.com/nachiketnasa/petri-v2/issues
 
-Generated from the tracker on 2026-11-10. The tracker is the source of truth; this file is a readable snapshot committed alongside the spec, not edited independently — re-generate it instead of hand-editing when issues change.
+Generated from the tracker on 2026-11-11. The tracker is the source of truth; this file is a readable snapshot committed alongside the spec, not edited independently — re-generate it instead of hand-editing when issues change.
 
 ## #1 — OpenAPI contract: define openapi.yaml
 
@@ -362,7 +362,7 @@ Ref: `_docs/specs.md` → Technical plan, step 8.
 
 ## Implementation tasks (MVP slice)
 
-- [ ] Project setup: backend scaffold managed with `uv`, `uv sync` installs dependencies, `uv run pytest` runs one trivial passing test.
+- [x] Project setup: backend scaffold managed with `uv`, `uv sync` installs dependencies, `uv run pytest` runs one trivial passing test.
 - [ ] `GET /health` endpoint + test — proves the app boots before any real endpoint is built.
 
 ---
@@ -385,7 +385,7 @@ Ref: `_docs/specs.md` → Tech stack, Technical plan step 8.
 
 ## Implementation tasks (MVP slice)
 
-- [ ] Project setup: frontend scaffold (inside `frontend/`), `npm install` installs dependencies, `npm test` runs one trivial passing Vitest test.
+- [x] Project setup: frontend scaffold (inside `frontend/`), `npm install` installs dependencies, `npm test` runs one trivial passing Vitest test.
 - [ ] Frontend project wired to the backend's `/health` endpoint (proves CORS/base-URL config before real UI work).
 
 ---
