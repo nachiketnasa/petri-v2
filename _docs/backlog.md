@@ -147,6 +147,37 @@ MVP note: OAuth and sign-up email verification are deferred past this slice; shi
 
 ---
 
+## order-04b · #20 — Auth: session expiration / TTL
+
+- **Status**: OPEN
+- **Labels**: backend, auth
+- **Link**: https://github.com/nachiketnasa/petri-v2/issues/20
+
+## What
+
+Issue #2's own Acceptance criteria says "sessions expire," but no checklist
+line on #2 covers automatic, time-based expiration — only manual logout
+(invalidating one session on request) is scheduled there. This issue is
+that gap: sessions created by sign-in (#2) should expire after some TTL
+even if the user never calls logout.
+
+Split out during grooming of "Backend: sign-in + session cookie, dependency
+to resolve current user" (see the `## Groomed:` comment on #2) because it
+depends on that task's session-store shape and is a separate piece of
+behavior from a single logout call.
+
+## Acceptance criteria
+
+- [ ] A session created by `POST /auth/login` stops being valid after a
+      defined TTL, even without a `POST /auth/logout` call.
+- [ ] A request using an expired session's cookie through `get_current_user`
+      (see #2) gets 401, same as an unknown/missing session.
+
+Ref: `_docs/specs.md` → Authentication; `_docs/team/pm.md` for grooming into
+the task template before implementation.
+
+---
+
 ## order-05 · #4 — Experiments: CRUD + lifecycle + check-ins + retro gate
 
 - **Status**: OPEN
