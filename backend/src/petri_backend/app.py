@@ -1,3 +1,4 @@
+import os
 from datetime import date, datetime, timedelta, timezone
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
@@ -7,6 +8,7 @@ from pydantic import BaseModel
 
 from petri_backend.repository import CheckIn, Experiment, Repository, User
 from petri_backend.repository_memory import InMemoryRepository
+from petri_backend.repository_postgres import PostgresRepository
 from petri_backend.security import (
     hash_password,
     new_reset_token,
@@ -29,6 +31,9 @@ RESET_TOKEN_TTL = timedelta(minutes=15)
 
 
 def get_repository() -> Repository:
+    database_url = os.environ.get("DATABASE_URL")
+    if database_url:
+        return PostgresRepository(database_url)
     return _repository
 
 
