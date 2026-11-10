@@ -118,6 +118,13 @@ class ExperimentOut(BaseModel):
         )
 
 
+class ArchiveExperimentRequest(BaseModel):
+    what_worked: str | None = None
+    what_didnt: str | None = None
+    decision: str | None = None
+    abandon_reason: str | None = None
+
+
 class CreateCheckInRequest(BaseModel):
     value_bool: bool | None = None
     value_rating: int | None = None
@@ -296,6 +303,68 @@ def get_experiment(
         # whether the id exists for someone else.
         raise HTTPException(status_code=404, detail="Experiment not found.")
     return ExperimentOut.from_experiment(experiment)
+
+
+@app.post("/experiments/{id}/archive", response_model=ExperimentOut)
+def archive_experiment(
+    id: str,
+    body: ArchiveExperimentRequest,
+    current_user: User = Depends(get_current_user),
+    repository: Repository = Depends(get_repository),
+) -> ExperimentOut:
+    experiment = repository.get_experiment(experiment_id=id, user_id=current_user.id)
+    if experiment is None:
+        # Same identical-404 treatment as GET /experiments/{id}.
+        raise HTTPException(status_code=404, detail="Experiment not found.")
+    if experiment.status not in ("active", "reflect"):
+        raise HTTPException(
+            status_code=400, detail="Experiment must be active or in reflect to archive."
+        )
+
+    is_retro = (
+        body.what_worked is not None
+        and body.what_didnt is not None
+        and body.decision is not None
+        and body.abandon_reason is None
+    )
+    is_abandon = (
+        body.abandon_reason is not None
+        and body.what_worked is None
+        and body.what_didnt is None
+        and body.decision is None
+    )
+    if not is_retro and not is_abandon:
+        raise HTTPException(
+            status_code=400,
+            detail="Must supply either a complete retro (what_worked, what_didnt, "
+            "decision) or an abandon_reason, not both or neither.",
+        )
+
+    if is_retro:
+        repository.add_retro(
+            experiment_id=id,
+            user_id=current_user.id,
+            what_worked=body.what_worked,
+            what_didnt=body.what_didnt,
+            decision=body.decision,
+        )
+        updated = repository.update_experiment(
+            experiment_id=id,
+            user_id=current_user.id,
+            status="archived",
+            ended_early=False,
+            archived_at=datetime.now(timezone.utc),
+        )
+    else:
+        updated = repository.update_experiment(
+            experiment_id=id,
+            user_id=current_user.id,
+            status="archived",
+            ended_early=True,
+            abandon_reason=body.abandon_reason,
+            archived_at=datetime.now(timezone.utc),
+        )
+    return ExperimentOut.from_experiment(updated)
 
 
 @app.post("/experiments/{id}/check-ins", status_code=201, response_model=CheckInOut)
