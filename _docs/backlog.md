@@ -367,6 +367,34 @@ Ref: `_docs/specs.md` → Board model, Core entities, Abandoning something early
 
 ---
 
+## order-05 · #26 — Check-ins: validate value_bool/value_rating against the experiment's check_in_kind
+
+- **Status**: OPEN
+- **Labels**: backend
+- **Link**: https://github.com/nachiketnasa/petri-v2/issues/26
+
+## What
+
+`openapi.yaml`'s `CreateCheckInRequest` allows both `value_bool` and `value_rating` as optional/nullable, with no constraint tying them to the owning experiment's `check_in_kind` (`"boolean"` or whatever rating kind is chosen at experiment creation, per `_docs/specs.md` → Core entities: "Structured field (done / not done, or a 1-5 rating, picked once per experiment ... at creation)").
+
+Right now nothing stops a client from POSTing `value_rating` on a boolean-kind experiment, or vice versa, or both, or neither.
+
+## Why it's split out
+
+Noticed while grooming #4's "log a check-in" checklist line. That task is scoped to the Active-only status gate; it doesn't touch kind-matching validation, which isn't called for by that checklist line, by `openapi.yaml` (no `oneOf`/conditional schema), or by the dataclass. Folding it in would widen that task's acceptance criteria beyond what it's meant to cover.
+
+## Suggested acceptance criteria
+
+- `check_in_kind == "boolean"`: `value_bool` required (or at least non-null), `value_rating` must be null/omitted → 400 otherwise.
+- `check_in_kind` is a rating kind: `value_rating` required, in range (spec says 1-5), `value_bool` must be null/omitted → 400 otherwise.
+- Decide and document the exact rejection shape (400, per the existing `CreateCheckInRequest` error response in `openapi.yaml`).
+
+## Out of scope
+
+- The Active-only status gate on check-ins — #4's own checklist line.
+
+---
+
 ## order-06 · #7 — Enforce work-in-progress limits (2 experiments + 1 goal)
 
 - **Status**: OPEN
