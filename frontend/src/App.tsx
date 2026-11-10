@@ -5,6 +5,7 @@ import viteLogo from './assets/vite.svg'
 import HealthStatus from './HealthStatus'
 import AuthForm from './AuthForm'
 import Dashboard from './Dashboard'
+import NewExperimentForm from './NewExperimentForm'
 import './App.css'
 
 function App() {
@@ -34,6 +35,7 @@ function App() {
         <HealthStatus />
         <AuthForm />
         <Dashboard />
+        <NewExperimentForm />
       </section>
 
       <div className="ticks"></div>
