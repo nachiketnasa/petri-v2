@@ -553,7 +553,7 @@ Ref: `_docs/specs.md` → Creating an experiment or a goal.
 
 ## order-08b · #14 — Backend data layer: Postgres + repository interface
 
-- **Status**: OPEN
+- **Status**: CLOSED
 - **Labels**: backend, infra
 - **Link**: https://github.com/nachiketnasa/petri-v2/issues/14
 
@@ -572,7 +572,7 @@ Ref: `_docs/specs.md` → Technical plan, `_docs/schema.sql`, `_docs/architectur
 ## Implementation tasks (MVP slice)
 
 - [x] Repository interface + in-memory implementation first — every later backend task is written against the interface, not a concrete store.
-- [ ] Swap in the Postgres implementation once the schema in `_docs/schema.sql` is wired up; no route/service changes, only a second implementation of the same interface.
+- [x] Swap in the Postgres implementation once the schema in `_docs/schema.sql` is wired up; no route/service changes, only a second implementation of the same interface.
 
 ---
 
