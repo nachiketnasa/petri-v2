@@ -1,21 +1,37 @@
 from datetime import datetime
 
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from petri_backend.repository import Repository, User
 from petri_backend.repository_memory import InMemoryRepository
-from petri_backend.security import hash_password
+from petri_backend.security import hash_password, new_session_token, verify_password
 
 app = FastAPI()
 
 _repository: Repository = InMemoryRepository()
 
+# ponytail: module-level dict, no TTL/expiry (that's #20); fine for in-memory MVP.
+_sessions: dict[str, str] = {}
+
+SESSION_COOKIE_NAME = "session_id"
+
 
 def get_repository() -> Repository:
     return _repository
+
+
+def get_current_user(
+    request: Request, repository: Repository = Depends(get_repository)
+) -> User:
+    session_id = request.cookies.get(SESSION_COOKIE_NAME)
+    user_id = _sessions.get(session_id) if session_id else None
+    user = repository.get_user_by_id(user_id=user_id) if user_id else None
+    if user is None:
+        raise HTTPException(status_code=401, detail="Not authenticated.")
+    return user
 
 
 @app.exception_handler(RequestValidationError)
@@ -29,6 +45,11 @@ class SignupRequest(BaseModel):
     password: str
     display_name: str
     timezone: str = "UTC"
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
 
 
 class UserOut(BaseModel):
@@ -66,4 +87,24 @@ def signup(
         display_name=body.display_name,
         timezone=body.timezone,
     )
+    return UserOut.from_user(user)
+
+
+@app.post("/auth/login", response_model=UserOut)
+def login(
+    body: LoginRequest,
+    response: Response,
+    repository: Repository = Depends(get_repository),
+) -> UserOut:
+    user = repository.get_user_by_email(email=body.email)
+    if (
+        user is None
+        or user.password_hash is None
+        or not verify_password(body.password, user.password_hash)
+    ):
+        raise HTTPException(status_code=401, detail="Invalid email or password.")
+
+    token = new_session_token()
+    _sessions[token] = user.id
+    response.set_cookie(SESSION_COOKIE_NAME, token, httponly=True)
     return UserOut.from_user(user)

@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import os
+import secrets
 
 _ITERATIONS = 390_000
 
@@ -27,3 +28,7 @@ def verify_password(password: str, password_hash: str) -> bool:
         return False
     candidate = hashlib.pbkdf2_hmac("sha256", password.encode(), salt, _ITERATIONS)
     return hmac.compare_digest(candidate.hex(), digest_hex)
+
+
+def new_session_token() -> str:
+    return secrets.token_urlsafe(32)
