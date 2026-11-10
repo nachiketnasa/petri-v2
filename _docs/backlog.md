@@ -139,7 +139,7 @@ Ref: `_docs/specs.md` → Authentication.
 
 - [x] Backend: sign-up with email + password, reject duplicate email.
 - [x] Backend: sign-in + session cookie, dependency to resolve current user.
-- [ ] Backend: logout, invalidates the session.
+- [x] Backend: logout, invalidates the session.
 - [ ] Backend: forgot/reset password flow (the specific gap from v1 — needs its own test).
 - [ ] Frontend: sign-up / sign-in forms against the above.
 
