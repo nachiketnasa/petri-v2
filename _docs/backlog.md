@@ -26,7 +26,7 @@ Ref: `_docs/specs.md` → Technical plan, step 8.
 ## Implementation tasks (MVP slice)
 
 - [x] Project setup: backend scaffold managed with `uv`, `uv sync` installs dependencies, `uv run pytest` runs one trivial passing test.
-- [ ] `GET /health` endpoint + test — proves the app boots before any real endpoint is built.
+- [x] `GET /health` endpoint + test — proves the app boots before any real endpoint is built.
 
 ---
 
@@ -49,7 +49,7 @@ Ref: `_docs/specs.md` → Tech stack, Technical plan step 8.
 ## Implementation tasks (MVP slice)
 
 - [x] Project setup: frontend scaffold (inside `frontend/`), `npm install` installs dependencies, `npm test` runs one trivial passing Vitest test.
-- [ ] Frontend project wired to the backend's `/health` endpoint (proves CORS/base-URL config before real UI work).
+- [x] Frontend project wired to the backend's `/health` endpoint (proves CORS/base-URL config before real UI work).
 
 ---
 
