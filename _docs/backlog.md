@@ -359,7 +359,7 @@ Ref: `_docs/specs.md` → Board model, Core entities, Abandoning something early
 ## Implementation tasks (MVP slice)
 
 - [x] Backend: create experiment (title, hypothesis, cadence, target duration; 400 on missing field; checked against the WIP limit from #7).
-- [ ] Backend: list + get experiments, scoped to the signed-in user (proves per-user isolation).
+- [x] Backend: list + get experiments, scoped to the signed-in user (proves per-user isolation).
 - [ ] Backend: log a check-in, rejected unless the experiment is Active.
 - [ ] Backend: archive, blocked without a retro (duration ran out) or a one-line abandon reason (ended early).
 - [ ] Frontend: experiment detail page + check-in form.
