@@ -1,0 +1,552 @@
+openapi: 3.0.3
+info:
+  title: Petri v2 API
+  description: >-
+    MVP slice: health check, email/password auth, experiment
+    create/list/get/archive, and check-in create. OAuth, 2FA, goals,
+    evolve/branch, other-tasks, and sharing endpoints are deferred to their
+    own issues and are intentionally not in this contract.
+  version: 0.1.0
+
+servers:
+  - url: /
+
+security:
+  - sessionCookie: []
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      operationId: getHealth
+      security: []
+      tags: [health]
+      responses:
+        "200":
+          description: Service is healthy.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status:
+                    type: string
+                    example: ok
+
+  /auth/signup:
+    post:
+      summary: Create a new account
+      operationId: signup
+      security: []
+      tags: [auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SignupRequest"
+      responses:
+        "201":
+          description: Account created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          description: Missing or invalid field.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /auth/login:
+    post:
+      summary: Log in with email and password
+      operationId: login
+      security: []
+      tags: [auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Logged in.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Invalid email or password.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /auth/logout:
+    post:
+      summary: Log out the current session
+      operationId: logout
+      tags: [auth]
+      responses:
+        "204":
+          description: Logged out.
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /auth/forgot-password:
+    post:
+      summary: Request a password reset
+      operationId: forgotPassword
+      security: []
+      tags: [auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ForgotPasswordRequest"
+      responses:
+        "200":
+          description: Reset flow initiated (always returned, regardless of whether the email exists).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+        "400":
+          description: Missing or invalid field.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /auth/reset-password:
+    post:
+      summary: Reset password using a reset token
+      operationId: resetPassword
+      security: []
+      tags: [auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResetPasswordRequest"
+      responses:
+        "200":
+          description: Password reset.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+        "400":
+          description: Missing or invalid field, or invalid/expired token.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /experiments:
+    post:
+      summary: Create an experiment
+      operationId: createExperiment
+      tags: [experiments]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateExperimentRequest"
+      responses:
+        "201":
+          description: Experiment created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Experiment"
+        "400":
+          description: Missing or invalid field.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    get:
+      summary: List experiments for the current user
+      operationId: listExperiments
+      tags: [experiments]
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of experiments.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Experiment"
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /experiments/{id}:
+    get:
+      summary: Get a single experiment
+      operationId: getExperiment
+      tags: [experiments]
+      parameters:
+        - $ref: "#/components/parameters/ExperimentId"
+      responses:
+        "200":
+          description: Experiment found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Experiment"
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Experiment not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /experiments/{id}/archive:
+    post:
+      summary: Archive an experiment (with retro, or an early-abandon reason)
+      operationId: archiveExperiment
+      tags: [experiments]
+      parameters:
+        - $ref: "#/components/parameters/ExperimentId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ArchiveExperimentRequest"
+      responses:
+        "200":
+          description: Experiment archived.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Experiment"
+        "400":
+          description: >-
+            Neither a complete retro (what_worked, what_didnt, decision) nor
+            an abandon_reason was supplied.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Experiment not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /experiments/{id}/check-ins:
+    post:
+      summary: Record a check-in for an experiment
+      operationId: createCheckIn
+      tags: [check-ins]
+      parameters:
+        - $ref: "#/components/parameters/ExperimentId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCheckInRequest"
+      responses:
+        "201":
+          description: Check-in recorded.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckIn"
+        "400":
+          description: Missing or invalid field.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Experiment not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: session_id
+
+  parameters:
+    ExperimentId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+
+  schemas:
+    Error:
+      type: object
+      required: [detail]
+      properties:
+        detail:
+          type: string
+
+    User:
+      type: object
+      description: >-
+        Mirrors repository.py's User dataclass, minus password_hash, which is
+        server-internal and never returned.
+      required: [id, email, display_name, timezone, created_at]
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+          format: email
+        display_name:
+          type: string
+        timezone:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    SignupRequest:
+      type: object
+      required: [email, password, display_name]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+        display_name:
+          type: string
+        timezone:
+          type: string
+          default: UTC
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+
+    ForgotPasswordRequest:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+
+    ResetPasswordRequest:
+      type: object
+      required: [token, password]
+      properties:
+        token:
+          type: string
+        password:
+          type: string
+          format: password
+
+    Experiment:
+      type: object
+      description: Mirrors repository.py's Experiment dataclass.
+      required:
+        - id
+        - user_id
+        - title
+        - hypothesis
+        - cadence_type
+        - cadence_days
+        - check_in_kind
+        - start_date
+        - target_days
+        - status
+        - ended_early
+        - abandon_reason
+        - created_at
+        - updated_at
+        - archived_at
+      properties:
+        id:
+          type: string
+        user_id:
+          type: string
+        title:
+          type: string
+        hypothesis:
+          type: string
+        cadence_type:
+          type: string
+        cadence_days:
+          type: integer
+          nullable: true
+        check_in_kind:
+          type: string
+        start_date:
+          type: string
+          format: date
+        target_days:
+          type: integer
+        status:
+          type: string
+        ended_early:
+          type: boolean
+        abandon_reason:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        archived_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    CreateExperimentRequest:
+      type: object
+      required: [title, hypothesis, cadence_type, target_days]
+      properties:
+        title:
+          type: string
+        hypothesis:
+          type: string
+        cadence_type:
+          type: string
+        cadence_days:
+          type: integer
+          nullable: true
+        check_in_kind:
+          type: string
+        start_date:
+          type: string
+          format: date
+        target_days:
+          type: integer
+
+    ArchiveExperimentRequest:
+      type: object
+      description: >-
+        Either a complete retro (what_worked, what_didnt, decision) or an
+        abandon_reason must be supplied; there is no standalone retro
+        endpoint in this slice, so retro data travels on this call.
+      properties:
+        what_worked:
+          type: string
+        what_didnt:
+          type: string
+        decision:
+          type: string
+        abandon_reason:
+          type: string
+
+    CheckIn:
+      type: object
+      description: Mirrors repository.py's CheckIn dataclass.
+      required:
+        - id
+        - experiment_id
+        - value_bool
+        - value_rating
+        - note
+        - checked_in_at
+      properties:
+        id:
+          type: string
+        experiment_id:
+          type: string
+        value_bool:
+          type: boolean
+          nullable: true
+        value_rating:
+          type: integer
+          nullable: true
+        note:
+          type: string
+          nullable: true
+        checked_in_at:
+          type: string
+          format: date-time
+
+    CreateCheckInRequest:
+      type: object
+      properties:
+        value_bool:
+          type: boolean
+          nullable: true
+        value_rating:
+          type: integer
+          nullable: true
+        note:
+          type: string
+          nullable: true
+        checked_in_at:
+          type: string
+          format: date-time
