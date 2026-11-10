@@ -472,7 +472,7 @@ Ref: `_docs/specs.md` → Core entities (check-ins).
 
 ## order-06 · #7 — Enforce work-in-progress limits (2 experiments + 1 goal)
 
-- **Status**: OPEN
+- **Status**: CLOSED
 - **Labels**: backend
 - **Link**: https://github.com/nachiketnasa/petri-v2/issues/7
 
@@ -482,14 +482,14 @@ A user can be running at most 2 experiments Active at the same time; a 3rd activ
 
 ## Acceptance criteria
 
-- [ ] `POST /experiments/{id}/activate` exists, documented in openapi.yaml, following the same shape as the existing `POST /experiments/{id}/archive` endpoint.
-- [ ] Calling it on a `backlog` experiment when the user has 0 or 1 other experiments already `active` succeeds: status becomes `active`, response is the updated Experiment.
-- [ ] Calling it on a `backlog` experiment when the user already has 2 experiments `active` is rejected with 400, and both existing active experiments remain active and unchanged.
-- [ ] Calling it on an experiment that is not currently `backlog` (already `active`, in `reflect`, or `archived`) is rejected with 400.
-- [ ] The limit is scoped per-user: one user being at their limit does not block a different user's activation.
-- [ ] Calling it on a nonexistent experiment id, or an experiment id belonging to another user, returns the same identical-404 shape used by `GET /experiments/{id}` and the archive endpoint (don't distinguish "doesn't exist" from "exists but isn't yours").
-- [ ] Calling it unauthenticated returns 401, consistent with every other experiment endpoint.
-- [ ] The active count is derived at request time via `repository.list_experiments(user_id=..., status="active")` - no new persisted counter field.
+- [x] `POST /experiments/{id}/activate` exists, documented in openapi.yaml, following the same shape as the existing `POST /experiments/{id}/archive` endpoint.
+- [x] Calling it on a `backlog` experiment when the user has 0 or 1 other experiments already `active` succeeds: status becomes `active`, response is the updated Experiment.
+- [x] Calling it on a `backlog` experiment when the user already has 2 experiments `active` is rejected with 400, and both existing active experiments remain active and unchanged.
+- [x] Calling it on an experiment that is not currently `backlog` (already `active`, in `reflect`, or `archived`) is rejected with 400.
+- [x] The limit is scoped per-user: one user being at their limit does not block a different user's activation.
+- [x] Calling it on a nonexistent experiment id, or an experiment id belonging to another user, returns the same identical-404 shape used by `GET /experiments/{id}` and the archive endpoint (don't distinguish "doesn't exist" from "exists but isn't yours").
+- [x] Calling it unauthenticated returns 401, consistent with every other experiment endpoint.
+- [x] The active count is derived at request time via `repository.list_experiments(user_id=..., status="active")` - no new persisted counter field.
 
 ## Out of scope
 
