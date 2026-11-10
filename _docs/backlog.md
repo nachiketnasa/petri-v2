@@ -100,7 +100,7 @@ Ref: `_docs/specs.md` → Technical plan, `_docs/schema.sql`, `_docs/architectur
 
 ## Implementation tasks (MVP slice)
 
-- [ ] Repository interface + in-memory implementation first — every later backend task is written against the interface, not a concrete store.
+- [x] Repository interface + in-memory implementation first — every later backend task is written against the interface, not a concrete store.
 - [ ] Swap in the Postgres implementation once the schema in `_docs/schema.sql` is wired up; no route/service changes, only a second implementation of the same interface.
 
 ---
