@@ -476,14 +476,31 @@ Ref: `_docs/specs.md` → Core entities (check-ins).
 - **Labels**: backend
 - **Link**: https://github.com/nachiketnasa/petri-v2/issues/7
 
-## What
-Enforce the work-in-progress limit: at most 2 experiments and 1 goal Active at the same time.
+## Goal
+
+A user can be running at most 2 experiments Active at the same time; a 3rd activation attempt is rejected server-side. This requires adding the activate transition itself, since no endpoint currently moves an experiment from "backlog" to "active" (deferred here from issue number 4's grooming).
 
 ## Acceptance criteria
-- Activating a 3rd experiment or a 2nd goal is blocked server-side, not just hinted at in the UI.
-- Dashboard shows the live count (e.g. "2 / 2").
 
-Ref: `_docs/specs.md` → Work in progress limits.
+- [ ] `POST /experiments/{id}/activate` exists, documented in openapi.yaml, following the same shape as the existing `POST /experiments/{id}/archive` endpoint.
+- [ ] Calling it on a `backlog` experiment when the user has 0 or 1 other experiments already `active` succeeds: status becomes `active`, response is the updated Experiment.
+- [ ] Calling it on a `backlog` experiment when the user already has 2 experiments `active` is rejected with 400, and both existing active experiments remain active and unchanged.
+- [ ] Calling it on an experiment that is not currently `backlog` (already `active`, in `reflect`, or `archived`) is rejected with 400.
+- [ ] The limit is scoped per-user: one user being at their limit does not block a different user's activation.
+- [ ] Calling it on a nonexistent experiment id, or an experiment id belonging to another user, returns the same identical-404 shape used by `GET /experiments/{id}` and the archive endpoint (don't distinguish "doesn't exist" from "exists but isn't yours").
+- [ ] Calling it unauthenticated returns 401, consistent with every other experiment endpoint.
+- [ ] The active count is derived at request time via `repository.list_experiments(user_id=..., status="active")` - no new persisted counter field.
+
+## Out of scope
+
+- The "1 goal Active" half of this issue's original acceptance criteria - goals don't exist yet (issue number 5, order-14, is still open). Filed as its own follow-up: issue number 29 (order-14b), to be picked up once issue number 5 lands.
+- "Dashboard shows the live count (e.g. '2 / 2')" - this is a frontend/UI concern, not a backend check. It belongs with issue number 10 (dashboard, order-07), which is already next in the build sequence. This task only needs to make the limit real server-side; the UI reads it back from `GET /experiments?status=active` (count the array length) once this ships.
+
+## Constraints
+
+- Backend only: `backend/src/petri_backend/app.py` (new route), `openapi.yaml` (new path + schema additions), and `backend/src/petri_backend/repository.py` / `repository_memory.py` only if the existing `update_experiment(**fields)` / `list_experiments(...)` methods turn out not to be enough (they should be - no new abstract Repository method is expected).
+- No new dependency - a single count-and-compare against `list_experiments(status="active")` is in scope, not a generic quota/rate-limit framework.
+- Ref: `_docs/specs.md` -> "Work in progress limits".
 
 ---
 
@@ -677,6 +694,37 @@ Goal CRUD with an ordered, locked milestone list; milestones run their own PACT 
 - Moving a goal/milestone to Archived requires a saved retro first.
 
 Ref: `_docs/specs.md` → Core entities, Board model.
+
+---
+
+## order-14b · #29 — Enforce goal WIP limit (1 goal Active at a time)
+
+- **Status**: OPEN
+- **Labels**: backend
+- **Link**: https://github.com/nachiketnasa/petri-v2/issues/29
+
+## Goal
+
+A user may have at most 1 goal Active at a time, enforced server-side on whatever endpoint activates a goal, mirroring the experiment WIP limit added for issue number 7.
+
+## Acceptance criteria
+
+- [ ] Activating a 1st goal succeeds.
+- [ ] Activating a 2nd goal while one is already Active is rejected with 400, and the first goal remains Active.
+- [ ] The limit is scoped per-user.
+- [ ] Activating a nonexistent/other-user's goal returns the same 404 shape used elsewhere.
+- [ ] Unauthenticated requests get 401.
+- [ ] The activate endpoint (and the goal's state machine generally) is documented in openapi.yaml.
+
+## Out of scope
+
+- Dashboard display of the live goal count - that is a frontend concern tracked under issue number 10 (order-07).
+
+## Constraints
+
+- Depends on issue number 5 (Goals CRUD + milestones, order-14) landing first - there is no Goal entity, repository method, or activate transition to enforce a limit on yet.
+- Follow the same shape/pattern used for the experiment WIP limit (issue number 7): count the user's goals with status="active" before allowing activation, reject the over-limit attempt with 400, identical-404 for not-found/cross-user.
+- Mirrors `_docs/specs.md` -> "Work in progress limits".
 
 ---
 
