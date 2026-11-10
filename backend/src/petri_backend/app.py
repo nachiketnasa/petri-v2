@@ -244,3 +244,28 @@ def create_experiment(
         target_days=body.target_days,
     )
     return ExperimentOut.from_experiment(experiment)
+
+
+@app.get("/experiments", response_model=list[ExperimentOut])
+def list_experiments(
+    status: str | None = None,
+    current_user: User = Depends(get_current_user),
+    repository: Repository = Depends(get_repository),
+) -> list[ExperimentOut]:
+    experiments = repository.list_experiments(user_id=current_user.id, status=status)
+    return [ExperimentOut.from_experiment(experiment) for experiment in experiments]
+
+
+@app.get("/experiments/{id}", response_model=ExperimentOut)
+def get_experiment(
+    id: str,
+    current_user: User = Depends(get_current_user),
+    repository: Repository = Depends(get_repository),
+) -> ExperimentOut:
+    experiment = repository.get_experiment(experiment_id=id, user_id=current_user.id)
+    if experiment is None:
+        # get_experiment returns None for both "no such id" and "exists but
+        # belongs to another user" - don't distinguish, so a 404 can't leak
+        # whether the id exists for someone else.
+        raise HTTPException(status_code=404, detail="Experiment not found.")
+    return ExperimentOut.from_experiment(experiment)
