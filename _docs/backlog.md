@@ -338,7 +338,7 @@ Split out while auditing #2's full scope against its MVP checklist.
 
 ## order-05 · #4 — Experiments: CRUD + lifecycle + check-ins + retro gate
 
-- **Status**: OPEN
+- **Status**: CLOSED
 - **Labels**: backend
 - **Link**: https://github.com/nachiketnasa/petri-v2/issues/4
 
@@ -392,6 +392,33 @@ Noticed while grooming #4's "log a check-in" checklist line. That task is scoped
 ## Out of scope
 
 - The Active-only status gate on check-ins — #4's own checklist line.
+
+---
+
+## order-05b · #27 — Check-in Due derived badge: not computed/exposed anywhere
+
+- **Status**: OPEN
+- **Labels**: backend, frontend
+- **Link**: https://github.com/nachiketnasa/petri-v2/issues/27
+
+## What
+
+#4's own top-level Acceptance criteria lists: *"'Check-in Due' is a derived badge on Active, not a persisted column."* (`_docs/specs.md` → Board model, item 3: cadence elapsed, awaiting a log entry, derived from last check-in timestamp + cadence vs. now.)
+
+Auditing #4's Implementation tasks checklist against its own top-level AC (same audit done on #2): create, list/get, check-in, and archive are all covered by a checklist line. This one isn't — nothing in #4's checklist computes or exposes "Check-in Due," on the backend or the frontend. It's easy to lose since it's a derived/badge concept, not a stored field, so there's no dataclass or migration to remind anyone it's missing.
+
+## Acceptance criteria
+
+- [ ] Decide where "Check-in Due" is computed: either a field added to the `Experiment` API response (e.g. `check_in_due: bool`, computed per-request from `cadence_type`/`cadence_days` + the latest check-in's `checked_in_at` vs. now, only meaningful when `status == "active"`), or computed client-side in the frontend from data it already has (last check-in + cadence already present on `Experiment`). Either is viable; pick one explicitly rather than leaving it implicit.
+- [ ] The badge only ever shows for experiments with `status == "active"` (per the board model: it's "a badge on Active," not a separate persisted status).
+- [ ] An experiment with zero check-ins logged since `start_date` past its first cadence interval shows as check-in-due (don't assume a check-in always exists to diff against).
+- [ ] Covered by a test (backend computation, or frontend render logic) depending on where it's decided to live.
+
+## Out of scope
+
+- Any backend endpoint change beyond adding a computed field (if that's the path chosen) — no new persisted column, no migration.
+
+Ref: `_docs/specs.md` → Board model (item 3).
 
 ---
 
