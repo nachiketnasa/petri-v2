@@ -33,6 +33,8 @@ type Props = {
   experimentId: string
 }
 
+type ArchiveMode = 'retro' | 'abandon'
+
 function ExperimentDetail({ experimentId }: Props) {
   const [experiment, setExperiment] = useState<Experiment | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -44,6 +46,14 @@ function ExperimentDetail({ experimentId }: Props) {
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [lastCheckIn, setLastCheckIn] = useState<CheckIn | null>(null)
+
+  const [archiveMode, setArchiveMode] = useState<ArchiveMode>('retro')
+  const [whatWorked, setWhatWorked] = useState('')
+  const [whatDidnt, setWhatDidnt] = useState('')
+  const [decision, setDecision] = useState('')
+  const [abandonReason, setAbandonReason] = useState('')
+  const [archiving, setArchiving] = useState(false)
+  const [archiveError, setArchiveError] = useState<string | null>(null)
 
   useEffect(() => {
     fetch(`${BASE_URL}/experiments/${experimentId}`, { credentials: 'include' })
@@ -83,6 +93,53 @@ function ExperimentDetail({ experimentId }: Props) {
       })
       .catch((err: Error) => setSubmitError(err.message))
       .finally(() => setSubmitting(false))
+  }
+
+  function toggleArchiveMode() {
+    setArchiveMode((m) => (m === 'retro' ? 'abandon' : 'retro'))
+    setWhatWorked('')
+    setWhatDidnt('')
+    setDecision('')
+    setAbandonReason('')
+    setArchiveError(null)
+  }
+
+  function handleArchiveSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setArchiveError(null)
+
+    if (archiveMode === 'retro') {
+      if (whatWorked === '' || whatDidnt === '' || decision === '') {
+        setArchiveError('Please fill in what worked, what didn\'t, and the decision.')
+        return
+      }
+    } else {
+      if (abandonReason === '') {
+        setArchiveError('Please provide a reason for abandoning early.')
+        return
+      }
+    }
+
+    setArchiving(true)
+
+    const body: Record<string, unknown> =
+      archiveMode === 'retro'
+        ? { what_worked: whatWorked, what_didnt: whatDidnt, decision }
+        : { abandon_reason: abandonReason }
+
+    fetch(`${BASE_URL}/experiments/${experimentId}/archive`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+      .then(async (res) => {
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.detail)
+        setExperiment(data)
+      })
+      .catch((err: Error) => setArchiveError(err.message))
+      .finally(() => setArchiving(false))
   }
 
   if (loadError) return <p role="alert">{loadError}</p>
@@ -144,6 +201,48 @@ function ExperimentDetail({ experimentId }: Props) {
       )}
 
       {lastCheckIn && <p>Last check-in logged: {lastCheckIn.checked_in_at}</p>}
+
+      {(experiment.status === 'active' || experiment.status === 'reflect') && (
+        <form onSubmit={handleArchiveSubmit}>
+          <h3>Archive this experiment</h3>
+          <button type="button" onClick={toggleArchiveMode} disabled={archiving}>
+            {archiveMode === 'retro' ? 'Switch to abandon early' : 'Switch to retro'}
+          </button>
+          {archiveMode === 'retro' ? (
+            <>
+              <input
+                type="text"
+                placeholder="What worked"
+                value={whatWorked}
+                onChange={(e) => setWhatWorked(e.target.value)}
+              />
+              <input
+                type="text"
+                placeholder="What didn't"
+                value={whatDidnt}
+                onChange={(e) => setWhatDidnt(e.target.value)}
+              />
+              <input
+                type="text"
+                placeholder="Decision"
+                value={decision}
+                onChange={(e) => setDecision(e.target.value)}
+              />
+            </>
+          ) : (
+            <input
+              type="text"
+              placeholder="Abandon reason"
+              value={abandonReason}
+              onChange={(e) => setAbandonReason(e.target.value)}
+            />
+          )}
+          {archiveError && <p role="alert">{archiveError}</p>}
+          <button type="submit" disabled={archiving}>
+            Archive
+          </button>
+        </form>
+      )}
     </div>
   )
 }

@@ -130,4 +130,98 @@ describe('ExperimentDetail', () => {
       expect(screen.getByRole('alert')).toHaveTextContent('Experiment is not active'),
     )
   })
+
+  it('archives via the retro path and hides both forms on success', async () => {
+    const archived = { ...experiment, status: 'archived' }
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => experiment })
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => archived })
+    vi.stubGlobal('fetch', fetchMock)
+
+    render(<ExperimentDetail experimentId="exp-1" />)
+    await waitFor(() => expect(screen.getByText('Drink more water')).toBeInTheDocument())
+
+    fireEvent.change(screen.getByPlaceholderText('What worked'), { target: { value: 'consistency' } })
+    fireEvent.change(screen.getByPlaceholderText("What didn't"), { target: { value: 'mornings' } })
+    fireEvent.change(screen.getByPlaceholderText('Decision'), { target: { value: 'continue' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Archive' }))
+
+    await waitFor(() => expect(screen.getByText('Status: archived')).toBeInTheDocument())
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      expect.stringContaining('/experiments/exp-1/archive'),
+      expect.objectContaining({
+        method: 'POST',
+        credentials: 'include',
+        body: JSON.stringify({ what_worked: 'consistency', what_didnt: 'mornings', decision: 'continue' }),
+      }),
+    )
+    expect(screen.queryByRole('button', { name: 'Log check-in' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Archive' })).not.toBeInTheDocument()
+  })
+
+  it('archives via the abandon-early path and hides both forms on success', async () => {
+    const archived = { ...experiment, status: 'archived', abandon_reason: 'lost interest' }
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => experiment })
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => archived })
+    vi.stubGlobal('fetch', fetchMock)
+
+    render(<ExperimentDetail experimentId="exp-1" />)
+    await waitFor(() => expect(screen.getByText('Drink more water')).toBeInTheDocument())
+
+    fireEvent.click(screen.getByRole('button', { name: 'Switch to abandon early' }))
+    fireEvent.change(screen.getByPlaceholderText('Abandon reason'), { target: { value: 'lost interest' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Archive' }))
+
+    await waitFor(() => expect(screen.getByText('Status: archived')).toBeInTheDocument())
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      expect.stringContaining('/experiments/exp-1/archive'),
+      expect.objectContaining({
+        method: 'POST',
+        credentials: 'include',
+        body: JSON.stringify({ abandon_reason: 'lost interest' }),
+      }),
+    )
+  })
+
+  it('blocks an incomplete archive submission client-side with no fetch call', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce({ ok: true, json: async () => experiment })
+    vi.stubGlobal('fetch', fetchMock)
+
+    render(<ExperimentDetail experimentId="exp-1" />)
+    await waitFor(() => expect(screen.getByText('Drink more water')).toBeInTheDocument())
+
+    fireEvent.change(screen.getByPlaceholderText('What worked'), { target: { value: 'consistency' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Archive' }))
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(screen.getByRole('alert')).toHaveTextContent(/fill in what worked/i)
+  })
+
+  it('shows the backend error text on a rejected archive submission', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => experiment })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        json: async () => ({ detail: 'Experiment is not active or reflect' }),
+      })
+    vi.stubGlobal('fetch', fetchMock)
+
+    render(<ExperimentDetail experimentId="exp-1" />)
+    await waitFor(() => expect(screen.getByText('Drink more water')).toBeInTheDocument())
+
+    fireEvent.change(screen.getByPlaceholderText('What worked'), { target: { value: 'consistency' } })
+    fireEvent.change(screen.getByPlaceholderText("What didn't"), { target: { value: 'mornings' } })
+    fireEvent.change(screen.getByPlaceholderText('Decision'), { target: { value: 'continue' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Archive' }))
+
+    await waitFor(() =>
+      expect(screen.getByRole('alert')).toHaveTextContent('Experiment is not active or reflect'),
+    )
+  })
 })
