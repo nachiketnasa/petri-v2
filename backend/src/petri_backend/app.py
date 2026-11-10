@@ -367,6 +367,29 @@ def archive_experiment(
     return ExperimentOut.from_experiment(updated)
 
 
+@app.post("/experiments/{id}/activate", response_model=ExperimentOut)
+def activate_experiment(
+    id: str,
+    current_user: User = Depends(get_current_user),
+    repository: Repository = Depends(get_repository),
+) -> ExperimentOut:
+    experiment = repository.get_experiment(experiment_id=id, user_id=current_user.id)
+    if experiment is None:
+        # Same identical-404 treatment as GET /experiments/{id}.
+        raise HTTPException(status_code=404, detail="Experiment not found.")
+    if experiment.status != "backlog":
+        raise HTTPException(status_code=400, detail="Experiment must be in backlog to activate.")
+
+    active = repository.list_experiments(user_id=current_user.id, status="active")
+    if len(active) >= 2:
+        raise HTTPException(
+            status_code=400, detail="You already have 2 active experiments."
+        )
+
+    updated = repository.update_experiment(experiment_id=id, user_id=current_user.id, status="active")
+    return ExperimentOut.from_experiment(updated)
+
+
 @app.post("/experiments/{id}/check-ins", status_code=201, response_model=CheckInOut)
 def create_check_in(
     id: str,
