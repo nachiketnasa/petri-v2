@@ -5,7 +5,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from petri_backend.repository import Experiment, Repository, User
+from petri_backend.repository import CheckIn, Experiment, Repository, User
 from petri_backend.repository_memory import InMemoryRepository
 from petri_backend.security import (
     hash_password,
@@ -115,6 +115,33 @@ class ExperimentOut(BaseModel):
             created_at=experiment.created_at,
             updated_at=experiment.updated_at,
             archived_at=experiment.archived_at,
+        )
+
+
+class CreateCheckInRequest(BaseModel):
+    value_bool: bool | None = None
+    value_rating: int | None = None
+    note: str | None = None
+    checked_in_at: datetime | None = None
+
+
+class CheckInOut(BaseModel):
+    id: str
+    experiment_id: str
+    value_bool: bool | None
+    value_rating: int | None
+    note: str | None
+    checked_in_at: datetime
+
+    @classmethod
+    def from_check_in(cls, check_in: CheckIn) -> "CheckInOut":
+        return cls(
+            id=check_in.id,
+            experiment_id=check_in.experiment_id,
+            value_bool=check_in.value_bool,
+            value_rating=check_in.value_rating,
+            note=check_in.note,
+            checked_in_at=check_in.checked_in_at,
         )
 
 
@@ -269,3 +296,35 @@ def get_experiment(
         # whether the id exists for someone else.
         raise HTTPException(status_code=404, detail="Experiment not found.")
     return ExperimentOut.from_experiment(experiment)
+
+
+@app.post("/experiments/{id}/check-ins", status_code=201, response_model=CheckInOut)
+def create_check_in(
+    id: str,
+    body: CreateCheckInRequest,
+    current_user: User = Depends(get_current_user),
+    repository: Repository = Depends(get_repository),
+) -> CheckInOut:
+    experiment = repository.get_experiment(experiment_id=id, user_id=current_user.id)
+    if experiment is None:
+        # Same identical-404 treatment as GET /experiments/{id}.
+        raise HTTPException(status_code=404, detail="Experiment not found.")
+    if experiment.status != "active":
+        raise HTTPException(
+            status_code=400, detail="Check-ins can only be logged while active."
+        )
+    try:
+        check_in = repository.add_check_in(
+            experiment_id=id,
+            user_id=current_user.id,
+            value_bool=body.value_bool,
+            value_rating=body.value_rating,
+            note=body.note,
+            checked_in_at=body.checked_in_at or datetime.now(timezone.utc),
+        )
+    except ValueError:
+        # Defensive: add_check_in raises ValueError when the experiment
+        # doesn't exist for this user, but the pre-check above already
+        # covers that - this should be unreachable in normal flow.
+        raise HTTPException(status_code=404, detail="Experiment not found.")
+    return CheckInOut.from_check_in(check_in)
