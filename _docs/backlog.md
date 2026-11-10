@@ -363,7 +363,7 @@ Ref: `_docs/specs.md` → Board model, Core entities, Abandoning something early
 - [x] Backend: log a check-in, rejected unless the experiment is Active.
 - [x] Backend: archive, blocked without a retro (duration ran out) or a one-line abandon reason (ended early).
 - [x] Frontend: experiment detail page + check-in form.
-- [ ] Frontend: archive/retro form, mirrors the backend's own validation client-side.
+- [x] Frontend: archive/retro form, mirrors the backend's own validation client-side.
 
 ---
 
