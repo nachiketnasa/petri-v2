@@ -11,7 +11,10 @@ import re
 import subprocess
 
 REPO = "nachiketnasa/petri-v2"
-ORDER_RE = re.compile(r"order-(\d+)$")
+# A trailing letter (order-08b) slots between order-08 and order-09 without
+# renumbering every later label — used when a chunk of an already-numbered
+# issue gets rescheduled later in the sequence.
+ORDER_RE = re.compile(r"order-(\d+)([a-z]?)$")
 
 
 def fetch_issues() -> list[dict]:
@@ -25,12 +28,12 @@ def fetch_issues() -> list[dict]:
     return json.loads(out)
 
 
-def order_key(issue: dict) -> tuple[int, int]:
+def order_key(issue: dict) -> tuple[int, str, int]:
     for label in issue["labels"]:
         m = ORDER_RE.match(label["name"])
         if m:
-            return (int(m.group(1)), issue["number"])
-    return (10**6, issue["number"])  # unordered issues sort last
+            return (int(m.group(1)), m.group(2), issue["number"])
+    return (10**6, "", issue["number"])  # unordered issues sort last
 
 
 def render(issues: list[dict]) -> str:

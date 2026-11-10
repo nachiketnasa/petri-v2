@@ -80,31 +80,6 @@ Ref: `_docs/specs.md` → Tech stack, Technical plan step 8.
 
 ---
 
-## order-02 · #14 — Backend data layer: Postgres + repository interface
-
-- **Status**: OPEN
-- **Labels**: backend, infra
-- **Link**: https://github.com/nachiketnasa/petri-v2/issues/14
-
-## What
-Backend data layer: PostgreSQL from the start, behind a repository interface.
-
-## Acceptance criteria
-- Schema matches `_docs/schema.sql` (already drafted and verified against a real `postgres:16` instance).
-- Route/service code never touches SQL directly — only the repository interface does.
-- Each user's data is isolated; no cross-user reads or writes.
-
-Ref: `_docs/specs.md` → Technical plan, `_docs/schema.sql`, `_docs/architecture.html`.
-
-
-
-## Implementation tasks (MVP slice)
-
-- [x] Repository interface + in-memory implementation first — every later backend task is written against the interface, not a concrete store.
-- [ ] Swap in the Postgres implementation once the schema in `_docs/schema.sql` is wired up; no route/service changes, only a second implementation of the same interface.
-
----
-
 ## order-03 · #1 — OpenAPI contract: define openapi.yaml
 
 - **Status**: OPEN
@@ -264,6 +239,31 @@ Ref: `_docs/specs.md` → Creating an experiment or a goal.
 ## Implementation tasks (MVP slice)
 
 - [ ] Frontend: plain new-experiment form (hypothesis, cadence, target duration) wired to `POST /experiments`. The multi-step wizard + side progress rail is a follow-up polish pass once the fields and the request round-trip work.
+
+---
+
+## order-08b · #14 — Backend data layer: Postgres + repository interface
+
+- **Status**: OPEN
+- **Labels**: backend, infra
+- **Link**: https://github.com/nachiketnasa/petri-v2/issues/14
+
+## What
+Backend data layer: PostgreSQL from the start, behind a repository interface.
+
+## Acceptance criteria
+- Schema matches `_docs/schema.sql` (already drafted and verified against a real `postgres:16` instance).
+- Route/service code never touches SQL directly — only the repository interface does.
+- Each user's data is isolated; no cross-user reads or writes.
+
+Ref: `_docs/specs.md` → Technical plan, `_docs/schema.sql`, `_docs/architecture.html`.
+
+
+
+## Implementation tasks (MVP slice)
+
+- [x] Repository interface + in-memory implementation first — every later backend task is written against the interface, not a concrete store.
+- [ ] Swap in the Postgres implementation once the schema in `_docs/schema.sql` is wired up; no route/service changes, only a second implementation of the same interface.
 
 ---
 
