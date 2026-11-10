@@ -135,7 +135,7 @@ Ref: `_docs/specs.md` → Technical plan, step 3.
 
 ## Implementation tasks (MVP slice)
 
-- [ ] Write `openapi.yaml` for the MVP slice only: signup, login, logout, forgot/reset password, experiment create/list/get/archive, check-in create. OAuth/2FA/goals/sharing endpoints get added to the contract when their own issues are worked.
+- [x] Write `openapi.yaml` for the MVP slice only: signup, login, logout, forgot/reset password, experiment create/list/get/archive, check-in create. OAuth/2FA/goals/sharing endpoints get added to the contract when their own issues are worked.
 
 ---
 
