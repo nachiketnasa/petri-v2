@@ -217,6 +217,60 @@ the dev-log version deliberately avoided) and shouldn't block that task.
 
 ---
 
+## order-04d · #22 — Frontend: forgot/reset password form
+
+- **Status**: OPEN
+- **Labels**: frontend, auth
+- **Link**: https://github.com/nachiketnasa/petri-v2/issues/22
+
+## What
+
+#2's checklist line being groomed as "Frontend: sign-up / sign-in forms
+against the above" covers only sign-up and sign-in — its own title names
+just those two. The backend forgot/reset password flow (also on #2,
+`POST /auth/forgot-password` / `POST /auth/reset-password`, dev-log token
+delivery) has no frontend counterpart anywhere in the backlog. This issue
+is that gap: a form to request a reset and a form to set a new password
+from the emailed (for now, dev-log-printed, see #21) token.
+
+## Acceptance criteria
+
+- [ ] A "forgot password" form (email only) submits to
+      `POST /auth/forgot-password` and shows the same generic
+      confirmation regardless of whether the email is registered — the
+      frontend must not add its own "if this email exists" branching,
+      since the backend's response is already identical either way.
+- [ ] A "reset password" form (token + new password) submits to
+      `POST /auth/reset-password`. Where the token comes from (e.g. a
+      query param on a reset link) is this task's call to make.
+- [ ] A failed reset (unknown/expired/already-used token, or validation
+      error) renders the backend's `detail` message, not invented copy.
+- [ ] A successful reset confirms the password changed and does not
+      silently sign the user in (#2's backend groomed comment makes a
+      reset invalidate all of that user's existing sessions).
+- [ ] A Vitest + RTL test per form covering success and failure paths,
+      fetch mocked — same pattern as the sign-up/sign-in forms task.
+
+## Out of scope
+
+- Real email delivery of the reset link — #21 (`order-04c`). This form
+  works against the dev-log token in the meantime (paste it in manually,
+  or load the link with the token as a query param).
+- Routing to a protected dashboard after reset — #10.
+- Neumorphic/pixel-accurate design polish — later design pass.
+
+## Constraints
+
+- Stay inside `frontend/src/`.
+- Match `ForgotPasswordRequest`/`ResetPasswordRequest` in `openapi.yaml`
+  exactly.
+- Follow the same component/env-var pattern as `HealthStatus.tsx`
+  (`import.meta.env.VITE_BACKEND_URL`) and whatever pattern the
+  sign-up/sign-in forms task (#2) establishes for calling the backend
+  and rendering errors.
+
+---
+
 ## order-05 · #4 — Experiments: CRUD + lifecycle + check-ins + retro gate
 
 - **Status**: OPEN
