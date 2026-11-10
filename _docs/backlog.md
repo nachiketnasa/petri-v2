@@ -576,6 +576,96 @@ Ref: `_docs/specs.md` → Technical plan, `_docs/schema.sql`, `_docs/architectur
 
 ---
 
+## order-08c · #30 — Wire frontend into one signed-in app flow (router + shared auth state)
+
+- **Status**: OPEN
+- **Labels**: frontend
+- **Link**: https://github.com/nachiketnasa/petri-v2/issues/30
+
+## What
+
+Every frontend piece built so far (AuthForm, Dashboard, ExperimentDetail,
+NewExperimentForm, HealthStatus) works and is tested in isolation, but
+none of them are actually connected. Right now App.tsx just stacks them
+vertically on one page, on top of the untouched Vite scaffold (hero
+images, counter button, docs/social links). Concretely broken today:
+
+- ExperimentDetail isn't even imported into App.tsx -- it's unreachable.
+- Dashboard fetches once on mount; signing in via AuthForm afterward
+  does not make it refetch.
+- There is no router, so there is no way to navigate from a Dashboard
+  card to that experiment's detail page -- ExperimentDetail currently
+  requires a hardcoded experimentId prop with nothing supplying one.
+- Creating an experiment via NewExperimentForm does not update
+  Dashboard's list.
+- No shared auth/session state exists across components; each one
+  independently discovers whether a request is authenticated by trying
+  its own fetch call and reacting to a 401.
+
+This issue is that wiring. It was repeatedly deferred across the
+Dashboard/ExperimentDetail/NewExperimentForm grooming passes, each time
+by pointing at a different issue's scope rather than landing a concrete
+task anywhere -- this is that concrete task.
+
+## Acceptance criteria
+
+- [ ] A router is installed (react-router-dom -- the one deliberate new
+      dependency this task adds) with at least these routes: a
+      signed-out view (shows AuthForm), a dashboard view (Dashboard),
+      an experiment detail view reading its id from the URL (not a
+      hardcoded prop), and some way to reach NewExperimentForm from the
+      dashboard (a route or a toggle -- implementer's call, state it).
+- [ ] A shared auth state (minimal context, no new state-management
+      dependency) tracks whether the user is signed in, derived once
+      (e.g. a `/auth/me`-equivalent check on load -- check whether such
+      an endpoint exists in openapi.yaml; if not, deciding how to derive
+      "am I signed in" cheaply is part of this task) and updated on
+      sign-in/sign-out, so Dashboard/ExperimentDetail don't each
+      independently discover auth state via a failed fetch.
+- [ ] Signing in via AuthForm transitions to the dashboard view and
+      Dashboard's list is fetched with the now-valid session.
+- [ ] Clicking a Dashboard card navigates to that experiment's real
+      detail page (via its real id, through the router), not a
+      hardcoded id.
+- [ ] Creating an experiment via NewExperimentForm returns the user to
+      (or otherwise updates) the dashboard view, and the new experiment
+      appears in the list without a manual page reload.
+- [ ] The leftover Vite scaffold content (hero images, counter button,
+      "Explore Vite"/docs/social sections) is removed from App.tsx --
+      this is the actual product now, not the starter template.
+- [ ] Existing component-level tests for AuthForm/Dashboard/
+      ExperimentDetail/NewExperimentForm still pass unmodified in their
+      standalone form where reasonable; new integration-level tests
+      (Vitest + RTL) cover at least: sign up -> land on dashboard,
+      create an experiment -> see it on dashboard, click into it -> see
+      its detail page.
+
+## Out of scope
+
+- Visual/design-system polish (neumorphic styling, the Pinterest-derived
+  mockups) -- functional wiring only. The standalone UX Validator role
+  (`_docs/team/ux-validator.md`) covers visual bugs separately, once
+  there's a real flow to look at.
+- The real multi-step creation wizard (#13's own remaining scope) --
+  this task wires up whatever form currently exists, doesn't rebuild it.
+- The calm landing/greeting screen (#10's own remaining scope).
+- Running the backend against a real, persistently-running Postgres for
+  an actual local demo -- that's #15 (order-12, Docker Compose). This
+  task is pure frontend wiring and works the same regardless of which
+  repository implementation the backend happens to be running against.
+
+## Constraints
+
+- `frontend/src/` only. No backend changes unless a genuinely missing
+  "who am I" endpoint turns up during implementation, in which case
+  flag it rather than silently adding one -- check first whether
+  something already covers it (none of GET /experiments's existing
+  behavior requires a separate identity endpoint; reusing whatever's
+  cheapest is the goal).
+- No new dependency beyond react-router-dom.
+
+---
+
 ## order-09 · #19 — Public landing page
 
 - **Status**: OPEN
