@@ -2,7 +2,7 @@
 
 A local mirror of the public task tracker: https://github.com/nachiketnasa/petri-v2/issues
 
-Generated from the tracker on 2026-11-09. The tracker is the source of truth; this file is a readable snapshot committed alongside the spec, not edited independently — re-generate it instead of hand-editing when issues change.
+Generated from the tracker on 2026-11-10. The tracker is the source of truth; this file is a readable snapshot committed alongside the spec, not edited independently — re-generate it instead of hand-editing when issues change.
 
 ## #1 — OpenAPI contract: define openapi.yaml
 
@@ -18,6 +18,12 @@ Define `openapi.yaml` as the source of truth for every endpoint, before any back
 - Frontend and backend both generate/validate against it.
 
 Ref: `_docs/specs.md` → Technical plan, step 3.
+
+
+
+## Implementation tasks (MVP slice)
+
+- [ ] Write `openapi.yaml` for the MVP slice only: signup, login, logout, forgot/reset password, experiment create/list/get/archive, check-in create. OAuth/2FA/goals/sharing endpoints get added to the contract when their own issues are worked.
 
 ---
 
@@ -40,6 +46,18 @@ Sign-up/sign-in via Google, LinkedIn, or Microsoft OAuth, or email + password. O
 
 Ref: `_docs/specs.md` → Authentication.
 
+
+
+## Implementation tasks (MVP slice)
+
+- [ ] Backend: sign-up with email + password, reject duplicate email.
+- [ ] Backend: sign-in + session cookie, dependency to resolve current user.
+- [ ] Backend: logout, invalidates the session.
+- [ ] Backend: forgot/reset password flow (the specific gap from v1 — needs its own test).
+- [ ] Frontend: sign-up / sign-in forms against the above.
+
+MVP note: OAuth and sign-up email verification are deferred past this slice; ship email/password first.
+
 ---
 
 ## #3 — Auth: TOTP two-factor authentication
@@ -58,6 +76,12 @@ Optional two-factor authentication (TOTP, RFC 6238), off by default, via `pyotp`
 - Applies to email/password sign-in; OAuth defers to the provider's own 2FA.
 
 Ref: `_docs/specs.md` → Authentication, `_docs/schema.sql` → `users.totp_*`, `totp_recovery_codes`.
+
+
+
+## Implementation tasks (MVP slice)
+
+No MVP-slice breakdown yet — 2FA is deferred past the MVP slice (see issue #2's note). Revisit once email/password auth is working end to end.
 
 ---
 
@@ -78,6 +102,17 @@ Experiment CRUD and lifecycle: Backlog → Active → Check-in Due (badge) → R
 - Ending early without a one-line reason is blocked; the reason is stored permanently.
 
 Ref: `_docs/specs.md` → Board model, Core entities, Abandoning something early.
+
+
+
+## Implementation tasks (MVP slice)
+
+- [ ] Backend: create experiment (title, hypothesis, cadence, target duration; 400 on missing field; checked against the WIP limit from #7).
+- [ ] Backend: list + get experiments, scoped to the signed-in user (proves per-user isolation).
+- [ ] Backend: log a check-in, rejected unless the experiment is Active.
+- [ ] Backend: archive, blocked without a retro (duration ran out) or a one-line abandon reason (ended early).
+- [ ] Frontend: experiment detail page + check-in form.
+- [ ] Frontend: archive/retro form, mirrors the backend's own validation client-side.
 
 ---
 
@@ -190,6 +225,12 @@ Dashboard and the calm landing/greeting screen.
 
 Ref: `_docs/specs.md` → Landing screen and dashboard, Streaks.
 
+
+
+## Implementation tasks (MVP slice)
+
+- [ ] Frontend: dashboard card grid listing the signed-in user's experiments (MVP: list + stage only, filters/streak/ratio tiles can follow once data exists).
+
 ---
 
 ## #11 — Calendar: week and month views
@@ -244,6 +285,12 @@ Multi-step creation wizard for a new experiment or goal, with a side progress ra
 
 Ref: `_docs/specs.md` → Creating an experiment or a goal.
 
+
+
+## Implementation tasks (MVP slice)
+
+- [ ] Frontend: plain new-experiment form (hypothesis, cadence, target duration) wired to `POST /experiments`. The multi-step wizard + side progress rail is a follow-up polish pass once the fields and the request round-trip work.
+
 ---
 
 ## #14 — Backend data layer: Postgres + repository interface
@@ -261,6 +308,13 @@ Backend data layer: PostgreSQL from the start, behind a repository interface.
 - Each user's data is isolated; no cross-user reads or writes.
 
 Ref: `_docs/specs.md` → Technical plan, `_docs/schema.sql`, `_docs/architecture.html`.
+
+
+
+## Implementation tasks (MVP slice)
+
+- [ ] Repository interface + in-memory implementation first — every later backend task is written against the interface, not a concrete store.
+- [ ] Swap in the Postgres implementation once the schema in `_docs/schema.sql` is wired up; no route/service changes, only a second implementation of the same interface.
 
 ---
 
@@ -281,6 +335,12 @@ Hosting and deployment.
 
 Ref: `_docs/specs.md` → Tech stack (Infra, Hosting).
 
+
+
+## Implementation tasks (MVP slice)
+
+- [ ] Docker Compose: backend, frontend, and Postgres as three services, one `docker compose up`, no manual steps after it. Deploying that compose file to the actual VPS/domain is a separate follow-up once it runs locally.
+
 ---
 
 ## #16 — Backend test suite (pytest)
@@ -298,6 +358,13 @@ Backend test suite (pytest + FastAPI's test client), covering the acceptance cri
 
 Ref: `_docs/specs.md` → Technical plan, step 8.
 
+
+
+## Implementation tasks (MVP slice)
+
+- [ ] Project setup: backend scaffold with pytest wired up and one trivial passing test.
+- [ ] `GET /health` endpoint + test — proves the app boots before any real endpoint is built.
+
 ---
 
 ## #17 — Frontend test suite (Vitest + RTL)
@@ -314,6 +381,13 @@ Frontend test suite: Vitest + React Testing Library.
 
 Ref: `_docs/specs.md` → Tech stack, Technical plan step 8.
 
+
+
+## Implementation tasks (MVP slice)
+
+- [ ] Project setup: frontend scaffold with Vitest wired up and one trivial passing test.
+- [ ] Frontend project wired to the backend's `/health` endpoint (proves CORS/base-URL config before real UI work).
+
 ---
 
 ## #18 — CI/CD pipeline (deferred)
@@ -328,6 +402,12 @@ CI/CD pipeline.
 **Deferred** — explicitly held for later in discussion with the user; revisit once the MVP backend/frontend exist. Should include: automated test run on PR, Dependabot/Renovate for dependency updates with CI as the merge gate (see cost/vulnerability discussion), and a deploy step to the VPS.
 
 Ref: conversation history — "hold for now" on CI/CD.
+
+
+
+## Implementation tasks (MVP slice)
+
+- [ ] GitHub Actions workflow: run `pytest` and `vitest run` on every pull request against `main`. This is just the merge gate — the deploy step stays deferred as noted above.
 
 ---
 
@@ -347,5 +427,3 @@ A single public landing page for unauthenticated visitors, separate from the sig
 - Same restrained, neumorphic design direction as the rest of the product — not a typical SaaS gradient-hero page.
 
 Ref: `_docs/specs.md` → Public landing page.
-
----
