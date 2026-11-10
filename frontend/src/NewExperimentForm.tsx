@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useAuth } from './AuthContext'
 
 const BASE_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8000'
 
 function NewExperimentForm() {
   const navigate = useNavigate()
+  const { refetch } = useAuth()
   const [title, setTitle] = useState('')
   const [hypothesis, setHypothesis] = useState('')
   const [cadenceType, setCadenceType] = useState('')
@@ -50,6 +52,7 @@ function NewExperimentForm() {
       .then(async (res) => {
         const data = await res.json()
         if (!res.ok) throw new Error(data.detail)
+        refetch()
         navigate('/dashboard')
       })
       .catch((err: Error) => setError(err.message))

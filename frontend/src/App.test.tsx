@@ -106,4 +106,17 @@ describe('App', () => {
     await waitFor(() => expect(screen.getByText('I will feel better')).toBeInTheDocument())
     expect(screen.getByText('Status: active')).toBeInTheDocument()
   })
+
+  it('makes exactly one GET /experiments call on a signed-in dashboard visit', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => [experiment] })
+    vi.stubGlobal('fetch', fetchMock)
+    window.history.pushState({}, '', '/dashboard')
+
+    render(<App />)
+
+    await waitFor(() => expect(screen.getByText('Drink more water')).toBeInTheDocument())
+
+    const experimentsCalls = fetchMock.mock.calls.filter((call) => (call[0] as string).endsWith('/experiments'))
+    expect(experimentsCalls).toHaveLength(1)
+  })
 })

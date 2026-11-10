@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import NewExperimentForm from './NewExperimentForm'
+import { AuthProvider } from './AuthContext'
 
 const created = {
   id: 'exp-1',
@@ -21,12 +22,14 @@ function fillRequiredFields() {
 
 function renderForm() {
   return render(
-    <MemoryRouter initialEntries={['/experiments/new']}>
-      <Routes>
-        <Route path="/experiments/new" element={<NewExperimentForm />} />
-        <Route path="/dashboard" element={<p>Dashboard view</p>} />
-      </Routes>
-    </MemoryRouter>,
+    <AuthProvider>
+      <MemoryRouter initialEntries={['/experiments/new']}>
+        <Routes>
+          <Route path="/experiments/new" element={<NewExperimentForm />} />
+          <Route path="/dashboard" element={<p>Dashboard view</p>} />
+        </Routes>
+      </MemoryRouter>
+    </AuthProvider>,
   )
 }
 
@@ -37,10 +40,13 @@ describe('NewExperimentForm', () => {
   })
 
   it('submits the required fields and navigates to the dashboard on success', async () => {
-    const fetchMock = vi.fn().mockResolvedValueOnce({
-      ok: true,
-      status: 201,
-      json: async () => created,
+    // AuthProvider's own mount-time GET /experiments shares the mock with
+    // the form's POST and the post-create refetch.
+    const fetchMock = vi.fn((_url: string, init?: RequestInit) => {
+      if (init?.method === 'POST') {
+        return Promise.resolve({ ok: true, status: 201, json: async () => created })
+      }
+      return Promise.resolve({ ok: true, json: async () => [created] })
     })
     vi.stubGlobal('fetch', fetchMock)
 
@@ -65,8 +71,8 @@ describe('NewExperimentForm', () => {
     )
   })
 
-  it('blocks a custom-cadence submission with blank cadence_days, with no fetch call', () => {
-    const fetchMock = vi.fn()
+  it('blocks a custom-cadence submission with blank cadence_days, with no POST call', () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => [] })
     vi.stubGlobal('fetch', fetchMock)
 
     renderForm()
@@ -74,15 +80,19 @@ describe('NewExperimentForm', () => {
     fireEvent.change(screen.getByPlaceholderText('Cadence type'), { target: { value: 'custom' } })
     fireEvent.click(screen.getByRole('button', { name: 'Create experiment' }))
 
-    expect(fetchMock).not.toHaveBeenCalled()
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ method: 'POST' }),
+    )
     expect(screen.getByRole('alert')).toHaveTextContent(/cadence_days is required/i)
   })
 
   it('shows the backend error text on a rejected submission', async () => {
-    const fetchMock = vi.fn().mockResolvedValueOnce({
-      ok: false,
-      status: 400,
-      json: async () => ({ detail: 'cadence_type is required' }),
+    const fetchMock = vi.fn((_url: string, init?: RequestInit) => {
+      if (init?.method === 'POST') {
+        return Promise.resolve({ ok: false, status: 400, json: async () => ({ detail: 'cadence_type is required' }) })
+      }
+      return Promise.resolve({ ok: true, json: async () => [] })
     })
     vi.stubGlobal('fetch', fetchMock)
 

@@ -1,28 +1,8 @@
-import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-
-const BASE_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8000'
-
-type Experiment = {
-  id: string
-  title: string
-  cadence_type: string
-  status: string
-}
+import { useAuth } from './AuthContext'
 
 function Dashboard() {
-  const [experiments, setExperiments] = useState<Experiment[] | null>(null)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    fetch(`${BASE_URL}/experiments`, { credentials: 'include' })
-      .then(async (res) => {
-        const data = await res.json()
-        if (!res.ok) throw new Error(data.detail)
-        setExperiments(data)
-      })
-      .catch((err: Error) => setError(err.message))
-  }, [])
+  const { experiments, experimentsError: error } = useAuth()
 
   return (
     <div>
