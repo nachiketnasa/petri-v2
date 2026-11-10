@@ -4,6 +4,7 @@ import reactLogo from './assets/react.svg'
 import viteLogo from './assets/vite.svg'
 import HealthStatus from './HealthStatus'
 import AuthForm from './AuthForm'
+import Dashboard from './Dashboard'
 import './App.css'
 
 function App() {
@@ -32,6 +33,7 @@ function App() {
         </button>
         <HealthStatus />
         <AuthForm />
+        <Dashboard />
       </section>
 
       <div className="ticks"></div>
