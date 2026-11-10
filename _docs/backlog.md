@@ -178,6 +178,45 @@ the task template before implementation.
 
 ---
 
+## order-04c · #21 — Auth: send real emails for password reset (replace dev-log token)
+
+- **Status**: OPEN
+- **Labels**: backend, auth
+- **Link**: https://github.com/nachiketnasa/petri-v2/issues/21
+
+## What
+
+The forgot/reset password flow being built on #2 (`order-04`, see the
+"## Groomed: forgot/reset password" comment there) writes the reset token
+to stdout instead of emailing it — a deliberate MVP stand-in, not the
+real behavior. This issue is the real implementation: send the reset
+token to the user's actual email address via a real provider, per
+`_docs/specs.md`'s tech stack decision (Resend for now, behind a
+swappable interface so switching to Brevo/SES later needs no rewrite).
+
+## Acceptance criteria
+
+- [ ] `POST /auth/forgot-password` sends an email containing the reset
+      link/token to the requesting user's address, instead of (or in
+      addition to, during transition) printing it to stdout.
+- [ ] Email sending goes through a small interface
+      (`send_password_reset_email`, per `_docs/specs.md` → Technical
+      plan) rather than calling Resend's SDK directly from the route.
+- [ ] No enumeration regression: the forgot-password response is
+      identical whether or not the email is registered, exactly as #2's
+      dev-log version already requires — sending (or not sending) an
+      email must not leak anything observable in the HTTP response.
+- [ ] Missing/invalid Resend API key or a provider error does not 500 the
+      request in a way that reveals account existence; fails safely.
+
+Ref: `_docs/specs.md` → Authentication, Technical plan.
+
+Split out while grooming #2's "forgot/reset password" checklist line,
+since this needs its own Resend account/API key (an external dependency
+the dev-log version deliberately avoided) and shouldn't block that task.
+
+---
+
 ## order-05 · #4 — Experiments: CRUD + lifecycle + check-ins + retro gate
 
 - **Status**: OPEN
