@@ -19,7 +19,11 @@ Lifecycle
 3. Engineer implements it
 4. QA verifies it
 5. On FAIL, back to step 3 with the QA comment as input
-6. On PASS, close the issue
+6. On PASS: check off the groomed checklist line on the issue (if PM
+   groomed one line rather than the whole issue), regenerate
+   `_docs/backlog.md` with `scripts/regenerate_backlog.py`, and commit.
+   Close the issue only once every line/criterion on it is checked —
+   most issues take several passes through this loop before that's true.
 7. Repeat until the backlog is empty
 
 Rules
