@@ -162,7 +162,7 @@ Ref: `_docs/specs.md` → Authentication.
 
 ## Implementation tasks (MVP slice)
 
-- [ ] Backend: sign-up with email + password, reject duplicate email.
+- [x] Backend: sign-up with email + password, reject duplicate email.
 - [ ] Backend: sign-in + session cookie, dependency to resolve current user.
 - [ ] Backend: logout, invalidates the session.
 - [ ] Backend: forgot/reset password flow (the specific gap from v1 — needs its own test).
