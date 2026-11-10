@@ -80,6 +80,27 @@ describe('AuthForm', () => {
     )
   })
 
+  it('shows the backend error text on a failed sign up', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 400,
+        json: async () => ({ detail: 'Email already registered' }),
+      }),
+    )
+
+    render(<AuthForm />)
+    fireEvent.change(screen.getByPlaceholderText('Email'), { target: { value: 'new@x.com' } })
+    fireEvent.change(screen.getByPlaceholderText('Password'), { target: { value: 'secret123' } })
+    fireEvent.change(screen.getByPlaceholderText('Display name'), { target: { value: 'New' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Sign up' }))
+
+    await waitFor(() =>
+      expect(screen.getByText('Email already registered')).toBeInTheDocument(),
+    )
+  })
+
   it('shows the backend error text on a failed sign in', async () => {
     vi.stubGlobal(
       'fetch',
