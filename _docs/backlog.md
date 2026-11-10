@@ -141,7 +141,7 @@ Ref: `_docs/specs.md` → Authentication.
 - [x] Backend: sign-in + session cookie, dependency to resolve current user.
 - [x] Backend: logout, invalidates the session.
 - [x] Backend: forgot/reset password flow (the specific gap from v1 — needs its own test).
-- [ ] Frontend: sign-up / sign-in forms against the above.
+- [x] Frontend: sign-up / sign-in forms against the above.
 
 MVP note: OAuth and sign-up email verification are deferred past this slice; ship email/password first.
 
@@ -268,6 +268,71 @@ from the emailed (for now, dev-log-printed, see #21) token.
   (`import.meta.env.VITE_BACKEND_URL`) and whatever pattern the
   sign-up/sign-in forms task (#2) establishes for calling the backend
   and rendering errors.
+
+---
+
+## order-04e · #23 — Auth: sign-up email verification code
+
+- **Status**: OPEN
+- **Labels**: backend, auth
+- **Link**: https://github.com/nachiketnasa/petri-v2/issues/23
+
+## What
+
+#2's own Acceptance criteria requires "email + password sign-up requires a
+verification code," but the MVP-slice checklist on #2 (now fully checked)
+only covers unverified sign-up — no email is sent, no verification step
+exists, and an unverified account can sign in immediately. This issue is
+that missing verification step.
+
+## Acceptance criteria
+
+- [ ] On sign-up, a verification code/link is generated and sent to the
+      user's email (reuse whatever provider interface #21, order-04c,
+      ends up building for password reset — don't build a second one).
+- [ ] An unverified account cannot sign in (or is clearly marked
+      unverified) until the code is confirmed.
+- [ ] Confirming the code marks the account verified; confirming twice or
+      with a wrong/expired code fails cleanly without revealing which.
+
+Ref: `_docs/specs.md` → Authentication.
+
+Split out while auditing #2's full scope against its MVP checklist: this
+line in the original Acceptance criteria was never captured in any
+checklist item.
+
+---
+
+## order-04f · #24 — Auth: OAuth sign-up/sign-in (Google, LinkedIn, Microsoft)
+
+- **Status**: OPEN
+- **Labels**: backend, auth
+- **Link**: https://github.com/nachiketnasa/petri-v2/issues/24
+
+## What
+
+#2's own Acceptance criteria and title both include OAuth (Google,
+LinkedIn, Microsoft), explicitly deferred past the MVP slice ("OAuth and
+sign-up email verification are deferred past this slice; ship
+email/password first" — #2's own MVP note). The MVP checklist on #2 is
+now fully checked and only covers email/password. This issue is OAuth
+itself.
+
+## Acceptance criteria
+
+- [ ] Sign-up/sign-in via Google, LinkedIn, and Microsoft OAuth (Apple
+      excluded per #2's own acceptance criteria — cost).
+- [ ] One account per email address across every method — signing up via
+      OAuth with an email already registered under email/password (or a
+      different OAuth provider) never reveals that on screen, only by
+      email to that address (matches the no-enumeration pattern #2's
+      email/password flow already follows).
+- [ ] 2FA (#3) continues to defer to the OAuth provider's own security for
+      OAuth sign-ins, per #2's acceptance criteria.
+
+Ref: `_docs/specs.md` → Authentication.
+
+Split out while auditing #2's full scope against its MVP checklist.
 
 ---
 
@@ -591,3 +656,39 @@ Public sharing, likes, and comments.
 - Turning sharing off deletes all likes/comments and invalidates the link; re-enabling issues a new token, starting at zero.
 
 Ref: `_docs/specs.md` → Sharing model. `_docs/schema.sql` → `shares`, `comments`, `likes`.
+
+---
+
+## order-18b · #25 — Auth: account deletion (backend cascade)
+
+- **Status**: OPEN
+- **Labels**: backend, auth
+- **Link**: https://github.com/nachiketnasa/petri-v2/issues/25
+
+## What
+
+#2's own Acceptance criteria requires "full account deletion removes the
+user's board, check-ins, retros, other tasks, and their own comments
+elsewhere," but no checklist item on #2 (now fully checked) covers it.
+#12 (Settings screen) has an "account deletion" bullet, but that's the
+frontend entry point/button — this issue is the backend logic it calls.
+
+## Acceptance criteria
+
+- [ ] A backend endpoint deletes the signed-in user's account: their user
+      record, every experiment/goal/milestone/check-in/retro/other task
+      they own, their own comments on other people's shared pages, and
+      invalidates every session for that user.
+- [ ] Deleting an account does not delete content other users still need
+      intact — e.g. a comment someone else left on this user's (now
+      deleted) shared page should itself be removed too, per the shared
+      page cascading when sharing is turned off (see #9's own acceptance
+      criteria for that cascade's shape).
+- [ ] The endpoint requires authentication (`get_current_user`) and cannot
+      delete a different user's account.
+
+Ref: `_docs/specs.md` → Authentication, Accounts.
+
+Split out while auditing #2's full scope against its MVP checklist.
+Depends on #4 (experiments)/#5 (goals)/#9 (sharing) existing first, since
+the cascade touches their data — scheduled after those in the sequence.
