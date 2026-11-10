@@ -4,7 +4,7 @@ A local mirror of the public task tracker: https://github.com/nachiketnasa/petri
 
 Generated from the tracker on 2026-11-11. The tracker is the source of truth; this file is a readable snapshot committed alongside the spec, not edited independently — re-generate it instead of hand-editing when issues change.
 
-**Listed in build order, not issue-number order.** Each issue carries an `order-NN` label marking when work on it should start; issues sharing a number are meant to start together (e.g. the two project-setup scaffolds). Give any new issue an `order-NN` label before filing it, placed at the point in the sequence where it belongs — otherwise it sorts last, below.
+**Listed in build order, not issue-number order.** Each issue carries an `order-NN` label marking when work on it should start; issues sharing a number are meant to start together (e.g. the two project-setup scaffolds). Give any new issue an `order-NN` label before filing it, placed at the point in the sequence where it belongs — otherwise it sorts last, below. Issues #1, #16, and #17 span the whole product (the contract and the two test suites), so their own Acceptance criteria is a checklist of the other issues that complete them, not a bounded task on its own.
 
 ## order-01 · #16 — Backend test suite (pytest)
 
@@ -16,8 +16,25 @@ Generated from the tracker on 2026-11-11. The tracker is the source of truth; th
 Backend test suite (pytest + FastAPI's test client), covering the acceptance criteria in `_docs/specs.md`.
 
 ## Acceptance criteria
-- Key endpoints covered: auth (incl. 2FA), create/list/update experiment and goal, log check-in, create retro, sharing, other tasks.
-- Tests run against the contract behavior, not implementation details.
+
+This issue closes when every line below is checked. Each one ticks as a side
+effect of its source issue's own Engineer pass (whose own definition of done
+already requires tests for new behavior) — this list exists so the running
+total is visible here instead of implicit.
+
+- [x] App boots, `GET /health` covered — this issue, health-check sub-task
+- [ ] Repository interface / data layer tests — #14
+- [ ] Auth tests — #2
+- [ ] 2FA tests — #3
+- [ ] Experiment CRUD/lifecycle/check-in/retro tests — #4
+- [ ] WIP limit enforcement tests — #7
+- [ ] Goal CRUD/milestone tests — #5
+- [ ] Evolve/branch lineage tests — #6
+- [ ] Other tasks tests — #8
+- [ ] Sharing/likes/comments tests — #9
+
+Tests run against contract behavior (what an endpoint does), not
+implementation details, throughout.
 
 Ref: `_docs/specs.md` → Technical plan, step 8.
 
@@ -40,7 +57,17 @@ Ref: `_docs/specs.md` → Technical plan, step 8.
 Frontend test suite: Vitest + React Testing Library.
 
 ## Acceptance criteria
-- Component/interaction-level tests covering the acceptance criteria in `_docs/specs.md`.
+
+This issue closes when every line below is checked, the same way as #16.
+
+- [x] Health-check wiring covered — this issue, health-check sub-task
+- [ ] Auth forms tests — #2
+- [ ] Dashboard + landing/greeting tests — #10
+- [ ] Creation wizard tests — #13
+- [ ] Experiment detail/check-in/archive UI tests — #4
+- [ ] Public landing page tests — #19
+- [ ] Calendar tests — #11
+- [ ] Settings screen tests — #12
 
 Ref: `_docs/specs.md` → Tech stack, Technical plan step 8.
 
@@ -88,8 +115,19 @@ Ref: `_docs/specs.md` → Technical plan, `_docs/schema.sql`, `_docs/architectur
 Define `openapi.yaml` as the source of truth for every endpoint, before any backend implementation starts.
 
 ## Acceptance criteria
-- Covers auth (OAuth, email/password, verification, reset, 2FA, sessions), experiments, goals, milestones, check-ins, retros, other tasks, sharing, comments, likes.
-- Frontend and backend both generate/validate against it.
+
+This issue closes when every line below is checked — each is covered by the
+contract work landing alongside its source issue, not written speculatively
+ahead of time.
+
+- [ ] Auth endpoints (OAuth, email/password, verification, reset, sessions) — #2
+- [ ] 2FA endpoints — #3
+- [ ] Experiment endpoints (CRUD, lifecycle, check-ins, retro) — #4
+- [ ] Goal endpoints (CRUD, milestones) — #5
+- [ ] Evolve/branch endpoints — #6
+- [ ] Other tasks endpoints — #8
+- [ ] Sharing/comments/likes endpoints — #9
+- [ ] Frontend and backend both generate/validate against `openapi.yaml` (checked once the above are in and both sides reference the file)
 
 Ref: `_docs/specs.md` → Technical plan, step 3.
 
