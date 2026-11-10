@@ -24,7 +24,16 @@ Lifecycle
    `_docs/backlog.md` with `scripts/regenerate_backlog.py`, and commit.
    Close the issue only once every line/criterion on it is checked —
    most issues take several passes through this loop before that's true.
-7. Repeat until the backlog is empty
+7. Before moving to the next order number: if this pass named anything
+   as out of scope or deferred (per PM's rule below), check it already
+   has an `order-NN` (or lettered `order-NNx`) label somewhere. If not,
+   assign one now — a deferred item with no schedule position silently
+   falls out of the backlog instead of coming back later. Also check
+   whether the next order number actually depends on something still
+   unchecked in the current issue (e.g. a later feature needing an
+   earlier feature's current-user resolution) — if so, finish the
+   current issue's blocking line(s) first rather than advancing anyway.
+8. Repeat until the backlog is empty
 
 Rules
 

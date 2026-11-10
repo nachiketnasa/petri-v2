@@ -28,4 +28,8 @@ Definition of done:
 
 If something does not belong in this task, do not silently drop it.
 File a follow-up issue and list it under out of scope with a link to
-that issue, so it is clear what was moved and where it went.
+that issue, so it is clear what was moved and where it went. Either way —
+a new follow-up issue or an existing checklist line you're leaving for
+later — make sure it carries (or gets) an `order-NN` label marking when
+it's actually due. Out of scope without a schedule position is how work
+gets lost; "noted in a comment somewhere" doesn't count as tracked.
