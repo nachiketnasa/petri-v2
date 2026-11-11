@@ -97,12 +97,20 @@ describe('App', () => {
 
     fireEvent.click(screen.getByRole('link', { name: 'New experiment' }))
 
-    await waitFor(() => expect(screen.getByRole('heading', { name: 'New experiment' })).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Details' })).toBeInTheDocument())
 
     fireEvent.change(screen.getByPlaceholderText('Title'), { target: { value: 'Drink more water' } })
     fireEvent.change(screen.getByPlaceholderText('Hypothesis'), { target: { value: 'I will feel better' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Cadence' })).toBeInTheDocument())
+
     fireEvent.change(screen.getByPlaceholderText('Cadence type'), { target: { value: 'daily' } })
     fireEvent.change(screen.getByPlaceholderText('Target days'), { target: { value: '30' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Review' })).toBeInTheDocument())
+
     fireEvent.click(screen.getByRole('button', { name: 'Create experiment' }))
 
     await waitFor(() => expect(screen.getByText('Drink more water')).toBeInTheDocument())

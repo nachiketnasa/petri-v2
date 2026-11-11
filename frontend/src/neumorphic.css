@@ -143,6 +143,54 @@
   margin-top: 8px;
 }
 
+.wizard {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+.wizard-rail ol {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 0;
+  margin: 0;
+}
+
+.wizard-step-button {
+  border: none;
+  border-radius: 12px;
+  padding: 10px 18px;
+  min-width: 120px;
+  text-align: left;
+  font-size: 14px;
+  background: var(--neu-surface);
+  color: var(--text);
+  box-shadow: 6px 6px 12px var(--neu-shadow-dark), -6px -6px 12px var(--neu-shadow-light);
+  cursor: pointer;
+}
+
+.wizard-step-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+  box-shadow: none;
+}
+
+.wizard-step-button.completed {
+  color: var(--sage);
+}
+
+.wizard-step-button.current {
+  color: var(--sage);
+  font-weight: 700;
+  box-shadow: inset 4px 4px 8px var(--neu-shadow-dark), inset -4px -4px 8px var(--neu-shadow-light);
+}
+
+.wizard-content {
+  flex: 1;
+}
+
 .backlog-section h3,
 .goals-section h3 {
   font-size: 16px;
