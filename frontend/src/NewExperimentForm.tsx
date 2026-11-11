@@ -137,32 +137,37 @@ function NewExperimentForm() {
 
       <div className="wizard-content">
         {step === 0 && (
-          <form onSubmit={handleDetailsNext}>
+          <form onSubmit={handleDetailsNext} className="raised" style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 12 }}>
             <h2>Details</h2>
             <input
               type="text"
               placeholder="Title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
+              className="input"
             />
             <input
               type="text"
               placeholder="Hypothesis"
               value={hypothesis}
               onChange={(e) => setHypothesis(e.target.value)}
+              className="input"
             />
             {stepError && <p role="alert">{stepError}</p>}
-            <button type="submit">Next</button>
+            <button type="submit" className="btn btn-primary-exp">
+              Next
+            </button>
           </form>
         )}
 
         {step === 1 && (
-          <form onSubmit={handleCadenceNext}>
+          <form onSubmit={handleCadenceNext} className="raised" style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 12 }}>
             <h2>Cadence</h2>
             <select
               aria-label="Cadence type"
               value={cadenceType}
               onChange={(e) => setCadenceType(e.target.value)}
+              className="input"
             >
               <option value="">Cadence type</option>
               <option value="daily">Daily</option>
@@ -174,6 +179,7 @@ function NewExperimentForm() {
               placeholder="Target days"
               value={targetDays}
               onChange={(e) => setTargetDays(e.target.value)}
+              className="input"
             />
             {cadenceType === 'custom' && (
               <input
@@ -181,12 +187,14 @@ function NewExperimentForm() {
                 placeholder="Cadence days"
                 value={cadenceDays}
                 onChange={(e) => setCadenceDays(e.target.value)}
+                className="input"
               />
             )}
             <select
               aria-label="Check-in kind"
               value={checkInKind}
               onChange={(e) => setCheckInKind(e.target.value)}
+              className="input"
             >
               <option value="">Check-in kind</option>
               <option value="boolean">Boolean</option>
@@ -197,17 +205,22 @@ function NewExperimentForm() {
               placeholder="Start date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
+              className="input"
             />
             {stepError && <p role="alert">{stepError}</p>}
-            <button type="button" onClick={handleBack}>
-              Back
-            </button>
-            <button type="submit">Next</button>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button type="button" onClick={handleBack} className="btn btn-text">
+                Back
+              </button>
+              <button type="submit" className="btn btn-primary-exp">
+                Next
+              </button>
+            </div>
           </form>
         )}
 
         {step === 2 && (
-          <div>
+          <div className="raised" style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 10 }}>
             <h2>Review</h2>
             <p>Title: {title}</p>
             <p>Hypothesis: {hypothesis}</p>
@@ -219,12 +232,14 @@ function NewExperimentForm() {
             {checkInKind !== '' && <p>Check-in kind: {checkInKind}</p>}
             {startDate !== '' && <p>Start date: {startDate}</p>}
             {submitError && <p role="alert">{submitError}</p>}
-            <button type="button" onClick={handleBack}>
-              Back
-            </button>
-            <button type="button" onClick={handleSubmit} disabled={submitting}>
-              Create experiment
-            </button>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button type="button" onClick={handleBack} className="btn btn-text">
+                Back
+              </button>
+              <button type="button" onClick={handleSubmit} disabled={submitting} className="btn btn-primary-exp">
+                Create experiment
+              </button>
+            </div>
           </div>
         )}
       </div>

@@ -60,42 +60,65 @@ function AuthForm({ onAuthenticated }: Props) {
   }
 
   return (
-    <div className="auth-screen">
-      <form onSubmit={handleSubmit} className="auth-form neu-card">
-        <h2>{mode === 'signup' ? 'Sign up' : 'Sign in'}</h2>
-        <input
-          type="email"
-          placeholder="Email"
-          required
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="neu-input"
-        />
-        <input
-          type="password"
-          placeholder="Password"
-          required
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="neu-input"
-        />
-        {mode === 'signup' && (
+    <div className="auth-wrap">
+      <form onSubmit={handleSubmit} className="raised auth-panel">
+        <div>
+          <div className="wordmark">Petri</div>
+          <h2 className="auth-tagline">{mode === 'signup' ? 'Sign up' : 'Sign in'}</h2>
+        </div>
+        <div className="auth-field">
+          <label className="label" htmlFor="auth-email">
+            Email
+          </label>
           <input
-            type="text"
-            placeholder="Display name"
+            id="auth-email"
+            type="email"
+            placeholder="you@example.com"
             required
-            value={displayName}
-            onChange={(e) => setDisplayName(e.target.value)}
-            className="neu-input"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="input"
           />
+        </div>
+        <div className="auth-field">
+          <label className="label" htmlFor="auth-password">
+            Password
+          </label>
+          <input
+            id="auth-password"
+            type="password"
+            placeholder="••••••••"
+            required
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="input"
+          />
+        </div>
+        {mode === 'signup' && (
+          <div className="auth-field">
+            <label className="label" htmlFor="auth-display-name">
+              Display name
+            </label>
+            <input
+              id="auth-display-name"
+              type="text"
+              placeholder="Your name"
+              required
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              className="input"
+            />
+          </div>
         )}
         {error && <p role="alert">{error}</p>}
-        <button type="submit" disabled={loading} className="neu-button">
+        <button type="submit" disabled={loading} className="btn btn-primary-exp" style={{ justifyContent: 'center' }}>
           {mode === 'signup' ? 'Sign up' : 'Sign in'}
         </button>
-        <button type="button" onClick={toggleMode} disabled={loading} className="neu-button-ghost">
-          {mode === 'signup' ? 'Switch to sign in' : 'Switch to sign up'}
-        </button>
+        <div className="auth-foot">
+          <button type="button" onClick={toggleMode} disabled={loading} className="btn btn-text">
+            {mode === 'signup' ? 'Switch to sign in' : 'Switch to sign up'}
+          </button>
+        </div>
       </form>
     </div>
   )

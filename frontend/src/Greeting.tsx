@@ -20,6 +20,14 @@ export function rememberDisplayName(name: string) {
   }
 }
 
+export function getStoredDisplayName(): string {
+  try {
+    return localStorage.getItem(STORAGE_KEY) ?? ''
+  } catch {
+    return ''
+  }
+}
+
 export function salutationFor(date: Date): string {
   const hour = date.getHours()
   if (hour < 12) return 'Good morning'
@@ -30,13 +38,7 @@ export function salutationFor(date: Date): string {
 function Greeting() {
   const navigate = useNavigate()
 
-  const [displayName] = useState(() => {
-    try {
-      return localStorage.getItem(STORAGE_KEY) ?? ''
-    } catch {
-      return ''
-    }
-  })
+  const [displayName] = useState(getStoredDisplayName)
 
   const salutation = salutationFor(new Date())
   const greetingText = displayName ? `${salutation}, ${displayName}.` : `${salutation}.`
@@ -45,7 +47,7 @@ function Greeting() {
     <div className="greeting-screen">
       <p className="greeting-text">{greetingText}</p>
       <p className="greeting-due">Nothing due today.</p>
-      <button type="button" className="greeting-action" onClick={() => navigate('/dashboard')}>
+      <button type="button" className="btn btn-primary-exp" onClick={() => navigate('/dashboard')}>
         Open dashboard
       </button>
     </div>

@@ -19,10 +19,10 @@ describe('Settings', () => {
   it('renders exactly four theme options, with Petri Light selected by default', () => {
     render(<Settings />)
 
-    expect(screen.getByRole('radio', { name: 'Petri Light' })).toBeChecked()
-    expect(screen.getByRole('radio', { name: 'Petri Dark' })).not.toBeChecked()
-    expect(screen.getByRole('radio', { name: 'Solarized Light' })).not.toBeChecked()
-    expect(screen.getByRole('radio', { name: 'Solarized Dark' })).not.toBeChecked()
+    expect(screen.getByRole('radio', { name: 'Petri light' })).toBeChecked()
+    expect(screen.getByRole('radio', { name: 'Petri dark' })).not.toBeChecked()
+    expect(screen.getByRole('radio', { name: 'Solarized light' })).not.toBeChecked()
+    expect(screen.getByRole('radio', { name: 'Solarized dark' })).not.toBeChecked()
     expect(screen.getAllByRole('radio')).toHaveLength(4)
   })
 
@@ -43,7 +43,7 @@ describe('Settings', () => {
   it('selecting a theme sets data-theme on <html> immediately and persists it to localStorage', () => {
     render(<Settings />)
 
-    fireEvent.click(screen.getByRole('radio', { name: 'Solarized Dark' }))
+    fireEvent.click(screen.getByRole('radio', { name: 'Solarized dark' }))
 
     expect(document.documentElement.getAttribute('data-theme')).toBe('solarized-dark')
     expect(localStorage.getItem('petri:theme')).toBe('solarized-dark')
@@ -51,7 +51,7 @@ describe('Settings', () => {
 
   it('a stored theme survives a reload: applyStoredTheme reads it back and re-applies it', () => {
     render(<Settings />)
-    fireEvent.click(screen.getByRole('radio', { name: 'Petri Dark' }))
+    fireEvent.click(screen.getByRole('radio', { name: 'Petri dark' }))
 
     // Simulate a fresh page load.
     document.documentElement.removeAttribute('data-theme')
@@ -63,17 +63,17 @@ describe('Settings', () => {
   it('exactly one theme option is selected at a time', () => {
     render(<Settings />)
 
-    fireEvent.click(screen.getByRole('radio', { name: 'Solarized Light' }))
+    fireEvent.click(screen.getByRole('radio', { name: 'Solarized light' }))
 
-    const checked = screen.getAllByRole('radio').filter((el) => (el as HTMLInputElement).checked)
+    const checked = screen.getAllByRole('radio').filter((el) => el.getAttribute('aria-checked') === 'true')
     expect(checked).toHaveLength(1)
-    expect(checked[0]).toHaveAccessibleName('Solarized Light')
+    expect(checked[0]).toHaveAccessibleName('Solarized light')
   })
 
   it('the sound effects toggle is off by default and persists when turned on', () => {
     render(<Settings />)
 
-    const toggle = screen.getByRole('checkbox', { name: 'Sound effects' })
+    const toggle = screen.getByRole('switch', { name: /Sound effects/ })
     expect(toggle).not.toBeChecked()
     expect(isSoundEnabled()).toBe(false)
 
@@ -87,7 +87,7 @@ describe('Settings', () => {
   it('the landing-screen preference is off by default and persists when turned on', () => {
     render(<Settings />)
 
-    const toggle = screen.getByRole('checkbox', { name: /dashboard directly/i })
+    const toggle = screen.getByRole('switch', { name: /dashboard directly|greeting screen first/i })
     expect(toggle).not.toBeChecked()
     expect(getLandingPreference()).toBe('greeting')
 

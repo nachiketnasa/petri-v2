@@ -57,9 +57,9 @@ describe('App', () => {
     // Initial /experiments check fails (not signed in yet) -> shows AuthForm
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Sign up' })).toBeInTheDocument())
 
-    fireEvent.change(screen.getByPlaceholderText('Email'), { target: { value: 'new@x.com' } })
-    fireEvent.change(screen.getByPlaceholderText('Password'), { target: { value: 'secret123' } })
-    fireEvent.change(screen.getByPlaceholderText('Display name'), { target: { value: 'New' } })
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'new@x.com' } })
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'secret123' } })
+    fireEvent.change(screen.getByLabelText('Display name'), { target: { value: 'New' } })
     fireEvent.click(screen.getByRole('button', { name: 'Sign up' }))
 
     // Sign-in now lands on the greeting screen, not the dashboard directly.
@@ -118,7 +118,7 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('link', { name: 'Drink more water' }))
 
     await waitFor(() => expect(screen.getByText('I will feel better')).toBeInTheDocument())
-    expect(screen.getByText('Status: active')).toBeInTheDocument()
+    expect(screen.getByText('Experiment, active')).toBeInTheDocument()
   })
 
   it('makes exactly one GET /experiments call on a signed-in dashboard visit', async () => {
@@ -251,9 +251,9 @@ describe('App', () => {
 
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Sign up' })).toBeInTheDocument())
 
-    fireEvent.change(screen.getByPlaceholderText('Email'), { target: { value: 'new@x.com' } })
-    fireEvent.change(screen.getByPlaceholderText('Password'), { target: { value: 'secret123' } })
-    fireEvent.change(screen.getByPlaceholderText('Display name'), { target: { value: 'New' } })
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'new@x.com' } })
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'secret123' } })
+    fireEvent.change(screen.getByLabelText('Display name'), { target: { value: 'New' } })
     fireEvent.click(screen.getByRole('button', { name: 'Sign up' }))
 
     await waitFor(() => expect(screen.getByText('No experiments yet.')).toBeInTheDocument())

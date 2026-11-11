@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { useEffect } from 'react'
-import { BrowserRouter, Link, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import HealthStatus from './HealthStatus'
 import AuthForm from './AuthForm'
 import Landing from './Landing'
@@ -11,32 +11,15 @@ import Greeting, { rememberDisplayName } from './Greeting'
 import NewExperimentForm from './NewExperimentForm'
 import Settings, { CookieNotice, applyStoredTheme, getLandingPreference } from './Settings'
 import { AuthProvider, useAuth } from './AuthContext'
-import './App.css'
 
 function landingPath() {
   return getLandingPreference() === 'dashboard' ? '/dashboard' : '/greeting'
 }
 
 function Header() {
-  const { signedIn, signOut } = useAuth()
-  const navigate = useNavigate()
-
-  function handleSignOut() {
-    signOut()
-    navigate('/')
-  }
-
   return (
-    <header className="app-header">
+    <header style={{ position: 'fixed', top: 12, right: 16, zIndex: 20 }}>
       <HealthStatus />
-      {signedIn && (
-        <>
-          <Link to="/settings">Settings</Link>
-          <button type="button" onClick={handleSignOut}>
-            Sign out
-          </button>
-        </>
-      )}
     </header>
   )
 }

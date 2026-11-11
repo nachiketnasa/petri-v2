@@ -147,117 +147,159 @@ function ExperimentDetail() {
   if (!experiment) return <p>Loading…</p>
 
   return (
-    <div className="detail-screen">
-      <div className="detail-card neu-card">
-        <h2>{experiment.title}</h2>
-        <p>{experiment.hypothesis}</p>
-        <p>
-          Cadence: {experiment.cadence_type}
-          {experiment.cadence_days != null && ` (every ${experiment.cadence_days} days)`}
-        </p>
-        <p>Check-in kind: {experiment.check_in_kind}</p>
-        <p>Start date: {experiment.start_date}</p>
-        <p>Target days: {experiment.target_days}</p>
-        <p>Status: {experiment.status}</p>
-        {experiment.abandon_reason != null && <p>Abandon reason: {experiment.abandon_reason}</p>}
-        <p>
-          <Link to={`/calendar/${experiment.id}`} className="neu-button-ghost">
-            View on calendar
-          </Link>
-        </p>
+    <div className="detail-wrap">
+      <div className="crumb">
+        <Link to="/dashboard">Back to the dashboard</Link>
       </div>
 
-      {experiment.status === 'active' ? (
-        <form onSubmit={handleSubmit} className="detail-form neu-card">
-          <h3>Log a check-in</h3>
-          <label>
-            <input
-              type="checkbox"
-              checked={valueBool}
-              onChange={(e) => setValueBool(e.target.checked)}
-            />
-            Value (bool)
-          </label>
-          <input
-            type="number"
-            placeholder="Rating"
-            value={valueRating}
-            onChange={(e) => setValueRating(e.target.value)}
-            className="neu-input"
-          />
-          <input
-            type="text"
-            placeholder="Note"
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            className="neu-input"
-          />
-          <input
-            type="datetime-local"
-            placeholder="Checked in at"
-            value={checkedInAt}
-            onChange={(e) => setCheckedInAt(e.target.value)}
-            className="neu-input"
-          />
-          {submitError && <p role="alert">{submitError}</p>}
-          <button type="submit" disabled={submitting} className="neu-button">
-            Log check-in
-          </button>
-        </form>
-      ) : (
-        <p>
-          Check-ins can only be logged while this experiment is Active — current status:{' '}
-          {experiment.status}
-        </p>
-      )}
+      <div className="detail-layout">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          <div className="raised head-card">
+            <div className="htop">
+              <span className="badge badge-exp">Experiment, {experiment.status}</span>
+              <Link to={`/calendar/${experiment.id}`} className="btn btn-text">
+                View on calendar
+              </Link>
+            </div>
+            <h2 className="card-title" style={{ marginTop: 10 }}>
+              {experiment.title}
+            </h2>
+            <p className="hyp">{experiment.hypothesis}</p>
+            <div className="meta-row">
+              <div className="meta">
+                <div className="meta-val">{experiment.cadence_type}</div>
+                <div className="meta-lbl">Cadence</div>
+              </div>
+              <div className="meta">
+                <div className="meta-val">{experiment.check_in_kind}</div>
+                <div className="meta-lbl">Check in kind</div>
+              </div>
+              <div className="meta">
+                <div className="meta-val">{experiment.target_days} days</div>
+                <div className="meta-lbl">Target</div>
+              </div>
+            </div>
+            {experiment.abandon_reason != null && (
+              <p className="hyp">Abandon reason: {experiment.abandon_reason}</p>
+            )}
+          </div>
+        </div>
 
-      {lastCheckIn && <p>Last check-in logged: {lastCheckIn.checked_in_at}</p>}
-
-      {(experiment.status === 'active' || experiment.status === 'reflect') && (
-        <form onSubmit={handleArchiveSubmit} className="detail-form neu-card">
-          <h3>Archive this experiment</h3>
-          <button type="button" onClick={toggleArchiveMode} disabled={archiving} className="neu-button-ghost">
-            {archiveMode === 'retro' ? 'Switch to abandon early' : 'Switch to retro'}
-          </button>
-          {archiveMode === 'retro' ? (
-            <>
-              <input
-                type="text"
-                placeholder="What worked"
-                value={whatWorked}
-                onChange={(e) => setWhatWorked(e.target.value)}
-                className="neu-input"
-              />
-              <input
-                type="text"
-                placeholder="What didn't"
-                value={whatDidnt}
-                onChange={(e) => setWhatDidnt(e.target.value)}
-                className="neu-input"
-              />
-              <input
-                type="text"
-                placeholder="Decision"
-                value={decision}
-                onChange={(e) => setDecision(e.target.value)}
-                className="neu-input"
-              />
-            </>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          {experiment.status === 'active' ? (
+            <form onSubmit={handleSubmit} className="raised checkin-card">
+              <div className="checkin-title">Log a check in</div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <input
+                  type="checkbox"
+                  checked={valueBool}
+                  onChange={(e) => setValueBool(e.target.checked)}
+                />
+                Value (bool)
+              </label>
+              <div className="auth-field">
+                <label className="label" htmlFor="value-rating">
+                  Rating
+                </label>
+                <input
+                  id="value-rating"
+                  type="number"
+                  value={valueRating}
+                  onChange={(e) => setValueRating(e.target.value)}
+                  className="input"
+                />
+              </div>
+              <div className="auth-field">
+                <label className="label" htmlFor="checkin-note">
+                  Note, this part is optional
+                </label>
+                <textarea
+                  id="checkin-note"
+                  rows={2}
+                  placeholder="Anything worth remembering?"
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  className="input"
+                />
+              </div>
+              <div className="auth-field">
+                <label className="label" htmlFor="checked-in-at">
+                  Checked in at
+                </label>
+                <input
+                  id="checked-in-at"
+                  type="datetime-local"
+                  value={checkedInAt}
+                  onChange={(e) => setCheckedInAt(e.target.value)}
+                  className="input"
+                />
+              </div>
+              {submitError && <p role="alert">{submitError}</p>}
+              <button type="submit" disabled={submitting} className="btn btn-primary-exp" style={{ justifyContent: 'center' }}>
+                Save check in
+              </button>
+              {lastCheckIn && (
+                <div className="card-sub">Last check in logged: {lastCheckIn.checked_in_at}</div>
+              )}
+            </form>
           ) : (
-            <input
-              type="text"
-              placeholder="Abandon reason"
-              value={abandonReason}
-              onChange={(e) => setAbandonReason(e.target.value)}
-              className="neu-input"
-            />
+            <div className="raised" style={{ padding: 22 }}>
+              <p className="card-sub">
+                Check ins can only be logged while this experiment is active, current status:{' '}
+                {experiment.status}
+              </p>
+            </div>
           )}
-          {archiveError && <p role="alert">{archiveError}</p>}
-          <button type="submit" disabled={archiving} className="neu-button">
-            Archive
-          </button>
-        </form>
-      )}
+
+          {(experiment.status === 'active' || experiment.status === 'reflect') && (
+            <form onSubmit={handleArchiveSubmit} className="raised checkin-card">
+              <div className="checkin-title">Archive this experiment</div>
+              <button type="button" onClick={toggleArchiveMode} disabled={archiving} className="btn btn-text">
+                {archiveMode === 'retro' ? 'Switch to abandon early' : 'Switch to retro'}
+              </button>
+              {archiveMode === 'retro' ? (
+                <>
+                  <input
+                    type="text"
+                    placeholder="What worked"
+                    value={whatWorked}
+                    onChange={(e) => setWhatWorked(e.target.value)}
+                    className="input"
+                  />
+                  <input
+                    type="text"
+                    placeholder="What didn't"
+                    value={whatDidnt}
+                    onChange={(e) => setWhatDidnt(e.target.value)}
+                    className="input"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Decision"
+                    value={decision}
+                    onChange={(e) => setDecision(e.target.value)}
+                    className="input"
+                  />
+                </>
+              ) : (
+                <input
+                  type="text"
+                  placeholder="Abandon reason"
+                  value={abandonReason}
+                  onChange={(e) => setAbandonReason(e.target.value)}
+                  className="input"
+                />
+              )}
+              {archiveError && <p role="alert">{archiveError}</p>}
+              <div className="footer-actions">
+                <button type="submit" disabled={archiving} className="btn btn-text" style={{ color: 'var(--danger)' }}>
+                  Archive
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+      </div>
     </div>
   )
 }

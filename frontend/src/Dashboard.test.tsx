@@ -37,7 +37,6 @@ describe('Dashboard', () => {
     renderDashboard()
 
     await waitFor(() => expect(screen.getByText('Cold showers')).toBeInTheDocument())
-    expect(screen.getByText('daily')).toBeInTheDocument()
     expect(screen.getByText('No sugar')).toBeInTheDocument()
     expect(screen.getByRole('radio', { name: 'Both' })).toBeChecked()
     // Goals empty state shows alongside experiment cards when the filter is Both.
@@ -57,7 +56,7 @@ describe('Dashboard', () => {
     renderDashboard()
 
     await waitFor(() => expect(screen.getByText('No experiments yet.')).toBeInTheDocument())
-    expect(screen.queryByRole('radiogroup')).not.toBeInTheDocument()
+    expect(document.querySelector('.stats-row')).not.toBeInTheDocument()
     expect(screen.queryByText('Backlog')).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'New experiment' })).toBeInTheDocument()
   })
@@ -75,8 +74,8 @@ describe('Dashboard', () => {
     renderDashboard()
 
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Not authenticated'))
-    expect(screen.queryByRole('radiogroup')).not.toBeInTheDocument()
-    expect(screen.queryByText('Streak')).not.toBeInTheDocument()
+    expect(document.querySelector('.stats-row')).not.toBeInTheDocument()
+    expect(screen.queryByText('— streak')).not.toBeInTheDocument()
   })
 
   it('shows a single loading indicator while the fetch is in flight, with no partial grid', async () => {
@@ -93,7 +92,7 @@ describe('Dashboard', () => {
     renderDashboard()
 
     expect(screen.getByText('Loading…')).toBeInTheDocument()
-    expect(screen.queryByRole('radiogroup')).not.toBeInTheDocument()
+    expect(document.querySelector('.stats-row')).not.toBeInTheDocument()
 
     resolveFetch({ ok: true, json: async () => [] })
     await waitFor(() => expect(screen.getByText('No experiments yet.')).toBeInTheDocument())
@@ -107,11 +106,11 @@ describe('Dashboard', () => {
 
     renderDashboard()
 
-    await waitFor(() => expect(screen.getByText('Experiments 1/2')).toBeInTheDocument())
-    expect(screen.getByText('Goals 0/1')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByText('1 / 2')).toBeInTheDocument())
+    expect(screen.getByText('0 / 1')).toBeInTheDocument()
   })
 
-  it('computes the completed vs abandoned ratio tile and a muted streak placeholder', async () => {
+  it('computes the completed vs abandoned ratio tile and a muted per-card streak placeholder', async () => {
     stubExperiments([
       { id: '1', title: 'A', cadence_type: 'daily', status: 'archived', ended_early: false },
       { id: '2', title: 'B', cadence_type: 'daily', status: 'archived', ended_early: false },
@@ -120,8 +119,10 @@ describe('Dashboard', () => {
 
     renderDashboard()
 
-    await waitFor(() => expect(screen.getByText('2 completed · 1 abandoned')).toBeInTheDocument())
-    expect(screen.getByText('—')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByText('A')).toBeInTheDocument())
+    const ratioTile = document.querySelectorAll('.stat-num')[2]
+    expect(ratioTile?.textContent).toBe('2 / 1')
+    expect(screen.getAllByText('— streak').length).toBeGreaterThan(0)
   })
 
   it('lists Backlog experiments separately from the active grid', async () => {
@@ -136,12 +137,11 @@ describe('Dashboard', () => {
     const backlogHeading = screen.getByRole('heading', { name: 'Backlog' })
     expect(backlogHeading).toBeInTheDocument()
     expect(screen.getByText('Shelved idea')).toBeInTheDocument()
+    expect(screen.getByText('Backlog', { selector: '.badge' })).toBeInTheDocument()
   })
 
   it('filters to Experiments only, hiding the Goals empty state', async () => {
-    stubExperiments([
-      { id: '1', title: 'A', cadence_type: 'daily', status: 'active', ended_early: false },
-    ])
+    stubExperiments([{ id: '1', title: 'A', cadence_type: 'daily', status: 'active', ended_early: false }])
 
     renderDashboard()
     await waitFor(() => expect(screen.getByText('A')).toBeInTheDocument())
@@ -153,9 +153,7 @@ describe('Dashboard', () => {
   })
 
   it('filters to Goals only, hiding the experiment grid and showing the zero state', async () => {
-    stubExperiments([
-      { id: '1', title: 'A', cadence_type: 'daily', status: 'active', ended_early: false },
-    ])
+    stubExperiments([{ id: '1', title: 'A', cadence_type: 'daily', status: 'active', ended_early: false }])
 
     renderDashboard()
     await waitFor(() => expect(screen.getByText('A')).toBeInTheDocument())
@@ -203,7 +201,8 @@ describe('Dashboard', () => {
     renderDashboard()
 
     await waitFor(() => expect(screen.getByText('In reflection')).toBeInTheDocument())
-    expect(screen.getByText('Experiments 0/2')).toBeInTheDocument()
-    expect(screen.getByText('0 completed · 0 abandoned')).toBeInTheDocument()
+    expect(screen.getByText('0 / 2')).toBeInTheDocument()
+    const statNums = document.querySelectorAll('.stat-num')
+    expect(statNums[2]?.textContent).toBe('0 / 0')
   })
 })

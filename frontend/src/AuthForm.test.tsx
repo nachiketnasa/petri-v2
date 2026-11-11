@@ -25,9 +25,9 @@ describe('AuthForm', () => {
 
     const onAuthenticated = vi.fn()
     render(<AuthForm onAuthenticated={onAuthenticated} />)
-    fireEvent.change(screen.getByPlaceholderText('Email'), { target: { value: 'new@x.com' } })
-    fireEvent.change(screen.getByPlaceholderText('Password'), { target: { value: 'secret123' } })
-    fireEvent.change(screen.getByPlaceholderText('Display name'), { target: { value: 'New' } })
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'new@x.com' } })
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'secret123' } })
+    fireEvent.change(screen.getByLabelText('Display name'), { target: { value: 'New' } })
     fireEvent.click(screen.getByRole('button', { name: 'Sign up' }))
 
     await waitFor(() =>
@@ -67,8 +67,8 @@ describe('AuthForm', () => {
     const onAuthenticated = vi.fn()
     render(<AuthForm onAuthenticated={onAuthenticated} />)
     fireEvent.click(screen.getByRole('button', { name: 'Switch to sign in' }))
-    fireEvent.change(screen.getByPlaceholderText('Email'), { target: { value: 'foo@x.com' } })
-    fireEvent.change(screen.getByPlaceholderText('Password'), { target: { value: 'secret123' } })
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'foo@x.com' } })
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'secret123' } })
     fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
 
     await waitFor(() =>
@@ -97,9 +97,9 @@ describe('AuthForm', () => {
     )
 
     render(<AuthForm onAuthenticated={vi.fn()} />)
-    fireEvent.change(screen.getByPlaceholderText('Email'), { target: { value: 'new@x.com' } })
-    fireEvent.change(screen.getByPlaceholderText('Password'), { target: { value: 'secret123' } })
-    fireEvent.change(screen.getByPlaceholderText('Display name'), { target: { value: 'New' } })
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'new@x.com' } })
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'secret123' } })
+    fireEvent.change(screen.getByLabelText('Display name'), { target: { value: 'New' } })
     fireEvent.click(screen.getByRole('button', { name: 'Sign up' }))
 
     await waitFor(() =>
@@ -119,8 +119,8 @@ describe('AuthForm', () => {
 
     render(<AuthForm onAuthenticated={vi.fn()} />)
     fireEvent.click(screen.getByRole('button', { name: 'Switch to sign in' }))
-    fireEvent.change(screen.getByPlaceholderText('Email'), { target: { value: 'foo@x.com' } })
-    fireEvent.change(screen.getByPlaceholderText('Password'), { target: { value: 'wrong' } })
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'foo@x.com' } })
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'wrong' } })
     fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
 
     await waitFor(() =>
@@ -140,8 +140,8 @@ describe('AuthForm', () => {
 
     render(<AuthForm onAuthenticated={vi.fn()} />)
     fireEvent.click(screen.getByRole('button', { name: 'Switch to sign in' }))
-    fireEvent.change(screen.getByPlaceholderText('Email'), { target: { value: 'foo@x.com' } })
-    fireEvent.change(screen.getByPlaceholderText('Password'), { target: { value: 'wrong' } })
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'foo@x.com' } })
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'wrong' } })
     fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
 
     await waitFor(() =>
@@ -151,7 +151,7 @@ describe('AuthForm', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Switch to sign up' }))
 
     expect(screen.queryByText('Invalid email or password')).not.toBeInTheDocument()
-    expect(screen.getByPlaceholderText('Email')).toHaveValue('')
-    expect(screen.getByPlaceholderText('Password')).toHaveValue('')
+    expect(screen.getByLabelText('Email')).toHaveValue('')
+    expect(screen.getByLabelText('Password')).toHaveValue('')
   })
 })

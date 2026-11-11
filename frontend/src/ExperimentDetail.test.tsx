@@ -51,7 +51,7 @@ describe('ExperimentDetail', () => {
 
     await waitFor(() => expect(screen.getByText('Drink more water')).toBeInTheDocument())
     expect(screen.getByText('I will feel better')).toBeInTheDocument()
-    expect(screen.getByText('Status: active')).toBeInTheDocument()
+    expect(screen.getByText('Experiment, active')).toBeInTheDocument()
     expect(fetch).toHaveBeenCalledWith(
       expect.stringContaining('/experiments/exp-1'),
       expect.objectContaining({ credentials: 'include' }),
@@ -93,11 +93,11 @@ describe('ExperimentDetail', () => {
     renderDetail("exp-1")
     await waitFor(() => expect(screen.getByText('Drink more water')).toBeInTheDocument())
 
-    fireEvent.change(screen.getByPlaceholderText('Note'), { target: { value: 'felt good' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Log check-in' }))
+    fireEvent.change(screen.getByLabelText(/Note/), { target: { value: 'felt good' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save check in' }))
 
     await waitFor(() =>
-      expect(screen.getByText(/Last check-in logged: 2026-01-02T09:00:00Z/)).toBeInTheDocument(),
+      expect(screen.getByText(/Last check in logged: 2026-01-02T09:00:00Z/)).toBeInTheDocument(),
     )
     expect(playTone).toHaveBeenCalledWith('check-in-log')
     expect(fetchMock).toHaveBeenCalledTimes(2)
@@ -120,9 +120,9 @@ describe('ExperimentDetail', () => {
     renderDetail("exp-1")
 
     await waitFor(() => expect(screen.getByText('Drink more water')).toBeInTheDocument())
-    expect(screen.queryByRole('button', { name: 'Log check-in' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Save check in' })).not.toBeInTheDocument()
     expect(
-      screen.getByText(/Check-ins can only be logged while this experiment is Active/),
+      screen.getByText(/Check ins can only be logged while this experiment is active/),
     ).toBeInTheDocument()
   })
 
@@ -140,7 +140,7 @@ describe('ExperimentDetail', () => {
     renderDetail("exp-1")
     await waitFor(() => expect(screen.getByText('Drink more water')).toBeInTheDocument())
 
-    fireEvent.click(screen.getByRole('button', { name: 'Log check-in' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save check in' }))
 
     await waitFor(() =>
       expect(screen.getByRole('alert')).toHaveTextContent('Experiment is not active'),
@@ -164,7 +164,7 @@ describe('ExperimentDetail', () => {
     fireEvent.change(screen.getByPlaceholderText('Decision'), { target: { value: 'continue' } })
     fireEvent.click(screen.getByRole('button', { name: 'Archive' }))
 
-    await waitFor(() => expect(screen.getByText('Status: archived')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('Experiment, archived')).toBeInTheDocument())
     expect(fetchMock).toHaveBeenCalledTimes(2)
     expect(fetchMock).toHaveBeenLastCalledWith(
       expect.stringContaining('/experiments/exp-1/archive'),
@@ -174,7 +174,7 @@ describe('ExperimentDetail', () => {
         body: JSON.stringify({ what_worked: 'consistency', what_didnt: 'mornings', decision: 'continue' }),
       }),
     )
-    expect(screen.queryByRole('button', { name: 'Log check-in' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Save check in' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Archive' })).not.toBeInTheDocument()
   })
 
@@ -193,7 +193,7 @@ describe('ExperimentDetail', () => {
     fireEvent.change(screen.getByPlaceholderText('Abandon reason'), { target: { value: 'lost interest' } })
     fireEvent.click(screen.getByRole('button', { name: 'Archive' }))
 
-    await waitFor(() => expect(screen.getByText('Status: archived')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('Experiment, archived')).toBeInTheDocument())
     expect(fetchMock).toHaveBeenLastCalledWith(
       expect.stringContaining('/experiments/exp-1/archive'),
       expect.objectContaining({

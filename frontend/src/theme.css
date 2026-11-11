@@ -1,0 +1,163 @@
+/* Petri v2 theme tokens and shared component classes */
+:root,
+[data-theme="petri-light"]{
+  --bg:#eceef2;
+  --surface:#eff1f5;
+  --surface-raised:#f8f9fb;
+  --shadow-dark:rgba(30,34,48,.08);
+  --shadow-light:rgba(255,255,255,.85);
+  --ink:#363a44;
+  --ink-muted:#5e6372;
+  --ink-faint:#868ba0;
+  --accent-exp:#6f9b82;
+  --accent-exp-ink:#3e6652;
+  --accent-exp-soft:#dde8e1;
+  --accent-goal:#c98355;
+  --accent-goal-ink:#8a4f2a;
+  --accent-goal-soft:#f1e0d3;
+  --danger:#bf6657;
+  --danger-soft:#f3ded9;
+}
+[data-theme="petri-dark"]{
+  --bg:#2b2e36;
+  --surface:#30333d;
+  --surface-raised:#3a3e49;
+  --shadow-dark:rgba(0,0,0,.4);
+  --shadow-light:rgba(255,255,255,.07);
+  --ink:#e7e9f0;
+  --ink-muted:#b2b7c8;
+  --ink-faint:#868ca0;
+  --accent-exp:#8bbaa0;
+  --accent-exp-ink:#a7d4ba;
+  --accent-exp-soft:#3b4740;
+  --accent-goal:#e0a378;
+  --accent-goal-ink:#eec1a0;
+  --accent-goal-soft:#4a3c32;
+  --danger:#e09486;
+  --danger-soft:#4d342f;
+}
+[data-theme="solarized-light"]{
+  --bg:#f6efdc;
+  --surface:#fdf6e3;
+  --surface-raised:#fffbf0;
+  --shadow-dark:rgba(101,123,131,.16);
+  --shadow-light:rgba(255,255,255,.95);
+  --ink:#4a5c62;
+  --ink-muted:#73858a;
+  --ink-faint:#93a3a5;
+  --accent-exp:#768f00;
+  --accent-exp-ink:#5b6b00;
+  --accent-exp-soft:#e9edc7;
+  --accent-goal:#cb4b16;
+  --accent-goal-ink:#9c3a10;
+  --accent-goal-soft:#f3dccb;
+  --danger:#dc322f;
+  --danger-soft:#f4d3d2;
+}
+[data-theme="solarized-dark"]{
+  --bg:#00272f;
+  --surface:#073642;
+  --surface-raised:#0d434f;
+  --shadow-dark:rgba(0,0,0,.45);
+  --shadow-light:rgba(147,161,161,.09);
+  --ink:#cfdcdc;
+  --ink-muted:#95acac;
+  --ink-faint:#6b8686;
+  --accent-exp:#2aa198;
+  --accent-exp-ink:#6fcac1;
+  --accent-exp-soft:#0b4a49;
+  --accent-goal:#d97b4a;
+  --accent-goal-ink:#f0a77a;
+  --accent-goal-soft:#4a2c1c;
+  --danger:#e2726c;
+  --danger-soft:#4a2320;
+}
+:root{
+  --radius-lg:20px;
+  --radius-md:13px;
+  --radius-sm:10px;
+  --radius-pill:999px;
+  --font-sans:'Inter',system-ui,sans-serif;
+  --font-mono:'IBM Plex Mono',ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:var(--font-sans);background:var(--bg);color:var(--ink)}
+a{color:var(--accent-exp-ink);text-decoration:none}
+a:hover{color:var(--accent-exp)}
+button{font-family:inherit;cursor:pointer}
+input,textarea{font-family:inherit}
+
+.raised{
+  background:var(--surface);
+  border-radius:var(--radius-lg);
+  box-shadow:3px 3px 7px var(--shadow-dark), -3px -3px 7px var(--shadow-light);
+  border:none;
+}
+.raised-sm{
+  background:var(--surface);
+  border-radius:var(--radius-md);
+  box-shadow:2px 2px 5px var(--shadow-dark), -2px -2px 5px var(--shadow-light);
+  border:none;
+}
+.inset{
+  background:var(--surface);
+  border-radius:var(--radius-md);
+  box-shadow:inset 2px 2px 5px var(--shadow-dark), inset -2px -2px 5px var(--shadow-light);
+  border:none;
+}
+.pill{border-radius:var(--radius-pill)}
+
+.btn{
+  font-size:14px;font-weight:600;padding:11px 20px;border-radius:var(--radius-pill);
+  background:var(--surface);color:var(--ink);
+  box-shadow:2px 2px 5px var(--shadow-dark), -2px -2px 5px var(--shadow-light);
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:42px;
+  line-height:1;
+}
+.btn:active{box-shadow:inset 2px 2px 4px var(--shadow-dark), inset -2px -2px 4px var(--shadow-light)}
+.btn:focus-visible{outline:2px solid var(--accent-exp-ink);outline-offset:2px}
+.btn-exp{color:var(--accent-exp-ink)}
+.btn-goal{color:var(--accent-goal-ink)}
+.btn-primary-exp{background:var(--accent-exp);color:#fff;box-shadow:2px 2px 5px var(--shadow-dark), -2px -2px 5px var(--shadow-light)}
+.btn-primary-goal{background:var(--accent-goal);color:#fff;box-shadow:2px 2px 5px var(--shadow-dark), -2px -2px 5px var(--shadow-light)}
+.btn-text{background:transparent;box-shadow:none;color:var(--ink-muted);padding:9px 12px;min-height:auto}
+.btn-text:focus-visible{outline:2px solid var(--accent-exp-ink);outline-offset:2px}
+.btn-icon{width:40px;height:40px;padding:0;border-radius:50%}
+
+.input{
+  width:100%;padding:12px 16px;font-size:14px;color:var(--ink);
+  background:var(--surface);border-radius:var(--radius-md);border:none;
+  box-shadow:inset 2px 2px 5px var(--shadow-dark), inset -2px -2px 5px var(--shadow-light);
+}
+.input:focus{outline:2px solid var(--accent-exp-ink);outline-offset:1px}
+.label{font-size:12px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--ink-muted);margin-bottom:8px;display:block}
+
+.mono{font-family:var(--font-mono)}
+.badge{
+  display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:var(--radius-pill);
+  font-size:11px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;
+  background:transparent;
+}
+.badge-exp{color:var(--accent-exp-ink);background:var(--accent-exp-soft)}
+.badge-goal{color:var(--accent-goal-ink);background:var(--accent-goal-soft)}
+.badge-muted{color:var(--ink-muted);background:var(--surface-raised)}
+.badge-danger{color:var(--danger);background:var(--danger-soft)}
+
+/* glow: soft ambient light, reserved for the one element that is "live" right now */
+.glow-exp{box-shadow:0 0 12px 0 color-mix(in srgb, var(--accent-exp) 45%, transparent)}
+.glow-goal{box-shadow:0 0 12px 0 color-mix(in srgb, var(--accent-goal) 45%, transparent)}
+
+/* cadence toggle, inspired by the pill-toggle reference */
+.ntoggle{position:relative;width:50px;height:27px;border-radius:var(--radius-pill);background:var(--surface);
+  box-shadow:inset 2px 2px 5px var(--shadow-dark), inset -2px -2px 5px var(--shadow-light);flex-shrink:0;border:none;padding:0}
+.ntoggle .knob{position:absolute;top:3px;left:3px;width:21px;height:21px;border-radius:50%;background:var(--surface-raised);
+  box-shadow:1px 1px 3px var(--shadow-dark), -1px -1px 3px var(--shadow-light);transition:left .15s ease}
+.ntoggle.on .knob{left:26px;background:var(--accent-exp);box-shadow:0 0 8px 0 color-mix(in srgb, var(--accent-exp) 55%, transparent)}
+.ntoggle.on.goal .knob{background:var(--accent-goal);box-shadow:0 0 8px 0 color-mix(in srgb, var(--accent-goal) 55%, transparent)}
+
+.icon{width:16px;height:16px;stroke:currentColor;stroke-width:1.6;fill:none;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0;display:block}
+.theme-dot{width:28px;height:28px;border-radius:50%;border:none;padding:0;cursor:pointer;flex-shrink:0}
+.theme-dot.active{box-shadow:0 0 0 2px var(--surface), 0 0 0 4px var(--accent-exp-ink)}
+
+.scroll-x{overflow-x:auto}
+.visually-hidden{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}

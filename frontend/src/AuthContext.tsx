@@ -5,6 +5,7 @@ const BASE_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8000'
 export type Experiment = {
   id: string
   title: string
+  hypothesis?: string
   cadence_type: string
   cadence_days?: number | null
   start_date?: string | null

@@ -12,10 +12,10 @@ const LANDING_KEY = 'petri:landingPreference'
 const COOKIE_KEY = 'petri:cookieNoticeDismissed'
 
 export const THEMES = [
-  { id: 'petri-light', label: 'Petri Light' },
-  { id: 'petri-dark', label: 'Petri Dark' },
-  { id: 'solarized-light', label: 'Solarized Light' },
-  { id: 'solarized-dark', label: 'Solarized Dark' },
+  { id: 'petri-light', label: 'Petri light', swatch: '#eff1f5' },
+  { id: 'petri-dark', label: 'Petri dark', swatch: '#30333d' },
+  { id: 'solarized-light', label: 'Solarized light', swatch: '#fdf6e3' },
+  { id: 'solarized-dark', label: 'Solarized dark', swatch: '#073642' },
 ] as const
 
 export type ThemeId = (typeof THEMES)[number]['id']
@@ -91,10 +91,11 @@ export function CookieNotice() {
   if (dismissed) return null
 
   return (
-    <div className="neu-card cookie-notice" role="status">
+    <div className="raised cookie-notice" role="status">
       <p>{COOKIE_NOTICE_TEXT}</p>
       <button
         type="button"
+        className="btn btn-primary-exp"
         onClick={() => {
           dismissCookieNotice()
           setDismissed(true)
@@ -113,64 +114,94 @@ function Settings() {
 
   return (
     <div className="settings-screen">
+      <div className="crumb">
+        <a href="/dashboard">Back to the dashboard</a>
+      </div>
       <h2>Settings</h2>
 
-      <section className="neu-card settings-section">
-        <h3>Theme</h3>
-        <div role="radiogroup" aria-label="Theme" className="settings-theme-options">
-          {THEMES.map((option) => (
-            <label key={option.id}>
-              <input
-                type="radio"
-                name="theme"
-                value={option.id}
-                checked={theme === option.id}
-                onChange={() => {
+      <div className="raised settings-panel">
+        <div>
+          <div className="settings-row-title">Theme</div>
+          <div className="settings-row-sub">Pick a look for the whole app.</div>
+          <div className="theme-grid" role="radiogroup" aria-label="Theme">
+            {THEMES.map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                role="radio"
+                aria-checked={theme === option.id}
+                className={`theme-opt${theme === option.id ? ' active' : ''}`}
+                onClick={() => {
                   setTheme(option.id)
                   setThemeState(option.id)
                 }}
-              />
-              {option.label}
-            </label>
-          ))}
+              >
+                <div
+                  className={`theme-swatch${theme === option.id ? ' active' : ''}`}
+                  style={{ background: option.swatch }}
+                />
+                <div className="theme-name">{option.label}</div>
+              </button>
+            ))}
+          </div>
         </div>
-      </section>
 
-      <section className="neu-card settings-section">
-        <h3>Sound</h3>
-        <label>
-          <input
-            type="checkbox"
-            checked={sound}
-            onChange={(e) => {
-              setSoundEnabled(e.target.checked)
-              setSound(e.target.checked)
+        <hr className="settings-hr" />
+
+        <div className="settings-row">
+          <div>
+            <div className="settings-row-title">Sound effects</div>
+            <div className="settings-row-sub">Short tones when you open a wizard, submit it, or log a check in.</div>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={sound}
+            aria-label={sound ? 'Sound effects are on' : 'Sound effects are off'}
+            className={`ntoggle${sound ? ' on' : ''}`}
+            onClick={() => {
+              setSoundEnabled(!sound)
+              setSound(!sound)
             }}
-          />
-          Sound effects
-        </label>
-      </section>
+          >
+            <span className="knob" />
+          </button>
+        </div>
 
-      <section className="neu-card settings-section">
-        <h3>After sign in</h3>
-        <label>
-          <input
-            type="checkbox"
-            checked={landing === 'dashboard'}
-            onChange={(e) => {
-              const pref: LandingPreference = e.target.checked ? 'dashboard' : 'greeting'
+        <hr className="settings-hr" />
+
+        <div className="settings-row">
+          <div>
+            <div className="settings-row-title">After sign in</div>
+            <div className="settings-row-sub">Open the dashboard directly, skipping the greeting screen.</div>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={landing === 'dashboard'}
+            aria-label={
+              landing === 'dashboard'
+                ? 'Opening the dashboard directly'
+                : 'Opening the greeting screen first'
+            }
+            className={`ntoggle${landing === 'dashboard' ? ' on' : ''}`}
+            onClick={() => {
+              const pref: LandingPreference = landing === 'dashboard' ? 'greeting' : 'dashboard'
               setLandingPreference(pref)
               setLanding(pref)
             }}
-          />
-          Open the dashboard directly, skipping the greeting screen
-        </label>
-      </section>
+          >
+            <span className="knob" />
+          </button>
+        </div>
 
-      <section className="neu-card settings-section">
-        <h3>Cookies</h3>
-        <p>{COOKIE_NOTICE_TEXT}</p>
-      </section>
+        <hr className="settings-hr" />
+
+        <div>
+          <div className="settings-row-title">Cookies</div>
+          <div className="settings-row-sub">{COOKIE_NOTICE_TEXT}</div>
+        </div>
+      </div>
     </div>
   )
 }

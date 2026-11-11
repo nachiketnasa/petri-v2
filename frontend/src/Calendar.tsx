@@ -36,7 +36,7 @@ function DayCell({
   isToday: boolean
   markers: Experiment[]
 }) {
-  const classes = ['calendar-day']
+  const classes = [isToday ? 'raised' : 'inset', 'calendar-day']
   if (faded) classes.push('calendar-day-faded')
   if (isToday) classes.push('calendar-day-today')
 
@@ -97,103 +97,101 @@ function Calendar() {
   return (
     <div className="calendar-screen">
       <div className="calendar-controls">
-        <div className="calendar-view-toggle" role="radiogroup" aria-label="Calendar view">
-          <label>
-            <input
-              type="radio"
-              name="calendar-view"
-              value="week"
-              checked={view === 'week'}
-              onChange={() => setView('week')}
-            />
-            Week
-          </label>
-          <label>
-            <input
-              type="radio"
-              name="calendar-view"
-              value="month"
-              checked={view === 'month'}
-              onChange={() => setView('month')}
-            />
-            Month
-          </label>
-        </div>
-
-        <div className="calendar-nav">
-          <button type="button" aria-label="Previous" onClick={goPrev}>
-            ‹
-          </button>
-          <span className="calendar-nav-label">
-            {view === 'week' ? weekLabel(weekDays) : monthLabel(anchor)}
-          </span>
-          <button type="button" aria-label="Next" onClick={goNext}>
-            ›
-          </button>
-        </div>
-
-        <div className="calendar-scope-toggle" role="radiogroup" aria-label="Scope">
-          <label>
-            <input
-              type="radio"
-              name="calendar-scope"
-              value="cadence"
-              checked={scope === 'cadence'}
-              onChange={() => setScope('cadence')}
-              disabled={!contextExperiment}
-            />
+        <div className="raised-sm segmented" role="radiogroup" aria-label="Scope">
+          <button
+            type="button"
+            role="radio"
+            aria-checked={scope === 'cadence'}
+            className={`seg-btn${scope === 'cadence' ? ' active' : ''}`}
+            onClick={() => setScope('cadence')}
+            disabled={!contextExperiment}
+          >
             This cadence only
-          </label>
-          <label>
-            <input
-              type="radio"
-              name="calendar-scope"
-              value="all"
-              checked={scope === 'all'}
-              onChange={() => setScope('all')}
-            />
+          </button>
+          <button
+            type="button"
+            role="radio"
+            aria-checked={scope === 'all'}
+            className={`seg-btn${scope === 'all' ? ' active' : ''}`}
+            onClick={() => setScope('all')}
+          >
             All active
-          </label>
+          </button>
         </div>
+
+        <div className="raised-sm segmented" role="radiogroup" aria-label="Calendar view">
+          <button
+            type="button"
+            role="radio"
+            aria-checked={view === 'week'}
+            className={`seg-btn${view === 'week' ? ' active' : ''}`}
+            onClick={() => setView('week')}
+          >
+            Week
+          </button>
+          <button
+            type="button"
+            role="radio"
+            aria-checked={view === 'month'}
+            className={`seg-btn${view === 'month' ? ' active' : ''}`}
+            onClick={() => setView('month')}
+          >
+            Month
+          </button>
+        </div>
+      </div>
+
+      <div className="calendar-nav">
+        <button type="button" className="btn btn-text btn-icon" aria-label="Previous" onClick={goPrev}>
+          ‹
+        </button>
+        <span className="calendar-nav-label">
+          {view === 'week' ? weekLabel(weekDays) : monthLabel(anchor)}
+        </span>
+        <button type="button" className="btn btn-text btn-icon" aria-label="Next" onClick={goNext}>
+          ›
+        </button>
       </div>
 
       {experiments && experiments.filter((e) => e.status === 'active').length === 0 && (
         <p className="calendar-empty-state">No active experiments yet.</p>
       )}
 
-      <div className="calendar-weekday-header">
-        {WEEKDAY_LABELS.map((label) => (
-          <div key={label} className="calendar-weekday-label">
-            {label}
-          </div>
-        ))}
-      </div>
+      <div className="raised" style={{ padding: 26 }}>
+        <div className="calendar-weekday-header">
+          {WEEKDAY_LABELS.map((label) => (
+            <div key={label} className="calendar-weekday-label">
+              {label}
+            </div>
+          ))}
+        </div>
 
-      {view === 'week' ? (
-        <div className="calendar-grid calendar-grid-week">
-          {weekDays.map((date) => (
-            <DayCell
-              key={date.toISOString()}
-              date={date}
-              faded={false}
-              isToday={isSameDay(date, today)}
-              markers={markersFor(date)}
-            />
-          ))}
-        </div>
-      ) : (
-        <div className="calendar-grid calendar-grid-month">
-          {monthDays.map(({ date, inCurrentMonth }) => (
-            <DayCell
-              key={date.toISOString()}
-              date={date}
-              faded={!inCurrentMonth}
-              isToday={isSameDay(date, today)}
-              markers={markersFor(date)}
-            />
-          ))}
-        </div>
-      )}
+        {view === 'week' ? (
+          <div className="calendar-grid calendar-grid-week">
+            {weekDays.map((date) => (
+              <DayCell
+                key={date.toISOString()}
+                date={date}
+                faded={false}
+                isToday={isSameDay(date, today)}
+                markers={markersFor(date)}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="calendar-grid calendar-grid-month">
+            {monthDays.map(({ date, inCurrentMonth }) => (
+              <DayCell
+                key={date.toISOString()}
+                date={date}
+                faded={!inCurrentMonth}
+                isToday={isSameDay(date, today)}
+                markers={markersFor(date)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
