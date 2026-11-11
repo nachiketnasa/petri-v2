@@ -367,7 +367,7 @@ A way for the frontend to know the signed-in user's `display_name` (and `timezon
 
 ## order-04h · #33 — Auth: sign-up does not establish a session (no cookie set)
 
-- **Status**: OPEN
+- **Status**: CLOSED
 - **Labels**: backend, auth
 - **Link**: https://github.com/nachiketnasa/petri-v2/issues/33
 
@@ -375,9 +375,10 @@ A way for the frontend to know the signed-in user's `display_name` (and `timezon
 A successful `POST /auth/signup` should leave the caller signed in, the same way `POST /auth/login` does right now — matching normal product expectations and what the frontend (`AuthForm.tsx`) already assumes.
 
 ## Acceptance criteria
-- [ ] `POST /auth/signup` sets the same `session_id` cookie (httponly) that `/auth/login` sets, using a new session token for the newly created user — verifiable with `curl -i`, a `Set-Cookie` header is present on the 201 response.
-- [ ] Immediately after a successful signup, a request carrying that cookie (e.g. `GET /experiments`) returns 200, not 401.
-- [ ] `/auth/login`'s existing behavior is unchanged.
+- [x] `POST /auth/signup` sets the same `session_id` cookie (httponly) that `/auth/login` sets, using a new session token for the newly created user — verifiable with `curl -i`, a `Set-Cookie` header is present on the 201 response.
+- [x] Immediately after a successful signup, a request carrying that cookie (e.g. `GET /experiments`) returns 200, not 401.
+- [x] `/auth/login`'s existing behavior is unchanged.
+- [x] A signup that fails with 400 (duplicate email) does not set a `Set-Cookie` header — no session is created for a failed signup.
 
 ## Out of scope
 - Any frontend change — `AuthForm.tsx` already treats a successful signup response as "authenticated"; once the backend actually sets the cookie, the existing frontend flow starts working correctly with no frontend change needed. If that turns out to be false, file a separate frontend follow-up.
@@ -594,7 +595,7 @@ A user can be running at most 2 experiments Active at the same time; a 3rd activ
 
 ## order-07 · #10 — Dashboard + calm landing/greeting screen
 
-- **Status**: OPEN
+- **Status**: CLOSED
 - **Labels**: frontend, design
 - **Link**: https://github.com/nachiketnasa/petri-v2/issues/10
 
