@@ -38,6 +38,10 @@ code or link while testing:
 ```bash
 docker compose logs backend | grep -A2 "EMAIL ("
 ```
+(run from the `petri-v2` directory, same as `docker compose up` — if you started that
+in a different terminal/tab, `cd` back into `petri-v2` first, otherwise `docker compose`
+won't find `docker-compose.yml` and errors with "no configuration file provided: not
+found.")
 
 Sign up, then look there for the 6-digit verification code (or use "Resend code" on
 the verify screen to get a fresh one). Same for "Forgot password."
