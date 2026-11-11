@@ -2,12 +2,14 @@ import { describe, expect, it } from 'vitest'
 import {
   addDays,
   addMonths,
+  dayStatus,
   getMonthGridDays,
   getWeekDays,
   isCadenceDay,
   isSameDay,
   localDate,
   startOfWeekMonday,
+  toLocalDateKey,
 } from './calendarMath'
 
 describe('getWeekDays', () => {
@@ -143,5 +145,32 @@ describe('isCadenceDay', () => {
 
   it('returns false when start_date is missing', () => {
     expect(isCadenceDay({ cadence_type: 'daily' }, localDate(2026, 10, 5))).toBe(false)
+  })
+})
+
+describe('dayStatus', () => {
+  const today = localDate(2026, 10, 11) // Nov 11 2026
+
+  it('is upcoming for a day after today, regardless of check-ins', () => {
+    const future = addDays(today, 2)
+    expect(dayStatus(future, today, new Set())).toBe('upcoming')
+  })
+
+  it('is completed for today or a past day with a matching check-in', () => {
+    expect(dayStatus(today, today, new Set([toLocalDateKey(today)]))).toBe('completed')
+    const past = addDays(today, -2)
+    expect(dayStatus(past, today, new Set([toLocalDateKey(past)]))).toBe('completed')
+  })
+
+  it('is missed for today or a past day with no matching check-in', () => {
+    expect(dayStatus(today, today, new Set())).toBe('missed')
+    const past = addDays(today, -2)
+    expect(dayStatus(past, today, new Set())).toBe('missed')
+  })
+})
+
+describe('toLocalDateKey', () => {
+  it('formats as YYYY-MM-DD, zero-padded', () => {
+    expect(toLocalDateKey(localDate(2026, 0, 5))).toBe('2026-01-05')
   })
 })

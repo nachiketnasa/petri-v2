@@ -1,15 +1,22 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useAuth, type Experiment } from './AuthContext'
 import {
   addDays,
   addMonths,
+  dayStatus,
   getMonthGridDays,
   getWeekDays,
   isCadenceDay,
   isSameDay,
+  type DayStatus,
+  toLocalDateKey,
 } from './calendarMath'
 import './neumorphic.css'
+
+const BASE_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8000'
+
+type Marker = { experiment: Experiment; status: DayStatus }
 
 type ViewMode = 'week' | 'month'
 type Scope = 'cadence' | 'all'
@@ -25,6 +32,12 @@ function weekLabel(days: Date[]): string {
   return `${fmt(days[0])} – ${fmt(days[6])}, ${days[6].getFullYear()}`
 }
 
+const STATUS_LABEL: Record<DayStatus, string> = {
+  upcoming: 'scheduled',
+  completed: 'completed',
+  missed: 'missed',
+}
+
 function DayCell({
   date,
   faded,
@@ -34,7 +47,7 @@ function DayCell({
   date: Date
   faded: boolean
   isToday: boolean
-  markers: Experiment[]
+  markers: Marker[]
 }) {
   const classes = [isToday ? 'raised' : 'inset', 'calendar-day']
   if (faded) classes.push('calendar-day-faded')
@@ -45,12 +58,12 @@ function DayCell({
       <span className="calendar-day-number">{date.getDate()}</span>
       {markers.length > 0 && (
         <div className="calendar-day-markers">
-          {markers.map((experiment) => (
+          {markers.map(({ experiment, status }) => (
             <span
               key={experiment.id}
-              className="calendar-marker"
+              className={`calendar-marker calendar-marker-${status}`}
               title={experiment.title}
-              aria-label={`${experiment.title} scheduled`}
+              aria-label={`${experiment.title} ${STATUS_LABEL[status]}`}
             />
           ))}
         </div>
@@ -77,13 +90,40 @@ function Calendar() {
     return experiments.filter((e) => e.status === 'active')
   }, [experiments, scope, contextExperiment])
 
+  // Real completed-vs-missed marking (#35) needs each scoped experiment's
+  // persisted check-in history (#28), not just same-session state -- keyed
+  // by experiment id so a day's status survives a reload or a different
+  // device/session, per #35's own acceptance criteria.
+  const [checkInDatesByExperiment, setCheckInDatesByExperiment] = useState<
+    Record<string, Set<string>>
+  >({})
+
+  useEffect(() => {
+    scopedExperiments.forEach((experiment) => {
+      fetch(`${BASE_URL}/experiments/${experiment.id}/check-ins`, { credentials: 'include' })
+        .then(async (res) => {
+          if (!res.ok) return
+          const checkIns: { checked_in_at: string }[] = await res.json()
+          const dates = new Set(checkIns.map((c) => toLocalDateKey(new Date(c.checked_in_at))))
+          setCheckInDatesByExperiment((prev) => ({ ...prev, [experiment.id]: dates }))
+        })
+        .catch(() => {})
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scopedExperiments.map((e) => e.id).join(',')])
+
   const today = new Date()
 
   const weekDays = useMemo(() => getWeekDays(anchor), [anchor])
   const monthDays = useMemo(() => getMonthGridDays(anchor), [anchor])
 
-  function markersFor(date: Date): Experiment[] {
-    return scopedExperiments.filter((e) => isCadenceDay(e, date))
+  function markersFor(date: Date): Marker[] {
+    return scopedExperiments
+      .filter((e) => isCadenceDay(e, date))
+      .map((experiment) => ({
+        experiment,
+        status: dayStatus(date, today, checkInDatesByExperiment[experiment.id] ?? new Set()),
+      }))
   }
 
   function goPrev() {

@@ -10,6 +10,23 @@ function stubExperiments(experiments: unknown[]) {
   return fetchMock
 }
 
+// URL-aware: experiments list on the base GET /experiments call,
+// per-experiment check-in history keyed by id on GET .../check-ins.
+function stubExperimentsWithCheckIns(
+  experiments: Array<{ id: string } & Record<string, unknown>>,
+  checkInsById: Record<string, Array<{ checked_in_at: string }>>,
+) {
+  const fetchMock = vi.fn((url: string) => {
+    const checkInsMatch = url.match(/\/experiments\/([^/]+)\/check-ins/)
+    if (checkInsMatch) {
+      return Promise.resolve({ ok: true, json: async () => checkInsById[checkInsMatch[1]] ?? [] })
+    }
+    return Promise.resolve({ ok: true, json: async () => experiments })
+  })
+  vi.stubGlobal('fetch', fetchMock)
+  return fetchMock
+}
+
 function renderCalendar(path = '/calendar') {
   return render(
     <AuthProvider>
@@ -192,6 +209,51 @@ describe('Calendar', () => {
 
     await waitFor(() => expect(screen.getByRole('radiogroup', { name: 'Scope' })).toBeInTheDocument())
     expect(screen.queryByText('Other tasks')).not.toBeInTheDocument()
+  })
+
+  it('marks a past scheduled day with a real check-in as completed (#35)', async () => {
+    vi.setSystemTime(new Date(2026, 10, 11))
+    stubExperimentsWithCheckIns(
+      [{ id: '1', title: 'Cold showers', cadence_type: 'daily', start_date: '2026-11-01', status: 'active' }],
+      { '1': [{ checked_in_at: '2026-11-05T09:00:00Z' }] },
+    )
+    renderCalendar()
+
+    await waitFor(() => expect(document.querySelector('.calendar-marker')).toBeInTheDocument())
+    const day5 = Array.from(document.querySelectorAll('.calendar-day')).find(
+      (cell) => cell.querySelector('.calendar-day-number')?.textContent === '5',
+    )!
+    await waitFor(() => expect(day5.querySelector('.calendar-marker-completed')).toBeTruthy())
+  })
+
+  it('marks a past scheduled day with no check-in as missed, distinct from completed (#35)', async () => {
+    vi.setSystemTime(new Date(2026, 10, 11))
+    stubExperimentsWithCheckIns(
+      [{ id: '1', title: 'Cold showers', cadence_type: 'daily', start_date: '2026-11-01', status: 'active' }],
+      { '1': [] },
+    )
+    renderCalendar()
+
+    await waitFor(() => expect(document.querySelector('.calendar-marker')).toBeInTheDocument())
+    const day5 = Array.from(document.querySelectorAll('.calendar-day')).find(
+      (cell) => cell.querySelector('.calendar-day-number')?.textContent === '5',
+    )!
+    await waitFor(() => expect(day5.querySelector('.calendar-marker-missed')).toBeTruthy())
+  })
+
+  it('marks a future scheduled day as upcoming, not missed, even with no check-in', async () => {
+    vi.setSystemTime(new Date(2026, 10, 11))
+    stubExperimentsWithCheckIns(
+      [{ id: '1', title: 'Cold showers', cadence_type: 'daily', start_date: '2026-11-01', status: 'active' }],
+      { '1': [] },
+    )
+    renderCalendar()
+
+    await waitFor(() => expect(document.querySelector('.calendar-marker')).toBeInTheDocument())
+    const day20 = Array.from(document.querySelectorAll('.calendar-day')).find(
+      (cell) => cell.querySelector('.calendar-day-number')?.textContent === '20',
+    )!
+    await waitFor(() => expect(day20.querySelector('.calendar-marker-upcoming')).toBeTruthy())
   })
 
   it('empty state: zero active experiments renders the grid and nav normally, with no markers and no error', async () => {

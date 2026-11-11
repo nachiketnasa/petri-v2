@@ -722,6 +722,14 @@
   background: var(--accent-exp);
 }
 
+.calendar-marker-missed {
+  background: var(--danger);
+}
+
+.calendar-marker-upcoming {
+  opacity: 0.45;
+}
+
 .health-status {
   font-size: 13px;
   color: var(--ink-muted);

@@ -71,10 +71,30 @@ export type CadenceExperiment = {
 }
 
 /** Whole-day difference between two local dates (b - a), ignoring time-of-day. */
-function dayDiff(a: Date, b: Date): number {
+export function dayDiff(a: Date, b: Date): number {
   const ms = localDate(b.getFullYear(), b.getMonth(), b.getDate()).getTime() -
     localDate(a.getFullYear(), a.getMonth(), a.getDate()).getTime()
   return Math.round(ms / 86_400_000)
+}
+
+/** 'YYYY-MM-DD' for a local date, matching parseLocalDate's input format. */
+export function toLocalDateKey(date: Date): string {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+export type DayStatus = 'upcoming' | 'completed' | 'missed'
+
+/**
+ * A scheduled day's real status (#35), given the set of local date keys
+ * (toLocalDateKey) this experiment actually has a check-in logged on.
+ * Only meaningful when isCadenceDay(experiment, date) is already true.
+ */
+export function dayStatus(date: Date, today: Date, checkedInDates: Set<string>): DayStatus {
+  if (dayDiff(today, date) > 0) return 'upcoming'
+  return checkedInDates.has(toLocalDateKey(date)) ? 'completed' : 'missed'
 }
 
 /**
