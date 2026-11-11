@@ -653,7 +653,7 @@ A signed-in user, right after sign-in, lands on a calm time-of-day greeting (not
 
 ## order-08 · #13 — Multi-step creation wizard (experiment/goal)
 
-- **Status**: OPEN
+- **Status**: CLOSED
 - **Labels**: frontend, design
 - **Link**: https://github.com/nachiketnasa/petri-v2/issues/13
 
@@ -665,39 +665,39 @@ Replace today's single long new-experiment form with a 3-step wizard (Details ->
 
 **Steps and fields**
 
-- [ ] The wizard renders at the same route as today, `/experiments/new`, replacing the current single-screen `NewExperimentForm`.
-- [ ] Step 1, "Details": `title` and `hypothesis` text inputs. Both required to advance.
-- [ ] Step 2, "Cadence": `cadence_type`, `target_days` (required); `cadence_days` input appears only when `cadence_type === 'custom'` and is required in that case; `check_in_kind` and `start_date` remain optional, same as today.
-- [ ] Step 3, "Review": a read-only summary of every value entered in Steps 1-2 (labeled, e.g. "Title: ...", "Hypothesis: ...", "Cadence: ..."), a "Back" control, and the submit action ("Create experiment"). No form inputs live on this step.
+- [x] The wizard renders at the same route as today, `/experiments/new`, replacing the current single-screen `NewExperimentForm`.
+- [x] Step 1, "Details": `title` and `hypothesis` text inputs. Both required to advance.
+- [x] Step 2, "Cadence": `cadence_type`, `target_days` (required); `cadence_days` input appears only when `cadence_type === 'custom'` and is required in that case; `check_in_kind` and `start_date` remain optional, same as today.
+- [x] Step 3, "Review": a read-only summary of every value entered in Steps 1-2 (labeled, e.g. "Title: ...", "Hypothesis: ...", "Cadence: ..."), a "Back" control, and the submit action ("Create experiment"). No form inputs live on this step.
 
 **Side progress rail**
 
-- [ ] A vertical rail is visible beside the step content at all times, listing all three step names ("Details", "Cadence", "Review").
-- [ ] The current step is visually distinguished (e.g. sage accent/bold) from the other two.
-- [ ] Steps already completed show a distinct completed state (e.g. a checkmark), visually different from both the current step and not-yet-reached steps.
-- [ ] Clicking a completed step's label in the rail navigates back to that step with its previously entered values still populated (see data-persistence criterion below).
-- [ ] A step not yet reached is not clickable and cannot be jumped to directly (no skipping Step 2's validation by clicking straight to "Review").
+- [x] A vertical rail is visible beside the step content at all times, listing all three step names ("Details", "Cadence", "Review").
+- [x] The current step is visually distinguished (e.g. sage accent/bold) from the other two.
+- [x] Steps already completed show a distinct completed state (e.g. a checkmark), visually different from both the current step and not-yet-reached steps.
+- [x] Clicking a completed step's label in the rail navigates back to that step with its previously entered values still populated (see data-persistence criterion below).
+- [x] A step not yet reached is not clickable and cannot be jumped to directly (no skipping Step 2's validation by clicking straight to "Review").
 
 **Validation**
 
-- [ ] Attempting "Next" on Step 1 with `title` or `hypothesis` empty shows an inline error and does not advance.
-- [ ] Attempting "Next" on Step 2 with `cadence_type` or `target_days` empty, or `cadence_days` empty while `cadence_type === 'custom'`, shows an inline error (reusing today's existing error copy where applicable) and does not advance.
-- [ ] No additional validation happens on Review beyond what Steps 1-2 already enforced; Review's own possible error is only a failed submit (see below).
+- [x] Attempting "Next" on Step 1 with `title` or `hypothesis` empty shows an inline error and does not advance.
+- [x] Attempting "Next" on Step 2 with `cadence_type` or `target_days` empty, or `cadence_days` empty while `cadence_type === 'custom'`, shows an inline error (reusing today's existing error copy where applicable) and does not advance.
+- [x] No additional validation happens on Review beyond what Steps 1-2 already enforced; Review's own possible error is only a failed submit (see below).
 
 **Submit**
 
-- [ ] Clicking "Create experiment" on Review sends the same request shape `NewExperimentForm.tsx` sends today: `POST {BASE_URL}/experiments`, `credentials: 'include'`, JSON body built from the three steps' values, omitting `cadence_days`/`check_in_kind`/`start_date` when empty exactly as today.
-- [ ] The submit button is disabled while the request is in flight (mirrors today's `submitting` state).
-- [ ] On success: `refetch()` from `useAuth()` is called and the user is navigated to `/dashboard`, same as today.
-- [ ] On a non-ok response (400 or 401), the backend's `detail` message renders via `role="alert"` on the Review step; the user stays on Review with their data intact and can retry.
+- [x] Clicking "Create experiment" on Review sends the same request shape `NewExperimentForm.tsx` sends today: `POST {BASE_URL}/experiments`, `credentials: 'include'`, JSON body built from the three steps' values, omitting `cadence_days`/`check_in_kind`/`start_date` when empty exactly as today.
+- [x] The submit button is disabled while the request is in flight (mirrors today's `submitting` state).
+- [x] On success: `refetch()` from `useAuth()` is called and the user is navigated to `/dashboard`, same as today.
+- [x] On a non-ok response (400 or 401), the backend's `detail` message renders via `role="alert"` on the Review step; the user stays on Review with their data intact and can retry.
 
 **Edge cases**
 
-- [ ] Data entered on Step 1/2 is still present if the user goes Back to Step 1/2 from Review, or forward again to Review — wizard state lives above the per-step views, not reset on step mount.
-- [ ] Navigating away mid-wizard (sign out, clicking another link) simply abandons the in-progress entry with no confirmation prompt and no draft saved — same "no persistence" behavior as today's form, just now spread across steps instead of one screen.
-- [ ] The browser back button, when pressed mid-wizard, navigates away from `/experiments/new` entirely (back to wherever the user came from) rather than stepping back within the wizard — step navigation only happens via the rail/in-wizard Back control, not the browser history stack.
-- [ ] All interactive elements (Next/Back buttons, rail step labels, inputs) are real, focusable `<button>`/`<input>` elements reachable by Tab in visual order and operable with Enter/Space; no custom keyboard shortcuts are introduced.
-- [ ] Refreshing the browser mid-wizard loses all entered data and returns to Step 1 on reload — acceptable given today's form has no persistence either.
+- [x] Data entered on Step 1/2 is still present if the user goes Back to Step 1/2 from Review, or forward again to Review — wizard state lives above the per-step views, not reset on step mount.
+- [x] Navigating away mid-wizard (sign out, clicking another link) simply abandons the in-progress entry with no confirmation prompt and no draft saved — same "no persistence" behavior as today's form, just now spread across steps instead of one screen.
+- [x] The browser back button, when pressed mid-wizard, navigates away from `/experiments/new` entirely (back to wherever the user came from) rather than stepping back within the wizard — step navigation only happens via the rail/in-wizard Back control, not the browser history stack.
+- [x] All interactive elements (Next/Back buttons, rail step labels, inputs) are real, focusable `<button>`/`<input>` elements reachable by Tab in visual order and operable with Enter/Space; no custom keyboard shortcuts are introduced.
+- [x] Refreshing the browser mid-wizard loses all entered data and returns to Step 1 on reload — acceptable given today's form has no persistence either.
 
 ## Out of scope
 
