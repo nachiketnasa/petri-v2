@@ -423,6 +423,39 @@ Discovered while implementing/verifying #11 (Calendar) — the Engineer had to r
 
 ---
 
+## order-04j · #37 — Auth/Account: persist Settings preferences (theme, sound effects, default landing) to the account
+
+- **Status**: OPEN
+- **Labels**: backend
+- **Link**: https://github.com/nachiketnasa/petri-v2/issues/37
+
+## What
+
+The Settings screen (#12, `order-11`) ships theme / sound-effects / default-landing preferences as local-browser-only (`localStorage`) for its first pass, because no backend path exists today to read or write them per account. This issue is that backend path, so a later pass can make the Settings screen's choices follow the user across browsers/devices instead of staying stuck to one browser's storage.
+
+`_docs/schema.sql`'s `users` table already has the columns ready: `theme` (check-constrained to the four theme names), `sound_effects_enabled`, `default_landing` (check-constrained to `greeting`/`dashboard`). Nothing above the repository layer uses them yet: the `User` dataclass in `backend/src/petri_backend/repository.py` has no `theme`/`sound_effects_enabled`/`default_landing` fields, `UserOut` in `backend/src/petri_backend/app.py` doesn't expose them, and no endpoint writes them.
+
+## Acceptance criteria
+
+- [ ] `User` (repository.py) gains `theme`, `sound_effects_enabled`, `default_landing` fields, backed by the existing `repository_memory.py` and `repository_postgres.py` implementations (reading/writing the real `users` columns in the Postgres case).
+- [ ] A way to read the current user's preferences (e.g. extend the existing `UserOut`/whatever becomes the `/auth/me`-style endpoint tracked in #31, `order-04g`, rather than inventing a second one) returns these three fields.
+- [ ] A `PATCH /users/me`-shaped endpoint (exact path is this issue's call) lets the signed-in user update one or more of `theme`, `sound_effects_enabled`, `default_landing`, validating `theme` against the same four values the DB check constraint allows and `default_landing` against `greeting`/`dashboard`; invalid values return 400.
+- [ ] The endpoint requires authentication (`get_current_user`) and only ever updates the caller's own row.
+- [ ] Once this lands, the Settings screen's frontend logic (from #12) can be updated in a later pass to read/write through this endpoint instead of `localStorage` — that frontend wiring is not part of this issue's scope, just the backend path it will call.
+
+## Out of scope
+
+- `other_tasks_enabled` persistence — not needed until #8 (`order-17`) ships the feature it toggles.
+- Any frontend change — #12's local-storage version keeps working until a separate follow-up wires it to this endpoint.
+- `/auth/me` itself, if it doesn't exist yet — tracked in #31 (`order-04g`); reuse whatever that issue lands rather than duplicating a current-user endpoint here.
+
+## Constraints
+
+- Files: `backend/src/petri_backend/repository.py`, `repository_memory.py`, `repository_postgres.py`, `app.py`, plus `_docs/schema.sql` needs no change (columns already exist).
+- No new dependencies.
+
+---
+
 ## order-05 · #4 — Experiments: CRUD + lifecycle + check-ins + retro gate
 
 - **Status**: OPEN
@@ -1047,16 +1080,67 @@ Ref: `_docs/specs.md` → Calendar.
 - **Labels**: frontend, design
 - **Link**: https://github.com/nachiketnasa/petri-v2/issues/12
 
-## What
-Settings screen.
+## Goal
+
+A Settings screen, reachable from the signed-in app, where a user can pick one of four visual themes, turn synthesized sound effects on or off, choose whether sign-in lands on the greeting screen or straight on the dashboard, and see the site's cookie notice. Theme, sound, and landing-preference choices are stored in the browser (`localStorage`) for this pass, not yet on the account — see Out of scope for the backend follow-up that adds account-level persistence. Other tasks toggle, 2FA enrollment, and account deletion are not built in this pass; each is explicitly deferred below to the issue that has to land first.
 
 ## Acceptance criteria
-- Theme: Petri Light, Petri Dark, Solarized Light, Solarized Dark — applies across the whole app, saved to the account.
-- Sound effects toggle (short synthesized tones: start/finish setup, check-in tick, pause/remove cadence).
-- Other tasks feature toggle, landing-screen preference, 2FA enrollment, account deletion.
-- Cookie notice: strictly-necessary-only disclosure, no category picker.
 
-Ref: `_docs/specs.md` → Design system/theming, Other tasks, Authentication.
+**Access**
+
+- [ ] A new `/settings` route exists and renders a `Settings` screen.
+- [ ] A "Settings" link is visible in the app's header (next to the existing "Sign out" button in `Header`) whenever a user is signed in, and navigates to `/settings`.
+- [ ] Visiting `/settings` while signed out redirects away, the same as every other `RequireAuth`-gated route today (e.g. `/dashboard`).
+
+**Theme**
+
+- [ ] Exactly four selectable options are shown, labeled "Petri Light", "Petri Dark", "Solarized Light", "Solarized Dark"; exactly one is selected at a time.
+- [ ] Selecting a theme re-skins the whole app immediately, not just the Settings screen itself — visible by selecting a theme, then navigating to the Dashboard or Greeting screen and seeing the same palette there.
+- [ ] The selected theme survives a full page reload (read back from `localStorage`).
+- [ ] A first-time visitor who has never opened Settings sees today's existing look unchanged (current default counts as "Petri Light"); no visual change happens before anyone picks anything.
+- [ ] Petri Light/Dark build on the sage-accent neumorphic palette already in `neumorphic.css`/`index.css`; Solarized Light/Dark use the published Solarized color values. All four are implemented as CSS variable sets selected by one attribute (e.g. `data-theme` on `<html>`), not four separate stylesheets and not per-component hardcoded colors.
+
+**Sound effects**
+
+- [ ] A single "Sound effects" on/off toggle, off by default, stored in `localStorage`.
+- [ ] When on, a short synthesized tone (Web Audio API, no shipped audio files) plays at exactly three moments that have a real UI hook today: opening the experiment creation wizard (`/experiments/new` mount), successfully submitting it, and successfully logging a check-in on `ExperimentDetail`.
+- [ ] When off, none of those three actions produce any sound.
+- [ ] The fourth moment named in `_docs/specs.md`'s Design system section, "pausing or removing a cadence," is not wired in this pass — confirmed there is no pause action and no cadence-removal/delete action anywhere in the backend (`app.py`) or frontend today, so there is nothing for a tone to attach to yet. See Out of scope.
+
+**Landing-screen preference**
+
+- [ ] A toggle (default off) lets the user choose to open the dashboard directly after sign-in instead of the greeting screen — this is the toggle #10's grooming named and deferred to this issue.
+- [ ] With the toggle on, signing in (or a signed-in user hitting `/`) goes straight to `/dashboard`, skipping `/greeting`.
+- [ ] With the toggle off (the default), today's greeting-first behavior from #10 is unchanged.
+- [ ] Stored in `localStorage`; the redirect logic already in `App.tsx` (`Home`, and anywhere else a signed-in user is sent to `/greeting`) reads this preference instead of hardcoding `/greeting`.
+
+**Cookie notice**
+
+- [ ] A cookie notice is visible on first load of the app (signed in or not), stating in substance that the site uses only cookies strictly necessary for sign-in and security, and that using the site means accepting this — matching `_docs/specs.md`'s Authentication section.
+- [ ] There is no category picker and no separate accept/reject choice — at most a single dismissal, since strictly-necessary cookies need no opt-in consent.
+- [ ] Once dismissed, the notice does not reappear on a later visit (dismissal remembered in `localStorage`).
+- [ ] The notice never covers or blocks interaction with the rest of the page underneath it (no full-page modal).
+
+**Explicitly not built this pass**
+
+- [ ] Settings contains no "Other tasks" toggle, no 2FA enrollment control, and no account-deletion control — see Out of scope for exactly why and where each is tracked. (This is checkable: these three controls are simply absent from the screen.)
+
+## Out of scope
+
+- Theme / sound-effects / default-landing choices persisting to the user's account instead of one browser's `localStorage` — `_docs/schema.sql` already has `users.theme`, `users.sound_effects_enabled`, `users.default_landing` columns, but nothing above the repository layer reads or writes them yet (`User` in `backend/src/petri_backend/repository.py` has no such fields, `UserOut` doesn't expose them, no endpoint writes them). New follow-up filed: #37 (`order-04j`).
+- Other tasks feature toggle — the feature it would control doesn't exist yet (#8, `order-17`, still open). A toggle with nothing behind it would be dead UI; add it once #8 ships.
+- 2FA enrollment UI (QR code, recovery codes) — depends on #3 (`order-16`, still open, the TOTP backend). Nothing to build against until that lands; no new issue, reference #3 directly when it's ready.
+- Account deletion control — depends on #25 (`order-18b`, still open, the backend cascade). Nothing to call until that endpoint exists; no new issue, reference #25 directly when it's ready.
+- The sound-effect tone for "pausing or removing a cadence" — not just unbuilt but unbuildable right now: no pause action and no cadence-removal action exist anywhere in the product (not in `_docs/schema.sql`'s status enums, not in `app.py`, not tracked by any other backlog issue). This is a missing product feature, not a missing sound hook, so no sound-only follow-up is filed for it; wire the tone once such an action exists and has its own issue.
+- Exact Solarized/Petri hex values beyond "distinguishable, working four themes" — pick values matching Solarized's published palette and the existing sage-accent Petri palette; a dedicated visual design review isn't required to close this issue.
+
+## Constraints
+
+- Files: new `frontend/src/Settings.tsx` + `Settings.test.tsx`; `frontend/src/App.tsx` (new `/settings` route, a Settings link in `Header`, and reading the landing-preference from the redirect logic instead of hardcoding `/greeting`); `frontend/src/neumorphic.css` / `frontend/src/index.css` (new named-theme CSS variable sets, switched by one attribute, not new hardcoded colors scattered per component); a small new helper (e.g. `frontend/src/sound.ts`) for Web Audio tone synthesis, called from the three wizard/check-in call sites named above.
+- No backend changes in this pass — `backend/` stays untouched; account-level persistence is #37's job, not this issue's.
+- Reuse the existing try/catch-wrapped `localStorage` pattern already used by `Greeting.tsx`'s `rememberDisplayName` for every preference this issue stores.
+- No new routing library beyond the already-installed `react-router-dom`, no new state-management library, no new CSS framework, no new npm dependency for audio (Web Audio API is a browser built-in).
+- No em dashes or hyphens used as punctuation in any new copy, per `_docs/specs.md`'s Design system section.
 
 ---
 
