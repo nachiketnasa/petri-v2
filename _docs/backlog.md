@@ -365,6 +365,34 @@ A way for the frontend to know the signed-in user's `display_name` (and `timezon
 
 ---
 
+## order-04h · #33 — Auth: sign-up does not establish a session (no cookie set)
+
+- **Status**: OPEN
+- **Labels**: backend, auth
+- **Link**: https://github.com/nachiketnasa/petri-v2/issues/33
+
+## Goal
+A successful `POST /auth/signup` should leave the caller signed in, the same way `POST /auth/login` does right now — matching normal product expectations and what the frontend (`AuthForm.tsx`) already assumes.
+
+## Acceptance criteria
+- [ ] `POST /auth/signup` sets the same `session_id` cookie (httponly) that `/auth/login` sets, using a new session token for the newly created user — verifiable with `curl -i`, a `Set-Cookie` header is present on the 201 response.
+- [ ] Immediately after a successful signup, a request carrying that cookie (e.g. `GET /experiments`) returns 200, not 401.
+- [ ] `/auth/login`'s existing behavior is unchanged.
+
+## Out of scope
+- Any frontend change — `AuthForm.tsx` already treats a successful signup response as "authenticated"; once the backend actually sets the cookie, the existing frontend flow starts working correctly with no frontend change needed. If that turns out to be false, file a separate frontend follow-up.
+- Session TTL/expiration — tracked in #20 (order-04b).
+- Exposing the current user on page reload — tracked in #31 (order-04g).
+
+## Constraints
+- Files: `backend/src/petri_backend/app.py` (the `signup` handler), mirroring the existing `login` handler's session-creation lines (`new_session_token()`, `_sessions[token] = user.id`, `response.set_cookie(...)`).
+- Add/extend a backend test asserting the signup response includes a working session cookie (not just a 201 status).
+
+## Found by
+Discovered during QA verification of #10 (dashboard/greeting screen) — QA used real curl requests against the live Docker Compose stack instead of mocked fetches and caught that signup never actually logs the user in. Pre-existing bug, unrelated to #10's own file changes.
+
+---
+
 ## order-05 · #4 — Experiments: CRUD + lifecycle + check-ins + retro gate
 
 - **Status**: OPEN
@@ -578,27 +606,27 @@ A signed-in user, right after sign-in, lands on a calm time-of-day greeting (not
 
 **Routing / greeting screen**
 
-- [ ] After a successful sign-in, the user lands on a new greeting screen, not directly on `/dashboard` (today `Home` redirects straight to `/dashboard` in `App.tsx` — that redirect target changes to the greeting screen).
-- [ ] Greeting text reads a time-of-day salutation + the user's `display_name` (e.g. "Good morning, Nachiket."), computed from the browser's local clock.
-- [ ] One quiet line below the greeting states how many things are due today. No stat grid, no cards, no color blocks anywhere on this screen.
-- [ ] Zero due today reads as a real sentence ("Nothing due today"), not "0 things due today."
-- [ ] A single explicit action ("Open dashboard" or equivalent) navigates to `/dashboard`. Nothing on this screen is a dashboard preview.
-- [ ] Refreshing the page while signed in still shows the correct name (not blank/undefined) — see Out of scope re: `/auth/me`.
+- [x] After a successful sign-in, the user lands on a new greeting screen, not directly on `/dashboard` (today `Home` redirects straight to `/dashboard` in `App.tsx` — that redirect target changes to the greeting screen).
+- [x] Greeting text reads a time-of-day salutation + the user's `display_name` (e.g. "Good morning, Nachiket."), computed from the browser's local clock.
+- [x] One quiet line below the greeting states how many things are due today. No stat grid, no cards, no color blocks anywhere on this screen.
+- [x] Zero due today reads as a real sentence ("Nothing due today"), not "0 things due today."
+- [x] A single explicit action ("Open dashboard" or equivalent) navigates to `/dashboard`. Nothing on this screen is a dashboard preview.
+- [x] Refreshing the page while signed in still shows the correct name (not blank/undefined) — see Out of scope re: `/auth/me`.
 
 **Dashboard**
 
-- [ ] Each experiment renders as a neumorphic card (soft dual-tone shadow, no hairline border, sage green accent) in a responsive grid — replacing the current plain `<ul><li>` three-line list in `Dashboard.tsx`.
-- [ ] An Experiments / Goals / Both filter control is present and defaults to "Both." Selecting "Goals" or "Both" shows an empty/zero state for goals (see Out of scope — no goal data exists yet); selecting "Experiments" or "Both" shows the real experiment cards.
-- [ ] A WIP tile shows the live experiment count against the cap, e.g. "Experiments 1/2," computed by counting `status === 'Active'` in the already-fetched experiments list. A goal WIP tile shows a static "Goals 0/1" until goals exist.
-- [ ] A completed-vs-abandoned ratio tile is computed from the same experiment list: abandoned = `ended_early === true`, completed = `status === 'Archived' && !ended_early`. Displays as e.g. "3 completed · 1 abandoned."
-- [ ] A streak number is shown prominently, Duolingo-style (large, set in IBM Plex Mono). No backend streak data exists yet (see Out of scope), so the tile renders in its final position/typography with a muted placeholder (e.g. "—") rather than a fabricated number.
-- [ ] A Backlog section lists experiments with `status === 'Backlog'` separately from the active grid (title + cadence type only, same card style, no extra fields).
-- [ ] Empty state (no experiments at all): one calm message (e.g. "No experiments yet.") instead of four empty section headers; the existing "New experiment" link stays visible.
-- [ ] 10+ experiments: grid wraps responsively, no horizontal scroll, no fixed per-row count.
-- [ ] A long title wraps or truncates with an ellipsis (full title available via a `title` attribute) without breaking the card or pushing the WIP/ratio tiles out of place.
-- [ ] While `GET /experiments` is in flight, the dashboard shows one loading indicator — no partial grid, no empty-state flash before data arrives.
-- [ ] On a non-ok response (including 401), the existing `role="alert"` error text renders alone — no grid, tiles, ratio, or streak placeholder alongside it.
-- [ ] Both screens respect the existing light/dark `prefers-color-scheme` variables already defined in `index.css` — no new hardcoded colors that break dark mode.
+- [x] Each experiment renders as a neumorphic card (soft dual-tone shadow, no hairline border, sage green accent) in a responsive grid — replacing the current plain `<ul><li>` three-line list in `Dashboard.tsx`.
+- [x] An Experiments / Goals / Both filter control is present and defaults to "Both." Selecting "Goals" or "Both" shows an empty/zero state for goals (see Out of scope — no goal data exists yet); selecting "Experiments" or "Both" shows the real experiment cards.
+- [x] A WIP tile shows the live experiment count against the cap, e.g. "Experiments 1/2," computed by counting `status === 'Active'` in the already-fetched experiments list. A goal WIP tile shows a static "Goals 0/1" until goals exist.
+- [x] A completed-vs-abandoned ratio tile is computed from the same experiment list: abandoned = `ended_early === true`, completed = `status === 'Archived' && !ended_early`. Displays as e.g. "3 completed · 1 abandoned."
+- [x] A streak number is shown prominently, Duolingo-style (large, set in IBM Plex Mono). No backend streak data exists yet (see Out of scope), so the tile renders in its final position/typography with a muted placeholder (e.g. "—") rather than a fabricated number.
+- [x] A Backlog section lists experiments with `status === 'Backlog'` separately from the active grid (title + cadence type only, same card style, no extra fields).
+- [x] Empty state (no experiments at all): one calm message (e.g. "No experiments yet.") instead of four empty section headers; the existing "New experiment" link stays visible.
+- [x] 10+ experiments: grid wraps responsively, no horizontal scroll, no fixed per-row count.
+- [x] A long title wraps or truncates with an ellipsis (full title available via a `title` attribute) without breaking the card or pushing the WIP/ratio tiles out of place.
+- [x] While `GET /experiments` is in flight, the dashboard shows one loading indicator — no partial grid, no empty-state flash before data arrives.
+- [x] On a non-ok response (including 401), the existing `role="alert"` error text renders alone — no grid, tiles, ratio, or streak placeholder alongside it.
+- [x] Both screens respect the existing light/dark `prefers-color-scheme` variables already defined in `index.css` — no new hardcoded colors that break dark mode.
 
 ## Out of scope
 
