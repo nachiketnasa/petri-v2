@@ -11,7 +11,16 @@ import uuid
 from datetime import date, datetime
 from datetime import timezone as _tz
 
-from petri_backend.repository import CheckIn, Experiment, Goal, Milestone, Repository, Retro, User
+from petri_backend.repository import (
+    CheckIn,
+    Experiment,
+    Goal,
+    Milestone,
+    RecoveryCode,
+    Repository,
+    Retro,
+    User,
+)
 
 
 class InMemoryRepository(Repository):
@@ -22,6 +31,7 @@ class InMemoryRepository(Repository):
         self._retros: dict[str, Retro] = {}
         self._goals: dict[str, Goal] = {}
         self._milestones: dict[str, Milestone] = {}
+        self._recovery_codes: dict[str, RecoveryCode] = {}
 
     def create_user(
         self,
@@ -59,6 +69,24 @@ class InMemoryRepository(Repository):
         for key, value in fields.items():
             setattr(user, key, value)
         return user
+
+    def replace_recovery_codes(self, *, user_id: str, code_hashes: list[str]) -> list[RecoveryCode]:
+        for rc_id in [rc.id for rc in self._recovery_codes.values() if rc.user_id == user_id]:
+            del self._recovery_codes[rc_id]
+        created = []
+        for code_hash in code_hashes:
+            rc = RecoveryCode(
+                id=str(uuid.uuid4()), user_id=user_id, code_hash=code_hash, created_at=_utcnow()
+            )
+            self._recovery_codes[rc.id] = rc
+            created.append(rc)
+        return created
+
+    def list_recovery_codes(self, *, user_id: str) -> list[RecoveryCode]:
+        return [rc for rc in self._recovery_codes.values() if rc.user_id == user_id]
+
+    def delete_recovery_code(self, *, recovery_code_id: str) -> None:
+        self._recovery_codes.pop(recovery_code_id, None)
 
     def create_experiment(
         self,

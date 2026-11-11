@@ -3,6 +3,7 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Literal
 from zoneinfo import ZoneInfo
 
+import pyotp
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,9 +11,17 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from petri_backend.email import send_password_reset_email, send_verification_email
-from petri_backend.repository import CheckIn, Experiment, Goal, Milestone, Repository, User
+from petri_backend.repository import (
+    CheckIn,
+    Experiment,
+    Goal,
+    Milestone,
+    Repository,
+    User,
+)
 from petri_backend.repository_memory import InMemoryRepository
 from petri_backend.repository_postgres import PostgresRepository
+from petri_backend.totp_crypto import decrypt_totp_secret, encrypt_totp_secret
 from petri_backend.security import (
     hash_password,
     new_reset_token,
@@ -113,6 +122,7 @@ class SignupRequest(BaseModel):
 class LoginRequest(BaseModel):
     email: str
     password: str
+    totp_code: str | None = None  # 6-digit TOTP code, or a recovery code (#3)
 
 
 class ForgotPasswordRequest(BaseModel):
@@ -348,6 +358,7 @@ class UserOut(BaseModel):
     sound_effects_enabled: bool
     default_landing: str
     email_verified: bool
+    totp_enabled: bool
 
     @classmethod
     def from_user(cls, user: User) -> "UserOut":
@@ -361,7 +372,21 @@ class UserOut(BaseModel):
             sound_effects_enabled=user.sound_effects_enabled,
             default_landing=user.default_landing,
             email_verified=user.email_verified_at is not None,
+            totp_enabled=user.totp_enabled,
         )
+
+
+class Enroll2FAResponse(BaseModel):
+    secret: str  # shown once, as text, for apps that can't scan a QR
+    otpauth_uri: str  # frontend renders this as a QR code
+
+
+class Confirm2FARequest(BaseModel):
+    code: str
+
+
+class Confirm2FAResponse(BaseModel):
+    recovery_codes: list[str]  # shown once, plaintext; only hashes are stored
 
 
 class UpdateUserPreferencesRequest(BaseModel):
@@ -420,6 +445,13 @@ def login(
         raise HTTPException(status_code=401, detail="Invalid email or password.")
     if user.email_verified_at is None:
         raise HTTPException(status_code=403, detail="Email not verified.")
+    if user.totp_enabled:
+        if body.totp_code is None:
+            raise HTTPException(status_code=428, detail="TOTP code required.")
+        if not _verify_totp_or_recovery_code(repository, user, body.totp_code):
+            # Deliberately the same generic message as a wrong password:
+            # which half of a two-factor check failed is not observable.
+            raise HTTPException(status_code=401, detail="Invalid email or password.")
 
     token = new_session_token()
     _start_session(token, user.id)
@@ -427,9 +459,80 @@ def login(
     return UserOut.from_user(user)
 
 
+def _verify_totp_or_recovery_code(repository: Repository, user: User, code: str) -> bool:
+    secret = decrypt_totp_secret(user.totp_secret)
+    if pyotp.TOTP(secret).verify(code, valid_window=1):
+        return True
+    for recovery_code in repository.list_recovery_codes(user_id=user.id):
+        if verify_password(code, recovery_code.code_hash):
+            repository.delete_recovery_code(recovery_code_id=recovery_code.id)
+            return True
+    return False
+
+
 @app.get("/auth/me", response_model=UserOut)
 def get_me(current_user: User = Depends(get_current_user)) -> UserOut:
     return UserOut.from_user(current_user)
+
+
+_RECOVERY_CODE_COUNT = 8
+
+
+def _generate_recovery_codes() -> list[str]:
+    # XXXX-XXXX: easy to read back from a printed/saved list, still ~34
+    # bits of entropy per code (5 base32-ish chars per half).
+    import secrets
+    import string
+
+    alphabet = string.ascii_uppercase + string.digits
+    return [
+        f"{''.join(secrets.choice(alphabet) for _ in range(4))}-"
+        f"{''.join(secrets.choice(alphabet) for _ in range(4))}"
+        for _ in range(_RECOVERY_CODE_COUNT)
+    ]
+
+
+@app.post("/auth/2fa/enroll", response_model=Enroll2FAResponse)
+def enroll_2fa(
+    current_user: User = Depends(get_current_user),
+    repository: Repository = Depends(get_repository),
+) -> Enroll2FAResponse:
+    # Generates (or replaces) a pending secret -- 2FA isn't considered
+    # enabled off this alone (specs.md): totp_enabled only flips true once
+    # confirm_2fa verifies one real code against it.
+    secret = pyotp.random_base32()
+    repository.update_user(user_id=current_user.id, totp_secret=encrypt_totp_secret(secret))
+    otpauth_uri = pyotp.TOTP(secret).provisioning_uri(name=current_user.email, issuer_name="Petri")
+    return Enroll2FAResponse(secret=secret, otpauth_uri=otpauth_uri)
+
+
+@app.post("/auth/2fa/confirm", response_model=Confirm2FAResponse)
+def confirm_2fa(
+    body: Confirm2FARequest,
+    current_user: User = Depends(get_current_user),
+    repository: Repository = Depends(get_repository),
+) -> Confirm2FAResponse:
+    if current_user.totp_secret is None:
+        raise HTTPException(status_code=400, detail="No pending 2FA enrollment. Call enroll first.")
+    secret = decrypt_totp_secret(current_user.totp_secret)
+    if not pyotp.TOTP(secret).verify(body.code, valid_window=1):
+        raise HTTPException(status_code=400, detail="Invalid code.")
+
+    repository.update_user(user_id=current_user.id, totp_enabled=True)
+    plaintext_codes = _generate_recovery_codes()
+    repository.replace_recovery_codes(
+        user_id=current_user.id, code_hashes=[hash_password(c) for c in plaintext_codes]
+    )
+    return Confirm2FAResponse(recovery_codes=plaintext_codes)
+
+
+@app.post("/auth/2fa/disable", status_code=204)
+def disable_2fa(
+    current_user: User = Depends(get_current_user),
+    repository: Repository = Depends(get_repository),
+) -> None:
+    repository.update_user(user_id=current_user.id, totp_enabled=False, totp_secret=None)
+    repository.replace_recovery_codes(user_id=current_user.id, code_hashes=[])
 
 
 @app.patch("/users/me", response_model=UserOut)

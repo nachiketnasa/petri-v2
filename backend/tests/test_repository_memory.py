@@ -40,6 +40,9 @@ def test_implements_exactly_the_interface_methods():
         "list_milestone_check_ins",
         "add_goal_retro",
         "add_milestone_retro",
+        "replace_recovery_codes",
+        "list_recovery_codes",
+        "delete_recovery_code",
     }
 
 

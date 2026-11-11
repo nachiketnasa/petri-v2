@@ -25,6 +25,16 @@ class User:
     sound_effects_enabled: bool = True
     default_landing: str = "greeting"
     email_verified_at: datetime | None = None
+    totp_secret: str | None = None  # ciphertext (totp_crypto.py), never plaintext
+    totp_enabled: bool = False
+
+
+@dataclass
+class RecoveryCode:
+    id: str
+    user_id: str
+    code_hash: str
+    created_at: datetime
 
 
 @dataclass
@@ -127,6 +137,22 @@ class Repository(ABC):
 
     @abstractmethod
     def update_user(self, *, user_id: str, **fields) -> User | None: ...
+
+    @abstractmethod
+    def replace_recovery_codes(self, *, user_id: str, code_hashes: list[str]) -> list[RecoveryCode]:
+        """Deletes any existing recovery codes for this user and inserts a
+        fresh set -- used both at initial 2FA enrollment and to mirror
+        deleting them on disable."""
+        ...
+
+    @abstractmethod
+    def list_recovery_codes(self, *, user_id: str) -> list[RecoveryCode]: ...
+
+    @abstractmethod
+    def delete_recovery_code(self, *, recovery_code_id: str) -> None:
+        """A code is deleted outright once used, not flagged -- "still
+        present" is itself the unused check (_docs/schema.sql)."""
+        ...
 
     @abstractmethod
     def create_experiment(

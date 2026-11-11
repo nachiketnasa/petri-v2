@@ -15,7 +15,16 @@ from __future__ import annotations
 
 import psycopg
 
-from petri_backend.repository import CheckIn, Experiment, Goal, Milestone, Repository, Retro, User
+from petri_backend.repository import (
+    CheckIn,
+    Experiment,
+    Goal,
+    Milestone,
+    RecoveryCode,
+    Repository,
+    Retro,
+    User,
+)
 
 # Columns `update_experiment` is allowed to set, matching the Experiment dataclass
 # (minus id/user_id, which identify the row rather than being updatable fields).
@@ -35,20 +44,23 @@ _EXPERIMENT_UPDATABLE_FIELDS = {
     "archived_at",
 }
 
-# Columns `update_user` is allowed to set -- Settings preferences (#37) plus
-# email_verified_at (#23); email/password/display_name/timezone go through
-# their own dedicated flows.
+# Columns `update_user` is allowed to set -- Settings preferences (#37),
+# email_verified_at (#23), totp_secret/totp_enabled (#3); email/password/
+# display_name/timezone go through their own dedicated flows.
 _USER_UPDATABLE_FIELDS = {
     "theme",
     "sound_effects_enabled",
     "default_landing",
     "email_verified_at",
+    "totp_secret",
+    "totp_enabled",
 }
 
 
 _USER_COLUMNS = (
     "id, email, password_hash, display_name, timezone, created_at, "
-    "theme, sound_effects_enabled, default_landing, email_verified_at"
+    "theme, sound_effects_enabled, default_landing, email_verified_at, "
+    "totp_secret, totp_enabled"
 )
 
 _EXPERIMENT_COLUMNS = (
@@ -117,6 +129,14 @@ def _row_to_user(row: tuple) -> User:
         sound_effects_enabled=row[7],
         default_landing=row[8],
         email_verified_at=row[9],
+        totp_secret=row[10],
+        totp_enabled=row[11],
+    )
+
+
+def _row_to_recovery_code(row: tuple) -> RecoveryCode:
+    return RecoveryCode(
+        id=str(row[0]), user_id=str(row[1]), code_hash=row[2], created_at=row[3]
     )
 
 
@@ -268,6 +288,35 @@ class PostgresRepository(Repository):
             )
             row = cur.fetchone()
             return _row_to_user(row) if row else None
+
+    def replace_recovery_codes(self, *, user_id: str, code_hashes: list[str]) -> list[RecoveryCode]:
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute("delete from totp_recovery_codes where user_id = %s", (user_id,))
+            created = []
+            for code_hash in code_hashes:
+                cur.execute(
+                    """
+                    insert into totp_recovery_codes (user_id, code_hash)
+                    values (%s, %s)
+                    returning id, user_id, code_hash, created_at
+                    """,
+                    (user_id, code_hash),
+                )
+                created.append(_row_to_recovery_code(cur.fetchone()))
+            return created
+
+    def list_recovery_codes(self, *, user_id: str) -> list[RecoveryCode]:
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute(
+                "select id, user_id, code_hash, created_at from totp_recovery_codes "
+                "where user_id = %s",
+                (user_id,),
+            )
+            return [_row_to_recovery_code(row) for row in cur.fetchall()]
+
+    def delete_recovery_code(self, *, recovery_code_id: str) -> None:
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute("delete from totp_recovery_codes where id = %s", (recovery_code_id,))
 
     def create_experiment(
         self,

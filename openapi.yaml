@@ -91,6 +91,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "428":
+          description: Correct credentials, but this account has 2FA enabled and no totp_code was supplied (#3).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 
   /auth/logout:
     post:
@@ -242,6 +248,76 @@ paths:
                     example: ok
         "400":
           description: Missing field, or invalid/expired/already-used code.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /auth/2fa/enroll:
+    post:
+      summary: Start TOTP 2FA enrollment (does not enable it yet)
+      operationId: enroll2fa
+      tags: [auth]
+      responses:
+        "200":
+          description: >-
+            A pending secret -- shown once as text, plus an otpauth:// URI
+            for the frontend to render as a QR code. 2FA isn't enabled
+            until POST /auth/2fa/confirm verifies a real code against it.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Enroll2FAResponse"
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /auth/2fa/confirm:
+    post:
+      summary: Confirm enrollment with one real code, enabling 2FA
+      operationId: confirm2fa
+      tags: [auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Confirm2FARequest"
+      responses:
+        "200":
+          description: >-
+            2FA enabled. The recovery codes are plaintext and shown exactly
+            once here -- only their hashes are stored.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Confirm2FAResponse"
+        "400":
+          description: No pending enrollment, or an invalid code.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /auth/2fa/disable:
+    post:
+      summary: Disable 2FA and delete its recovery codes
+      operationId: disable2fa
+      tags: [auth]
+      responses:
+        "204":
+          description: 2FA disabled.
+        "401":
+          description: Not authenticated.
           content:
             application/json:
               schema:
@@ -793,6 +869,7 @@ components:
           sound_effects_enabled,
           default_landing,
           email_verified,
+          totp_enabled,
         ]
       properties:
         id:
@@ -818,6 +895,37 @@ components:
         email_verified:
           type: boolean
           description: True once POST /auth/verify-email has confirmed the sign-up code (#23).
+        totp_enabled:
+          type: boolean
+          description: True once POST /auth/2fa/confirm has enabled two-factor auth (#3).
+
+    Enroll2FAResponse:
+      type: object
+      required: [secret, otpauth_uri]
+      properties:
+        secret:
+          type: string
+          description: Base32 TOTP secret, shown once as text for apps that can't scan a QR.
+        otpauth_uri:
+          type: string
+          description: otpauth:// URI for the frontend to render as a QR code.
+
+    Confirm2FARequest:
+      type: object
+      required: [code]
+      properties:
+        code:
+          type: string
+
+    Confirm2FAResponse:
+      type: object
+      required: [recovery_codes]
+      properties:
+        recovery_codes:
+          type: array
+          items:
+            type: string
+          description: Plaintext, shown exactly once; only their hashes are stored.
 
     UpdateUserPreferencesRequest:
       type: object
@@ -858,6 +966,12 @@ components:
         password:
           type: string
           format: password
+        totp_code:
+          type: string
+          description: >-
+            Required once the account has 2FA enabled (#3): a 6-digit TOTP
+            code, or a recovery code. Omitting it on a 2FA account returns
+            428, not 401.
 
     ForgotPasswordRequest:
       type: object
