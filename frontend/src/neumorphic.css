@@ -196,3 +196,43 @@
   font-size: 16px;
   color: var(--text-h);
 }
+
+.landing-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  min-height: 60vh;
+  max-width: 480px;
+  margin: 0 auto;
+  text-align: center;
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+.landing-title {
+  font-size: 32px;
+  color: var(--sage);
+}
+
+.landing-copy {
+  color: var(--text);
+  max-width: 100%;
+}
+
+.landing-action {
+  margin-top: 8px;
+  border: none;
+  border-radius: 14px;
+  padding: 12px 28px;
+  font-size: 16px;
+  background: var(--neu-surface);
+  color: var(--text-h);
+  box-shadow: 6px 6px 12px var(--neu-shadow-dark), -6px -6px 12px var(--neu-shadow-light);
+  cursor: pointer;
+}
+
+.landing-action:hover {
+  box-shadow: 4px 4px 8px var(--neu-shadow-dark), -4px -4px 8px var(--neu-shadow-light);
+}

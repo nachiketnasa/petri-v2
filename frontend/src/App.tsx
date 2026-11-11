@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { BrowserRouter, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import HealthStatus from './HealthStatus'
 import AuthForm from './AuthForm'
+import Landing from './Landing'
 import Dashboard from './Dashboard'
 import ExperimentDetail from './ExperimentDetail'
 import Greeting, { rememberDisplayName } from './Greeting'
@@ -38,6 +39,15 @@ function RequireAuth({ children }: { children: ReactNode }) {
 }
 
 function Home() {
+  const { signedIn } = useAuth()
+
+  if (signedIn === null) return <p>Loading…</p>
+  if (signedIn) return <Navigate to="/greeting" replace />
+
+  return <Landing />
+}
+
+function SignIn() {
   const { signedIn, signIn } = useAuth()
   const navigate = useNavigate()
 
@@ -61,6 +71,7 @@ function AppRoutes() {
       <Header />
       <Routes>
         <Route path="/" element={<Home />} />
+        <Route path="/sign-in" element={<SignIn />} />
         <Route
           path="/greeting"
           element={

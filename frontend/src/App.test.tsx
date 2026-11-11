@@ -50,7 +50,7 @@ describe('App', () => {
       return Promise.resolve({ ok: false, status: 401, json: async () => ({ detail: 'nope' }) })
     })
     vi.stubGlobal('fetch', fetchMock)
-    window.history.pushState({}, '', '/')
+    window.history.pushState({}, '', '/sign-in')
 
     render(<App />)
 
@@ -132,5 +132,41 @@ describe('App', () => {
 
     const experimentsCalls = fetchMock.mock.calls.filter((call) => (call[0] as string).endsWith('/experiments'))
     expect(experimentsCalls).toHaveLength(1)
+  })
+
+  it('renders the landing page, not AuthForm or a redirect, for an unauthenticated visitor at /', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 401, json: async () => ({ detail: 'nope' }) })
+    vi.stubGlobal('fetch', fetchMock)
+    window.history.pushState({}, '', '/')
+
+    render(<App />)
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument())
+    expect(screen.queryByRole('heading', { name: 'Sign up' })).not.toBeInTheDocument()
+    expect(screen.queryByPlaceholderText('Email')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Sign up' })).toBeInTheDocument())
+  })
+
+  it('redirects a signed-in visitor away from / to /greeting', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => [] })
+    vi.stubGlobal('fetch', fetchMock)
+    window.history.pushState({}, '', '/')
+
+    render(<App />)
+
+    await waitFor(() => expect(screen.getByText(/^Good (morning|afternoon|evening)/)).toBeInTheDocument())
+  })
+
+  it('redirects a signed-in visitor away from /sign-in to /greeting', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => [] })
+    vi.stubGlobal('fetch', fetchMock)
+    window.history.pushState({}, '', '/sign-in')
+
+    render(<App />)
+
+    await waitFor(() => expect(screen.getByText(/^Good (morning|afternoon|evening)/)).toBeInTheDocument())
   })
 })
