@@ -3,6 +3,7 @@ from datetime import date, datetime, timedelta, timezone
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
@@ -17,6 +18,17 @@ from petri_backend.security import (
 )
 
 app = FastAPI()
+
+# Browser fetches with credentials: 'include' need real CORS headers -
+# allow_origin can't be "*" once allow_credentials is True (browsers
+# reject that combination), so it comes from FRONTEND_ORIGIN instead.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[os.environ.get("FRONTEND_ORIGIN", "http://localhost:5173")],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 _repository: Repository = InMemoryRepository()
 
