@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
+from petri_backend.email import send_password_reset_email
 from petri_backend.repository import CheckIn, Experiment, Goal, Milestone, Repository, User
 from petri_backend.repository_memory import InMemoryRepository
 from petri_backend.repository_postgres import PostgresRepository
@@ -439,7 +440,10 @@ def forgot_password(
     if user is not None:
         token = new_reset_token()
         _reset_tokens[token] = (user.id, datetime.now(timezone.utc) + RESET_TOKEN_TTL)
-        print(f"PASSWORD_RESET_TOKEN email={user.email} token={token}")
+        # send_password_reset_email fails safely on its own (#21): a missing
+        # key or provider error never raises here, so it can't turn into an
+        # observable difference in this response either way.
+        send_password_reset_email(to=user.email, token=token)
     # Always the same response, registered or not - no email enumeration.
     return {"status": "ok"}
 

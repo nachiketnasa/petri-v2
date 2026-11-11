@@ -61,7 +61,7 @@ def test_forgot_password_logs_token_only_for_registered_email(client: TestClient
 
     client.post("/auth/forgot-password", json={"email": "user@example.com"})
     out = capsys.readouterr().out
-    assert "PASSWORD_RESET_TOKEN email=user@example.com token=" in out
+    assert "to=user@example.com" in out
     token = list(_reset_tokens.keys())[0]
     assert token in out
 
