@@ -49,7 +49,7 @@ yourself:
 |---|---|---|---|
 | 1 | Problem description | 2 / 2 | This README's [problem](#the-problem) and [functionality](#functionality) sections. |
 | 2 | Product specification | 2 / 2 | [`_docs/specs.md`](_docs/specs.md) (entities, user stories, acceptance criteria); public tracker at [Issues](https://github.com/nachiketnasa/petri-v2/issues), snapshotted in [`_docs/backlog.md`](_docs/backlog.md). |
-| 3 | Agent team specification | 2 / 2 | [`_docs/process.md`](_docs/process.md) (PM → Engineer → QA lifecycle) and [`_docs/team/`](_docs/team) (one file per role). |
+| 3 | Agent team specification | 2 / 2 | [`_docs/process.md`](_docs/process.md) (PM → Engineer → QA lifecycle) and [`_docs/team/`](_docs/team) (one file per role). **Evidence the roles were actually used, not just documented:** [issue #30](https://github.com/nachiketnasa/petri-v2/issues/30)'s comment thread shows the full cycle on one issue — PM's `## Groomed:` comment, Engineer's `Implemented:` comment, QA's `## QA: FAIL`, Engineer's follow-up fix, and QA's final `## QA: PASS` before close. |
 | 4 | Context management | 2 / 2 | [`AGENTS.md`](AGENTS.md) indexes every doc below it; each is scoped to one concern. |
 | 5 | Application | 2 / 2 | `docker compose up --build` runs frontend + backend + Postgres together; see [Running it locally](#running-it-locally-no-resend-account-needed) above. |
 | 6 | Testing | 2 / 2 | Backend: `cd backend && uv run pytest` (unit + integration against real Postgres, see `backend/tests/test_repository_postgres.py`). Frontend: `cd frontend && npm test` (Vitest + React Testing Library). |
