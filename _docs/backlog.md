@@ -743,7 +743,7 @@ Ref: `_docs/specs.md` → Tech stack (Infra, Hosting).
 
 ## Implementation tasks (MVP slice)
 
-- [ ] Docker Compose: backend, frontend, and Postgres as three services, one `docker compose up`, no manual steps after it. Deploying that compose file to the actual VPS/domain is a separate follow-up once it runs locally.
+- [x] Docker Compose: backend, frontend, and Postgres as three services, one `docker compose up`, no manual steps after it. Deploying that compose file to the actual VPS/domain is a separate follow-up once it runs locally.
 
 ---
 
