@@ -180,7 +180,7 @@ the task template before implementation.
 
 ## order-04c · #21 — Auth: send real emails for password reset (replace dev-log token)
 
-- **Status**: OPEN
+- **Status**: CLOSED
 - **Labels**: backend, auth
 - **Link**: https://github.com/nachiketnasa/petri-v2/issues/21
 
@@ -273,7 +273,7 @@ from the emailed (for now, dev-log-printed, see #21) token.
 
 ## order-04e · #23 — Auth: sign-up email verification code
 
-- **Status**: OPEN
+- **Status**: CLOSED
 - **Labels**: backend, auth
 - **Link**: https://github.com/nachiketnasa/petri-v2/issues/23
 
@@ -1225,7 +1225,7 @@ Ref: conversation history — "hold for now" on CI/CD.
 
 ## order-14 · #5 — Goals: CRUD + locked ordered milestone list
 
-- **Status**: OPEN
+- **Status**: CLOSED
 - **Labels**: backend
 - **Link**: https://github.com/nachiketnasa/petri-v2/issues/5
 
@@ -1325,7 +1325,7 @@ Ref: `_docs/specs.md` → Evolving and branching, Lineage section. `_docs/schema
 
 ## order-16 · #3 — Auth: TOTP two-factor authentication
 
-- **Status**: OPEN
+- **Status**: CLOSED
 - **Labels**: backend, auth
 - **Link**: https://github.com/nachiketnasa/petri-v2/issues/3
 
@@ -1350,7 +1350,7 @@ No MVP-slice breakdown yet — 2FA is deferred past the MVP slice (see issue #2'
 
 ## order-17 · #8 — Other tasks: scheduling, daily load warning, Web Push
 
-- **Status**: OPEN
+- **Status**: CLOSED
 - **Labels**: backend
 - **Link**: https://github.com/nachiketnasa/petri-v2/issues/8
 
@@ -1368,9 +1368,43 @@ Ref: `_docs/specs.md` → Other tasks.
 
 ---
 
-## order-18 · #9 — Sharing, likes, and comments
+## order-17a · #39 — Other tasks: actually send Web Push reminders (sending + scheduling, not just subscriptions)
 
 - **Status**: OPEN
+- **Labels**: backend
+- **Link**: https://github.com/nachiketnasa/petri-v2/issues/39
+
+## What
+
+`#8` (order-17) built Other tasks CRUD, the daily load warning, and Web Push *subscription* management (VAPID public key, `POST /push/subscribe`/`/unsubscribe`, subscriptions persisted in `push_subscriptions`). It did not build the piece that actually sends a push notification at the right time.
+
+Sending a real Web Push message needs two things that don't exist anywhere in this backend yet:
+
+1. A Web Push client that does the actual protocol (ECDH shared secret + AES128GCM payload encryption + a signed VAPID JWT per request) — `vapid.py`'s own docstring flags this explicitly. The standard choice is `pywebpush` (wraps this correctly; never hand-roll this layer of crypto).
+2. A background scheduler/worker that periodically checks "what's due now" (other tasks whose schedule matches today/now, condensed with each subscription's reminder preference) and sends one. This FastAPI backend is entirely request/response — there is no cron, queue, or background-job runner anywhere in it today (the same reason `#38`'s `active -> reflect` transition had to be computed lazily on read instead of via a timer).
+
+## Acceptance criteria
+
+- [ ] A scheduled job (interval doesn't need to be exact to the minute — every few minutes is fine per specs.md's own "informational, never blocks" framing) finds other_tasks due "now" for users with `push_reminder_enabled` and at least one stored subscription.
+- [ ] Sends an encrypted Web Push message (via `pywebpush` or equivalent) to each of that user's subscriptions.
+- [ ] A subscription that the push service reports as expired/invalid (410 Gone from the push service) is removed via the existing `delete_push_subscription`, not retried forever.
+- [ ] Decide and document the scheduling mechanism itself (an in-process `asyncio` loop started at app startup, vs. a separate worker process/container) — this is this issue's own call to make, not assumed here.
+
+## Out of scope
+
+- Everything `#8` already shipped (CRUD, daily load, subscription management, VAPID key generation) — this issue is additive.
+- Email notifications — Web Push only, per specs.md's Non-goals.
+
+## Constraints
+
+- Backend only.
+- No SMS, no email — Web Push API exclusively, per specs.md's "Other tasks" section.
+
+---
+
+## order-18 · #9 — Sharing, likes, and comments
+
+- **Status**: CLOSED
 - **Labels**: backend
 - **Link**: https://github.com/nachiketnasa/petri-v2/issues/9
 
