@@ -29,6 +29,17 @@ def test_implements_exactly_the_interface_methods():
         "list_check_ins",
         "add_retro",
         "get_retro",
+        "create_goal",
+        "list_goals",
+        "get_goal",
+        "update_goal",
+        "list_milestones",
+        "get_milestone",
+        "update_milestone",
+        "add_milestone_check_in",
+        "list_milestone_check_ins",
+        "add_goal_retro",
+        "add_milestone_retro",
     }
 
 

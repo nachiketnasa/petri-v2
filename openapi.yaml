@@ -437,6 +437,273 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /goals:
+    post:
+      summary: Create a goal with its locked, ordered milestone list
+      operationId: createGoal
+      tags: [goals]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateGoalRequest"
+      responses:
+        "201":
+          description: Goal created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Goal"
+        "400":
+          description: Missing/invalid field, or zero milestones supplied.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    get:
+      summary: List goals for the current user
+      operationId: listGoals
+      tags: [goals]
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of goals.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Goal"
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /goals/{id}:
+    get:
+      summary: Get a single goal, with its milestones
+      operationId: getGoal
+      tags: [goals]
+      parameters:
+        - $ref: "#/components/parameters/GoalId"
+      responses:
+        "200":
+          description: Goal found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Goal"
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Goal not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /goals/{id}/activate:
+    post:
+      summary: Activate a backlog goal (also activates its first milestone)
+      operationId: activateGoal
+      tags: [goals]
+      parameters:
+        - $ref: "#/components/parameters/GoalId"
+      responses:
+        "200":
+          description: Goal activated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Goal"
+        "400":
+          description: Goal is not in backlog status.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Goal not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /goals/{id}/archive:
+    post:
+      summary: Archive a goal (with retro, or an early-abandon reason)
+      operationId: archiveGoal
+      tags: [goals]
+      parameters:
+        - $ref: "#/components/parameters/GoalId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ArchiveExperimentRequest"
+      responses:
+        "200":
+          description: Goal archived.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Goal"
+        "400":
+          description: >-
+            Neither a complete retro nor an abandon_reason was supplied, or
+            the goal isn't active/reflect.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Goal not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /milestones/{id}/check-ins:
+    post:
+      summary: Record a check-in against a goal's currently active milestone
+      operationId: createMilestoneCheckIn
+      tags: [goals]
+      parameters:
+        - $ref: "#/components/parameters/MilestoneId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCheckInRequest"
+      responses:
+        "201":
+          description: Check-in recorded.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckIn"
+        "400":
+          description: Missing/invalid field, or milestone is not active.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Milestone not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    get:
+      summary: List a milestone's check-in history, newest first
+      operationId: listMilestoneCheckIns
+      tags: [goals]
+      parameters:
+        - $ref: "#/components/parameters/MilestoneId"
+      responses:
+        "200":
+          description: Check-in history.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CheckIn"
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Milestone not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /milestones/{id}/archive:
+    post:
+      summary: >-
+        Archive the current milestone (with retro, or an early-abandon
+        reason). Activates the next milestone in order, or moves the goal to
+        reflect if this was the last one.
+      operationId: archiveMilestone
+      tags: [goals]
+      parameters:
+        - $ref: "#/components/parameters/MilestoneId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ArchiveExperimentRequest"
+      responses:
+        "200":
+          description: Milestone archived.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Milestone"
+        "400":
+          description: >-
+            Neither a complete retro nor an abandon_reason was supplied, or
+            the milestone isn't active/reflect.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Milestone not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
 components:
   securitySchemes:
     sessionCookie:
@@ -446,6 +713,20 @@ components:
 
   parameters:
     ExperimentId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+
+    GoalId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+
+    MilestoneId:
       name: id
       in: path
       required: true
@@ -555,6 +836,176 @@ components:
         password:
           type: string
           format: password
+
+    Goal:
+      type: object
+      description: Mirrors repository.py's Goal dataclass, with its milestones embedded.
+      required:
+        - id
+        - user_id
+        - title
+        - why_text
+        - start_date
+        - target_date
+        - status
+        - ended_early
+        - abandon_reason
+        - evolved_from_experiment_id
+        - branched_into_goal_id
+        - branched_from_goal_id
+        - created_at
+        - updated_at
+        - archived_at
+        - milestones
+      properties:
+        id:
+          type: string
+        user_id:
+          type: string
+        title:
+          type: string
+        why_text:
+          type: string
+        start_date:
+          type: string
+          format: date
+        target_date:
+          type: string
+          format: date
+        status:
+          type: string
+          enum: [backlog, active, reflect, archived]
+        ended_early:
+          type: boolean
+        abandon_reason:
+          type: string
+          nullable: true
+        evolved_from_experiment_id:
+          type: string
+          nullable: true
+        branched_into_goal_id:
+          type: string
+          nullable: true
+        branched_from_goal_id:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        archived_at:
+          type: string
+          format: date-time
+          nullable: true
+        milestones:
+          type: array
+          items:
+            $ref: "#/components/schemas/Milestone"
+
+    Milestone:
+      type: object
+      description: >-
+        Mirrors repository.py's Milestone dataclass. Runs exactly like an
+        experiment (own cadence, own check-ins) under a different label; no
+        start_date/target_days of its own, unlike Experiment.
+      required:
+        - id
+        - goal_id
+        - order_index
+        - title
+        - cadence_type
+        - cadence_days
+        - check_in_kind
+        - target_date
+        - status
+        - ended_early
+        - abandon_reason
+        - created_at
+        - updated_at
+        - archived_at
+      properties:
+        id:
+          type: string
+        goal_id:
+          type: string
+        order_index:
+          type: integer
+        title:
+          type: string
+        cadence_type:
+          type: string
+          enum: [daily, weekly, custom]
+        cadence_days:
+          type: integer
+          nullable: true
+        check_in_kind:
+          type: string
+          enum: [boolean, rating]
+        target_date:
+          type: string
+          format: date
+          nullable: true
+        status:
+          type: string
+          enum: [backlog, active, reflect, archived]
+        ended_early:
+          type: boolean
+        abandon_reason:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        archived_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    MilestoneSpec:
+      type: object
+      description: One entry in CreateGoalRequest.milestones, locked at creation.
+      required: [title, cadence_type]
+      properties:
+        title:
+          type: string
+        cadence_type:
+          type: string
+          enum: [daily, weekly, custom]
+        cadence_days:
+          type: integer
+          description: Required when cadence_type is 'custom'.
+        check_in_kind:
+          type: string
+          enum: [boolean, rating]
+          description: Defaults to 'boolean' if omitted.
+        target_date:
+          type: string
+          format: date
+
+    CreateGoalRequest:
+      type: object
+      required: [title, why_text, start_date, target_date, milestones]
+      properties:
+        title:
+          type: string
+        why_text:
+          type: string
+        start_date:
+          type: string
+          format: date
+        target_date:
+          type: string
+          format: date
+        milestones:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/MilestoneSpec"
 
     Experiment:
       type: object
@@ -668,10 +1119,14 @@ components:
 
     CheckIn:
       type: object
-      description: Mirrors repository.py's CheckIn dataclass.
+      description: >-
+        Mirrors repository.py's CheckIn dataclass. Belongs to exactly one of
+        an experiment or a milestone -- exactly one of experiment_id/
+        milestone_id is non-null.
       required:
         - id
         - experiment_id
+        - milestone_id
         - value_bool
         - value_rating
         - note
@@ -681,6 +1136,10 @@ components:
           type: string
         experiment_id:
           type: string
+          nullable: true
+        milestone_id:
+          type: string
+          nullable: true
         value_bool:
           type: boolean
           nullable: true

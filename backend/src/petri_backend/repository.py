@@ -46,23 +46,63 @@ class Experiment:
 
 
 @dataclass
+class Goal:
+    id: str
+    user_id: str
+    title: str
+    why_text: str
+    start_date: date
+    target_date: date
+    status: str
+    ended_early: bool
+    abandon_reason: str | None
+    evolved_from_experiment_id: str | None
+    branched_into_goal_id: str | None
+    branched_from_goal_id: str | None
+    created_at: datetime
+    updated_at: datetime
+    archived_at: datetime | None
+
+
+@dataclass
+class Milestone:
+    id: str
+    goal_id: str
+    order_index: int
+    title: str
+    cadence_type: str
+    cadence_days: int | None
+    check_in_kind: str
+    target_date: date | None
+    status: str
+    ended_early: bool
+    abandon_reason: str | None
+    created_at: datetime
+    updated_at: datetime
+    archived_at: datetime | None
+
+
+@dataclass
 class CheckIn:
     id: str
-    experiment_id: str
+    experiment_id: str | None
     value_bool: bool | None
     value_rating: int | None
     note: str | None
     checked_in_at: datetime
+    milestone_id: str | None = None
 
 
 @dataclass
 class Retro:
     id: str
-    experiment_id: str
+    experiment_id: str | None
     what_worked: str
     what_didnt: str
     decision: str
     created_at: datetime
+    milestone_id: str | None = None
+    goal_id: str | None = None
 
 
 class Repository(ABC):
@@ -146,3 +186,62 @@ class Repository(ABC):
 
     @abstractmethod
     def get_retro(self, *, experiment_id: str, user_id: str) -> Retro | None: ...
+
+    @abstractmethod
+    def create_goal(
+        self,
+        *,
+        user_id: str,
+        title: str,
+        why_text: str,
+        start_date: date,
+        target_date: date,
+        milestones: list[dict],
+    ) -> Goal:
+        """`milestones` is an ordered list of
+        {title, cadence_type, cadence_days, check_in_kind, target_date} dicts,
+        persisted with order_index 0..n-1, matching that order exactly."""
+        ...
+
+    @abstractmethod
+    def list_goals(self, *, user_id: str, status: str | None = None) -> list[Goal]: ...
+
+    @abstractmethod
+    def get_goal(self, *, goal_id: str, user_id: str) -> Goal | None: ...
+
+    @abstractmethod
+    def update_goal(self, *, goal_id: str, user_id: str, **fields) -> Goal | None: ...
+
+    @abstractmethod
+    def list_milestones(self, *, goal_id: str, user_id: str) -> list[Milestone]: ...
+
+    @abstractmethod
+    def get_milestone(self, *, milestone_id: str, user_id: str) -> Milestone | None: ...
+
+    @abstractmethod
+    def update_milestone(self, *, milestone_id: str, user_id: str, **fields) -> Milestone | None: ...
+
+    @abstractmethod
+    def add_milestone_check_in(
+        self,
+        *,
+        milestone_id: str,
+        user_id: str,
+        value_bool: bool | None = None,
+        value_rating: int | None = None,
+        note: str | None = None,
+        checked_in_at: datetime,
+    ) -> CheckIn: ...
+
+    @abstractmethod
+    def list_milestone_check_ins(self, *, milestone_id: str, user_id: str) -> list[CheckIn]: ...
+
+    @abstractmethod
+    def add_goal_retro(
+        self, *, goal_id: str, user_id: str, what_worked: str, what_didnt: str, decision: str
+    ) -> Retro: ...
+
+    @abstractmethod
+    def add_milestone_retro(
+        self, *, milestone_id: str, user_id: str, what_worked: str, what_didnt: str, decision: str
+    ) -> Retro: ...

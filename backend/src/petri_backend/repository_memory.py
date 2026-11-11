@@ -11,7 +11,7 @@ import uuid
 from datetime import date, datetime
 from datetime import timezone as _tz
 
-from petri_backend.repository import CheckIn, Experiment, Repository, Retro, User
+from petri_backend.repository import CheckIn, Experiment, Goal, Milestone, Repository, Retro, User
 
 
 class InMemoryRepository(Repository):
@@ -20,6 +20,8 @@ class InMemoryRepository(Repository):
         self._experiments: dict[str, Experiment] = {}
         self._check_ins: dict[str, CheckIn] = {}
         self._retros: dict[str, Retro] = {}
+        self._goals: dict[str, Goal] = {}
+        self._milestones: dict[str, Milestone] = {}
 
     def create_user(
         self,
@@ -178,6 +180,163 @@ class InMemoryRepository(Repository):
             if retro.experiment_id == experiment_id:
                 return retro
         return None
+
+    def create_goal(
+        self,
+        *,
+        user_id: str,
+        title: str,
+        why_text: str,
+        start_date: date,
+        target_date: date,
+        milestones: list[dict],
+    ) -> Goal:
+        now = _utcnow()
+        goal = Goal(
+            id=str(uuid.uuid4()),
+            user_id=user_id,
+            title=title,
+            why_text=why_text,
+            start_date=start_date,
+            target_date=target_date,
+            status="backlog",
+            ended_early=False,
+            abandon_reason=None,
+            evolved_from_experiment_id=None,
+            branched_into_goal_id=None,
+            branched_from_goal_id=None,
+            created_at=now,
+            updated_at=now,
+            archived_at=None,
+        )
+        self._goals[goal.id] = goal
+        for index, spec in enumerate(milestones):
+            milestone = Milestone(
+                id=str(uuid.uuid4()),
+                goal_id=goal.id,
+                order_index=index,
+                title=spec["title"],
+                cadence_type=spec["cadence_type"],
+                cadence_days=spec.get("cadence_days"),
+                check_in_kind=spec.get("check_in_kind") or "boolean",
+                target_date=spec.get("target_date"),
+                status="backlog",
+                ended_early=False,
+                abandon_reason=None,
+                created_at=now,
+                updated_at=now,
+                archived_at=None,
+            )
+            self._milestones[milestone.id] = milestone
+        return goal
+
+    def list_goals(self, *, user_id: str, status: str | None = None) -> list[Goal]:
+        return [
+            goal
+            for goal in self._goals.values()
+            if goal.user_id == user_id and (status is None or goal.status == status)
+        ]
+
+    def get_goal(self, *, goal_id: str, user_id: str) -> Goal | None:
+        goal = self._goals.get(goal_id)
+        if goal is None or goal.user_id != user_id:
+            return None
+        return goal
+
+    def update_goal(self, *, goal_id: str, user_id: str, **fields) -> Goal | None:
+        goal = self.get_goal(goal_id=goal_id, user_id=user_id)
+        if goal is None:
+            return None
+        for key, value in fields.items():
+            setattr(goal, key, value)
+        return goal
+
+    def list_milestones(self, *, goal_id: str, user_id: str) -> list[Milestone]:
+        if self.get_goal(goal_id=goal_id, user_id=user_id) is None:
+            return []
+        return sorted(
+            (m for m in self._milestones.values() if m.goal_id == goal_id),
+            key=lambda m: m.order_index,
+        )
+
+    def get_milestone(self, *, milestone_id: str, user_id: str) -> Milestone | None:
+        milestone = self._milestones.get(milestone_id)
+        if milestone is None:
+            return None
+        if self.get_goal(goal_id=milestone.goal_id, user_id=user_id) is None:
+            return None
+        return milestone
+
+    def update_milestone(self, *, milestone_id: str, user_id: str, **fields) -> Milestone | None:
+        milestone = self.get_milestone(milestone_id=milestone_id, user_id=user_id)
+        if milestone is None:
+            return None
+        for key, value in fields.items():
+            setattr(milestone, key, value)
+        return milestone
+
+    def add_milestone_check_in(
+        self,
+        *,
+        milestone_id: str,
+        user_id: str,
+        value_bool: bool | None = None,
+        value_rating: int | None = None,
+        note: str | None = None,
+        checked_in_at: datetime,
+    ) -> CheckIn:
+        if self.get_milestone(milestone_id=milestone_id, user_id=user_id) is None:
+            raise ValueError("milestone not found for this user")
+        check_in = CheckIn(
+            id=str(uuid.uuid4()),
+            experiment_id=None,
+            milestone_id=milestone_id,
+            value_bool=value_bool,
+            value_rating=value_rating,
+            note=note,
+            checked_in_at=checked_in_at,
+        )
+        self._check_ins[check_in.id] = check_in
+        return check_in
+
+    def list_milestone_check_ins(self, *, milestone_id: str, user_id: str) -> list[CheckIn]:
+        if self.get_milestone(milestone_id=milestone_id, user_id=user_id) is None:
+            return []
+        return [c for c in self._check_ins.values() if c.milestone_id == milestone_id]
+
+    def add_goal_retro(
+        self, *, goal_id: str, user_id: str, what_worked: str, what_didnt: str, decision: str
+    ) -> Retro:
+        if self.get_goal(goal_id=goal_id, user_id=user_id) is None:
+            raise ValueError("goal not found for this user")
+        retro = Retro(
+            id=str(uuid.uuid4()),
+            experiment_id=None,
+            goal_id=goal_id,
+            what_worked=what_worked,
+            what_didnt=what_didnt,
+            decision=decision,
+            created_at=_utcnow(),
+        )
+        self._retros[retro.id] = retro
+        return retro
+
+    def add_milestone_retro(
+        self, *, milestone_id: str, user_id: str, what_worked: str, what_didnt: str, decision: str
+    ) -> Retro:
+        if self.get_milestone(milestone_id=milestone_id, user_id=user_id) is None:
+            raise ValueError("milestone not found for this user")
+        retro = Retro(
+            id=str(uuid.uuid4()),
+            experiment_id=None,
+            milestone_id=milestone_id,
+            what_worked=what_worked,
+            what_didnt=what_didnt,
+            decision=decision,
+            created_at=_utcnow(),
+        )
+        self._retros[retro.id] = retro
+        return retro
 
 
 def _utcnow() -> datetime:

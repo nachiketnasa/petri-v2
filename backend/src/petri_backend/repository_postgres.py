@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import psycopg
 
-from petri_backend.repository import CheckIn, Experiment, Repository, Retro, User
+from petri_backend.repository import CheckIn, Experiment, Goal, Milestone, Repository, Retro, User
 
 # Columns `update_experiment` is allowed to set, matching the Experiment dataclass
 # (minus id/user_id, which identify the row rather than being updatable fields).
@@ -48,6 +48,59 @@ _USER_COLUMNS = (
     "id, email, password_hash, display_name, timezone, created_at, "
     "theme, sound_effects_enabled, default_landing"
 )
+
+_EXPERIMENT_COLUMNS = (
+    "id, user_id, title, hypothesis, cadence_type, cadence_days, "
+    "check_in_kind, start_date, target_days, status, ended_early, "
+    "abandon_reason, created_at, updated_at, archived_at"
+)
+
+_GOAL_COLUMNS = (
+    "id, user_id, title, why_text, start_date, target_date, status, "
+    "ended_early, abandon_reason, evolved_from_experiment_id, "
+    "branched_into_goal_id, branched_from_goal_id, created_at, updated_at, archived_at"
+)
+
+_MILESTONE_COLUMNS = (
+    "id, goal_id, order_index, title, cadence_type, cadence_days, "
+    "check_in_kind, target_date, status, ended_early, abandon_reason, "
+    "created_at, updated_at, archived_at"
+)
+
+_CHECK_IN_COLUMNS = "id, experiment_id, milestone_id, value_bool, value_rating, note, checked_in_at"
+
+_RETRO_COLUMNS = "id, experiment_id, milestone_id, goal_id, what_worked, what_didnt, decision, created_at"
+
+# Columns `update_goal`/`update_milestone` are allowed to set.
+_GOAL_UPDATABLE_FIELDS = {
+    "title",
+    "why_text",
+    "start_date",
+    "target_date",
+    "status",
+    "ended_early",
+    "abandon_reason",
+    "evolved_from_experiment_id",
+    "branched_into_goal_id",
+    "branched_from_goal_id",
+    "created_at",
+    "updated_at",
+    "archived_at",
+}
+
+_MILESTONE_UPDATABLE_FIELDS = {
+    "title",
+    "cadence_type",
+    "cadence_days",
+    "check_in_kind",
+    "target_date",
+    "status",
+    "ended_early",
+    "abandon_reason",
+    "created_at",
+    "updated_at",
+    "archived_at",
+}
 
 
 def _row_to_user(row: tuple) -> User:
@@ -87,22 +140,64 @@ def _row_to_experiment(row: tuple) -> Experiment:
 def _row_to_check_in(row: tuple) -> CheckIn:
     return CheckIn(
         id=str(row[0]),
-        experiment_id=str(row[1]),
-        value_bool=row[2],
-        value_rating=row[3],
-        note=row[4],
-        checked_in_at=row[5],
+        experiment_id=str(row[1]) if row[1] else None,
+        milestone_id=str(row[2]) if row[2] else None,
+        value_bool=row[3],
+        value_rating=row[4],
+        note=row[5],
+        checked_in_at=row[6],
     )
 
 
 def _row_to_retro(row: tuple) -> Retro:
     return Retro(
         id=str(row[0]),
-        experiment_id=str(row[1]),
-        what_worked=row[2],
-        what_didnt=row[3],
-        decision=row[4],
-        created_at=row[5],
+        experiment_id=str(row[1]) if row[1] else None,
+        milestone_id=str(row[2]) if row[2] else None,
+        goal_id=str(row[3]) if row[3] else None,
+        what_worked=row[4],
+        what_didnt=row[5],
+        decision=row[6],
+        created_at=row[7],
+    )
+
+
+def _row_to_goal(row: tuple) -> Goal:
+    return Goal(
+        id=str(row[0]),
+        user_id=str(row[1]),
+        title=row[2],
+        why_text=row[3],
+        start_date=row[4],
+        target_date=row[5],
+        status=row[6],
+        ended_early=row[7],
+        abandon_reason=row[8],
+        evolved_from_experiment_id=str(row[9]) if row[9] else None,
+        branched_into_goal_id=str(row[10]) if row[10] else None,
+        branched_from_goal_id=str(row[11]) if row[11] else None,
+        created_at=row[12],
+        updated_at=row[13],
+        archived_at=row[14],
+    )
+
+
+def _row_to_milestone(row: tuple) -> Milestone:
+    return Milestone(
+        id=str(row[0]),
+        goal_id=str(row[1]),
+        order_index=row[2],
+        title=row[3],
+        cadence_type=row[4],
+        cadence_days=row[5],
+        check_in_kind=row[6],
+        target_date=row[7],
+        status=row[8],
+        ended_early=row[9],
+        abandon_reason=row[10],
+        created_at=row[11],
+        updated_at=row[12],
+        archived_at=row[13],
     )
 
 
@@ -287,10 +382,10 @@ class PostgresRepository(Repository):
             raise ValueError("experiment not found for this user")
         with self._connect() as conn, conn.cursor() as cur:
             cur.execute(
-                """
+                f"""
                 insert into check_ins (experiment_id, value_bool, value_rating, note, checked_in_at)
                 values (%s, %s, %s, %s, %s)
-                returning id, experiment_id, value_bool, value_rating, note, checked_in_at
+                returning {_CHECK_IN_COLUMNS}
                 """,
                 (experiment_id, value_bool, value_rating, note, checked_in_at),
             )
@@ -301,8 +396,7 @@ class PostgresRepository(Repository):
             return []
         with self._connect() as conn, conn.cursor() as cur:
             cur.execute(
-                "select id, experiment_id, value_bool, value_rating, note, checked_in_at "
-                "from check_ins where experiment_id = %s",
+                f"select {_CHECK_IN_COLUMNS} from check_ins where experiment_id = %s",
                 (experiment_id,),
             )
             return [_row_to_check_in(row) for row in cur.fetchall()]
@@ -320,10 +414,10 @@ class PostgresRepository(Repository):
             raise ValueError("experiment not found for this user")
         with self._connect() as conn, conn.cursor() as cur:
             cur.execute(
-                """
+                f"""
                 insert into retros (experiment_id, what_worked, what_didnt, decision)
                 values (%s, %s, %s, %s)
-                returning id, experiment_id, what_worked, what_didnt, decision, created_at
+                returning {_RETRO_COLUMNS}
                 """,
                 (experiment_id, what_worked, what_didnt, decision),
             )
@@ -334,9 +428,195 @@ class PostgresRepository(Repository):
             return None
         with self._connect() as conn, conn.cursor() as cur:
             cur.execute(
-                "select id, experiment_id, what_worked, what_didnt, decision, created_at "
-                "from retros where experiment_id = %s",
+                f"select {_RETRO_COLUMNS} from retros where experiment_id = %s",
                 (experiment_id,),
             )
             row = cur.fetchone()
             return _row_to_retro(row) if row else None
+
+    def create_goal(
+        self,
+        *,
+        user_id: str,
+        title: str,
+        why_text: str,
+        start_date,
+        target_date,
+        milestones: list[dict],
+    ) -> Goal:
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute(
+                f"""
+                insert into goals (user_id, title, why_text, start_date, target_date)
+                values (%s, %s, %s, %s, %s)
+                returning {_GOAL_COLUMNS}
+                """,
+                (user_id, title, why_text, start_date, target_date),
+            )
+            goal = _row_to_goal(cur.fetchone())
+            for index, spec in enumerate(milestones):
+                cur.execute(
+                    """
+                    insert into milestones
+                        (goal_id, order_index, title, cadence_type, cadence_days,
+                         check_in_kind, target_date)
+                    values (%s, %s, %s, %s, %s, %s, %s)
+                    """,
+                    (
+                        goal.id,
+                        index,
+                        spec["title"],
+                        spec["cadence_type"],
+                        spec.get("cadence_days"),
+                        spec.get("check_in_kind") or "boolean",
+                        spec.get("target_date"),
+                    ),
+                )
+            return goal
+
+    def list_goals(self, *, user_id: str, status: str | None = None) -> list[Goal]:
+        with self._connect() as conn, conn.cursor() as cur:
+            if status is None:
+                cur.execute(f"select {_GOAL_COLUMNS} from goals where user_id = %s", (user_id,))
+            else:
+                cur.execute(
+                    f"select {_GOAL_COLUMNS} from goals where user_id = %s and status = %s",
+                    (user_id, status),
+                )
+            return [_row_to_goal(row) for row in cur.fetchall()]
+
+    def get_goal(self, *, goal_id: str, user_id: str) -> Goal | None:
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute(
+                f"select {_GOAL_COLUMNS} from goals where id = %s and user_id = %s",
+                (goal_id, user_id),
+            )
+            row = cur.fetchone()
+            return _row_to_goal(row) if row else None
+
+    def update_goal(self, *, goal_id: str, user_id: str, **fields) -> Goal | None:
+        if not fields:
+            return self.get_goal(goal_id=goal_id, user_id=user_id)
+        unknown = set(fields) - _GOAL_UPDATABLE_FIELDS
+        if unknown:
+            raise ValueError(f"unknown goal field(s): {sorted(unknown)}")
+        set_clause = ", ".join(f"{key} = %s" for key in fields)
+        values = list(fields.values()) + [goal_id, user_id]
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute(
+                f"""
+                update goals set {set_clause}
+                where id = %s and user_id = %s
+                returning {_GOAL_COLUMNS}
+                """,
+                values,
+            )
+            row = cur.fetchone()
+            return _row_to_goal(row) if row else None
+
+    def list_milestones(self, *, goal_id: str, user_id: str) -> list[Milestone]:
+        if self.get_goal(goal_id=goal_id, user_id=user_id) is None:
+            return []
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute(
+                f"select {_MILESTONE_COLUMNS} from milestones "
+                "where goal_id = %s order by order_index",
+                (goal_id,),
+            )
+            return [_row_to_milestone(row) for row in cur.fetchall()]
+
+    def get_milestone(self, *, milestone_id: str, user_id: str) -> Milestone | None:
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute(
+                f"""
+                select {", ".join(f"m.{c.strip()}" for c in _MILESTONE_COLUMNS.split(","))}
+                from milestones m join goals g on g.id = m.goal_id
+                where m.id = %s and g.user_id = %s
+                """,
+                (milestone_id, user_id),
+            )
+            row = cur.fetchone()
+            return _row_to_milestone(row) if row else None
+
+    def update_milestone(self, *, milestone_id: str, user_id: str, **fields) -> Milestone | None:
+        if self.get_milestone(milestone_id=milestone_id, user_id=user_id) is None:
+            return None
+        if not fields:
+            return self.get_milestone(milestone_id=milestone_id, user_id=user_id)
+        unknown = set(fields) - _MILESTONE_UPDATABLE_FIELDS
+        if unknown:
+            raise ValueError(f"unknown milestone field(s): {sorted(unknown)}")
+        set_clause = ", ".join(f"{key} = %s" for key in fields)
+        values = list(fields.values()) + [milestone_id]
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute(
+                f"update milestones set {set_clause} where id = %s returning {_MILESTONE_COLUMNS}",
+                values,
+            )
+            row = cur.fetchone()
+            return _row_to_milestone(row) if row else None
+
+    def add_milestone_check_in(
+        self,
+        *,
+        milestone_id: str,
+        user_id: str,
+        value_bool: bool | None = None,
+        value_rating: int | None = None,
+        note: str | None = None,
+        checked_in_at,
+    ) -> CheckIn:
+        if self.get_milestone(milestone_id=milestone_id, user_id=user_id) is None:
+            raise ValueError("milestone not found for this user")
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute(
+                f"""
+                insert into check_ins (milestone_id, value_bool, value_rating, note, checked_in_at)
+                values (%s, %s, %s, %s, %s)
+                returning {_CHECK_IN_COLUMNS}
+                """,
+                (milestone_id, value_bool, value_rating, note, checked_in_at),
+            )
+            return _row_to_check_in(cur.fetchone())
+
+    def list_milestone_check_ins(self, *, milestone_id: str, user_id: str) -> list[CheckIn]:
+        if self.get_milestone(milestone_id=milestone_id, user_id=user_id) is None:
+            return []
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute(
+                f"select {_CHECK_IN_COLUMNS} from check_ins where milestone_id = %s",
+                (milestone_id,),
+            )
+            return [_row_to_check_in(row) for row in cur.fetchall()]
+
+    def add_goal_retro(
+        self, *, goal_id: str, user_id: str, what_worked: str, what_didnt: str, decision: str
+    ) -> Retro:
+        if self.get_goal(goal_id=goal_id, user_id=user_id) is None:
+            raise ValueError("goal not found for this user")
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute(
+                f"""
+                insert into retros (goal_id, what_worked, what_didnt, decision)
+                values (%s, %s, %s, %s)
+                returning {_RETRO_COLUMNS}
+                """,
+                (goal_id, what_worked, what_didnt, decision),
+            )
+            return _row_to_retro(cur.fetchone())
+
+    def add_milestone_retro(
+        self, *, milestone_id: str, user_id: str, what_worked: str, what_didnt: str, decision: str
+    ) -> Retro:
+        if self.get_milestone(milestone_id=milestone_id, user_id=user_id) is None:
+            raise ValueError("milestone not found for this user")
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute(
+                f"""
+                insert into retros (milestone_id, what_worked, what_didnt, decision)
+                values (%s, %s, %s, %s)
+                returning {_RETRO_COLUMNS}
+                """,
+                (milestone_id, what_worked, what_didnt, decision),
+            )
+            return _row_to_retro(cur.fetchone())

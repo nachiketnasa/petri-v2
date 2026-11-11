@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from petri_backend.repository import CheckIn, Experiment, Repository, User
+from petri_backend.repository import CheckIn, Experiment, Goal, Milestone, Repository, User
 from petri_backend.repository_memory import InMemoryRepository
 from petri_backend.repository_postgres import PostgresRepository
 from petri_backend.security import (
@@ -263,7 +263,8 @@ class CreateCheckInRequest(BaseModel):
 
 class CheckInOut(BaseModel):
     id: str
-    experiment_id: str
+    experiment_id: str | None
+    milestone_id: str | None
     value_bool: bool | None
     value_rating: int | None
     note: str | None
@@ -274,11 +275,57 @@ class CheckInOut(BaseModel):
         return cls(
             id=check_in.id,
             experiment_id=check_in.experiment_id,
+            milestone_id=check_in.milestone_id,
             value_bool=check_in.value_bool,
             value_rating=check_in.value_rating,
             note=check_in.note,
             checked_in_at=check_in.checked_in_at,
         )
+
+
+def _validate_check_in_body(check_in_kind: str, body: "CreateCheckInRequest") -> None:
+    # Shared by experiment and milestone check-ins (#5 reuses #26's rule):
+    # exactly the field matching check_in_kind, not the other one.
+    if check_in_kind == "boolean":
+        if body.value_bool is None or body.value_rating is not None:
+            raise HTTPException(
+                status_code=400,
+                detail="This item's check_in_kind is 'boolean': provide value_bool, "
+                "not value_rating.",
+            )
+    else:
+        if body.value_rating is None or body.value_bool is not None:
+            raise HTTPException(
+                status_code=400,
+                detail=f"This item's check_in_kind is '{check_in_kind}': "
+                "provide value_rating, not value_bool.",
+            )
+        if not (1 <= body.value_rating <= 5):
+            raise HTTPException(status_code=400, detail="value_rating must be between 1 and 5.")
+
+
+def _classify_archive_body(body: "ArchiveExperimentRequest") -> bool:
+    """Returns True for a retro, False for an abandon-early; raises 400 if
+    the body is neither shape cleanly (shared by experiments/goals/milestones)."""
+    is_retro = (
+        body.what_worked is not None
+        and body.what_didnt is not None
+        and body.decision is not None
+        and body.abandon_reason is None
+    )
+    is_abandon = (
+        body.abandon_reason is not None
+        and body.what_worked is None
+        and body.what_didnt is None
+        and body.decision is None
+    )
+    if not is_retro and not is_abandon:
+        raise HTTPException(
+            status_code=400,
+            detail="Must supply either a complete retro (what_worked, what_didnt, "
+            "decision) or an abandon_reason, not both or neither.",
+        )
+    return is_retro
 
 
 class UserOut(BaseModel):
@@ -503,24 +550,7 @@ def archive_experiment(
             status_code=400, detail="Experiment must be active or in reflect to archive."
         )
 
-    is_retro = (
-        body.what_worked is not None
-        and body.what_didnt is not None
-        and body.decision is not None
-        and body.abandon_reason is None
-    )
-    is_abandon = (
-        body.abandon_reason is not None
-        and body.what_worked is None
-        and body.what_didnt is None
-        and body.decision is None
-    )
-    if not is_retro and not is_abandon:
-        raise HTTPException(
-            status_code=400,
-            detail="Must supply either a complete retro (what_worked, what_didnt, "
-            "decision) or an abandon_reason, not both or neither.",
-        )
+    is_retro = _classify_archive_body(body)
 
     if is_retro:
         repository.add_retro(
@@ -594,24 +624,8 @@ def create_check_in(
     # value_bool/value_rating -- validate it here instead of letting a bad
     # request crash through to a DB CheckViolation. Beyond that, the one
     # provided must actually match this experiment's own check_in_kind,
-    # chosen once at creation (#26): a boolean-kind experiment only ever
-    # accepts value_bool, a rating-kind one only ever accepts value_rating.
-    if experiment.check_in_kind == "boolean":
-        if body.value_bool is None or body.value_rating is not None:
-            raise HTTPException(
-                status_code=400,
-                detail="This experiment's check_in_kind is 'boolean': provide value_bool, "
-                "not value_rating.",
-            )
-    else:
-        if body.value_rating is None or body.value_bool is not None:
-            raise HTTPException(
-                status_code=400,
-                detail=f"This experiment's check_in_kind is '{experiment.check_in_kind}': "
-                "provide value_rating, not value_bool.",
-            )
-        if not (1 <= body.value_rating <= 5):
-            raise HTTPException(status_code=400, detail="value_rating must be between 1 and 5.")
+    # chosen once at creation (#26).
+    _validate_check_in_body(experiment.check_in_kind, body)
     try:
         check_in = repository.add_check_in(
             experiment_id=id,
@@ -644,3 +658,333 @@ def list_check_ins(
         CheckInOut.from_check_in(c)
         for c in sorted(check_ins, key=lambda c: c.checked_in_at, reverse=True)
     ]
+
+
+# ─── Goals & milestones (#5) ──────────────────────────────────────────────
+# Milestones have no start_date/target_days of their own (schema.sql), so
+# unlike experiments they don't get a check_in_due/streak -- there's no
+# reference point in the schema to compute either against. Not invented
+# here; a real gap to revisit only if a future issue asks for it.
+
+
+class MilestoneSpec(BaseModel):
+    title: str
+    cadence_type: Literal["daily", "weekly", "custom"]
+    cadence_days: int | None = None
+    check_in_kind: Literal["boolean", "rating"] | None = None
+    target_date: date | None = None
+
+
+class CreateGoalRequest(BaseModel):
+    title: str
+    why_text: str
+    start_date: date
+    target_date: date
+    milestones: list[MilestoneSpec]
+
+
+class MilestoneOut(BaseModel):
+    id: str
+    goal_id: str
+    order_index: int
+    title: str
+    cadence_type: str
+    cadence_days: int | None
+    check_in_kind: str
+    target_date: date | None
+    status: str
+    ended_early: bool
+    abandon_reason: str | None
+    created_at: datetime
+    updated_at: datetime
+    archived_at: datetime | None
+
+    @classmethod
+    def from_milestone(cls, m: Milestone) -> "MilestoneOut":
+        return cls(
+            id=m.id,
+            goal_id=m.goal_id,
+            order_index=m.order_index,
+            title=m.title,
+            cadence_type=m.cadence_type,
+            cadence_days=m.cadence_days,
+            check_in_kind=m.check_in_kind,
+            target_date=m.target_date,
+            status=m.status,
+            ended_early=m.ended_early,
+            abandon_reason=m.abandon_reason,
+            created_at=m.created_at,
+            updated_at=m.updated_at,
+            archived_at=m.archived_at,
+        )
+
+
+class GoalOut(BaseModel):
+    id: str
+    user_id: str
+    title: str
+    why_text: str
+    start_date: date
+    target_date: date
+    status: str
+    ended_early: bool
+    abandon_reason: str | None
+    evolved_from_experiment_id: str | None
+    branched_into_goal_id: str | None
+    branched_from_goal_id: str | None
+    created_at: datetime
+    updated_at: datetime
+    archived_at: datetime | None
+    milestones: list[MilestoneOut]
+
+    @classmethod
+    def from_goal(cls, g: Goal, milestones: list[Milestone]) -> "GoalOut":
+        return cls(
+            id=g.id,
+            user_id=g.user_id,
+            title=g.title,
+            why_text=g.why_text,
+            start_date=g.start_date,
+            target_date=g.target_date,
+            status=g.status,
+            ended_early=g.ended_early,
+            abandon_reason=g.abandon_reason,
+            evolved_from_experiment_id=g.evolved_from_experiment_id,
+            branched_into_goal_id=g.branched_into_goal_id,
+            branched_from_goal_id=g.branched_from_goal_id,
+            created_at=g.created_at,
+            updated_at=g.updated_at,
+            archived_at=g.archived_at,
+            milestones=[MilestoneOut.from_milestone(m) for m in milestones],
+        )
+
+
+def _goal_out(repository: Repository, goal: Goal, user_id: str) -> GoalOut:
+    milestones = repository.list_milestones(goal_id=goal.id, user_id=user_id)
+    return GoalOut.from_goal(goal, milestones)
+
+
+@app.post("/goals", status_code=201, response_model=GoalOut)
+def create_goal(
+    body: CreateGoalRequest,
+    current_user: User = Depends(get_current_user),
+    repository: Repository = Depends(get_repository),
+) -> GoalOut:
+    if len(body.milestones) == 0:
+        raise HTTPException(status_code=400, detail="At least one milestone is required.")
+    for spec in body.milestones:
+        if spec.cadence_type == "custom" and spec.cadence_days is None:
+            raise HTTPException(
+                status_code=400,
+                detail="cadence_days is required when a milestone's cadence_type is 'custom'.",
+            )
+    goal = repository.create_goal(
+        user_id=current_user.id,
+        title=body.title,
+        why_text=body.why_text,
+        start_date=body.start_date,
+        target_date=body.target_date,
+        milestones=[
+            {
+                "title": m.title,
+                "cadence_type": m.cadence_type,
+                "cadence_days": m.cadence_days,
+                "check_in_kind": m.check_in_kind or "boolean",
+                "target_date": m.target_date,
+            }
+            for m in body.milestones
+        ],
+    )
+    return _goal_out(repository, goal, current_user.id)
+
+
+@app.get("/goals", response_model=list[GoalOut])
+def list_goals(
+    status: str | None = None,
+    current_user: User = Depends(get_current_user),
+    repository: Repository = Depends(get_repository),
+) -> list[GoalOut]:
+    goals = repository.list_goals(user_id=current_user.id, status=status)
+    return [_goal_out(repository, g, current_user.id) for g in goals]
+
+
+@app.get("/goals/{id}", response_model=GoalOut)
+def get_goal(
+    id: str,
+    current_user: User = Depends(get_current_user),
+    repository: Repository = Depends(get_repository),
+) -> GoalOut:
+    goal = repository.get_goal(goal_id=id, user_id=current_user.id)
+    if goal is None:
+        raise HTTPException(status_code=404, detail="Goal not found.")
+    return _goal_out(repository, goal, current_user.id)
+
+
+@app.post("/goals/{id}/activate", response_model=GoalOut)
+def activate_goal(
+    id: str,
+    current_user: User = Depends(get_current_user),
+    repository: Repository = Depends(get_repository),
+) -> GoalOut:
+    # No goal-WIP-cap check here on purpose -- that's #29 (order-14b), split
+    # out on its own and not yet built; this issue (#5) is CRUD + lifecycle.
+    goal = repository.get_goal(goal_id=id, user_id=current_user.id)
+    if goal is None:
+        raise HTTPException(status_code=404, detail="Goal not found.")
+    if goal.status != "backlog":
+        raise HTTPException(status_code=400, detail="Goal must be in backlog to activate.")
+    updated = repository.update_goal(goal_id=id, user_id=current_user.id, status="active")
+    milestones = repository.list_milestones(goal_id=id, user_id=current_user.id)
+    if milestones:
+        repository.update_milestone(
+            milestone_id=milestones[0].id, user_id=current_user.id, status="active"
+        )
+    return _goal_out(repository, updated, current_user.id)
+
+
+@app.post("/goals/{id}/archive", response_model=GoalOut)
+def archive_goal(
+    id: str,
+    body: ArchiveExperimentRequest,
+    current_user: User = Depends(get_current_user),
+    repository: Repository = Depends(get_repository),
+) -> GoalOut:
+    goal = repository.get_goal(goal_id=id, user_id=current_user.id)
+    if goal is None:
+        raise HTTPException(status_code=404, detail="Goal not found.")
+    if goal.status not in ("active", "reflect"):
+        raise HTTPException(status_code=400, detail="Goal must be active or in reflect to archive.")
+
+    is_retro = _classify_archive_body(body)
+    if is_retro:
+        repository.add_goal_retro(
+            goal_id=id,
+            user_id=current_user.id,
+            what_worked=body.what_worked,
+            what_didnt=body.what_didnt,
+            decision=body.decision,
+        )
+        updated = repository.update_goal(
+            goal_id=id,
+            user_id=current_user.id,
+            status="archived",
+            ended_early=False,
+            archived_at=datetime.now(timezone.utc),
+        )
+    else:
+        updated = repository.update_goal(
+            goal_id=id,
+            user_id=current_user.id,
+            status="archived",
+            ended_early=True,
+            abandon_reason=body.abandon_reason,
+            archived_at=datetime.now(timezone.utc),
+        )
+    return _goal_out(repository, updated, current_user.id)
+
+
+@app.post("/milestones/{id}/check-ins", status_code=201, response_model=CheckInOut)
+def create_milestone_check_in(
+    id: str,
+    body: CreateCheckInRequest,
+    current_user: User = Depends(get_current_user),
+    repository: Repository = Depends(get_repository),
+) -> CheckInOut:
+    milestone = repository.get_milestone(milestone_id=id, user_id=current_user.id)
+    if milestone is None:
+        raise HTTPException(status_code=404, detail="Milestone not found.")
+    if milestone.status != "active":
+        raise HTTPException(status_code=400, detail="Check-ins can only be logged while active.")
+    _validate_check_in_body(milestone.check_in_kind, body)
+    try:
+        check_in = repository.add_milestone_check_in(
+            milestone_id=id,
+            user_id=current_user.id,
+            value_bool=body.value_bool,
+            value_rating=body.value_rating,
+            note=body.note,
+            checked_in_at=body.checked_in_at or datetime.now(timezone.utc),
+        )
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Milestone not found.")
+    return CheckInOut.from_check_in(check_in)
+
+
+@app.get("/milestones/{id}/check-ins", response_model=list[CheckInOut])
+def list_milestone_check_ins(
+    id: str,
+    current_user: User = Depends(get_current_user),
+    repository: Repository = Depends(get_repository),
+) -> list[CheckInOut]:
+    milestone = repository.get_milestone(milestone_id=id, user_id=current_user.id)
+    if milestone is None:
+        raise HTTPException(status_code=404, detail="Milestone not found.")
+    check_ins = repository.list_milestone_check_ins(milestone_id=id, user_id=current_user.id)
+    return [
+        CheckInOut.from_check_in(c)
+        for c in sorted(check_ins, key=lambda c: c.checked_in_at, reverse=True)
+    ]
+
+
+@app.post("/milestones/{id}/archive", response_model=MilestoneOut)
+def archive_milestone(
+    id: str,
+    body: ArchiveExperimentRequest,
+    current_user: User = Depends(get_current_user),
+    repository: Repository = Depends(get_repository),
+) -> MilestoneOut:
+    milestone = repository.get_milestone(milestone_id=id, user_id=current_user.id)
+    if milestone is None:
+        raise HTTPException(status_code=404, detail="Milestone not found.")
+    if milestone.status not in ("active", "reflect"):
+        raise HTTPException(
+            status_code=400, detail="Milestone must be active or in reflect to archive."
+        )
+
+    is_retro = _classify_archive_body(body)
+    if is_retro:
+        repository.add_milestone_retro(
+            milestone_id=id,
+            user_id=current_user.id,
+            what_worked=body.what_worked,
+            what_didnt=body.what_didnt,
+            decision=body.decision,
+        )
+        updated = repository.update_milestone(
+            milestone_id=id,
+            user_id=current_user.id,
+            status="archived",
+            ended_early=False,
+            archived_at=datetime.now(timezone.utc),
+        )
+    else:
+        updated = repository.update_milestone(
+            milestone_id=id,
+            user_id=current_user.id,
+            status="archived",
+            ended_early=True,
+            abandon_reason=body.abandon_reason,
+            archived_at=datetime.now(timezone.utc),
+        )
+
+    # "Completing it activates the next in order" (#5): whichever way this
+    # milestone ended, advance to the next locked milestone if one exists.
+    # If this was the last one, the goal's own milestone sequence is done --
+    # move the goal to reflect (same "sequence/duration complete, retro
+    # required before archiving" shape as experiments' reflect transition,
+    # just triggered by the sequence ending rather than a date elapsing,
+    # since milestones have no target_days to compute that against).
+    siblings = repository.list_milestones(goal_id=milestone.goal_id, user_id=current_user.id)
+    next_milestone = next(
+        (m for m in siblings if m.order_index == milestone.order_index + 1), None
+    )
+    if next_milestone is not None:
+        repository.update_milestone(
+            milestone_id=next_milestone.id, user_id=current_user.id, status="active"
+        )
+    else:
+        goal = repository.get_goal(goal_id=milestone.goal_id, user_id=current_user.id)
+        if goal is not None and goal.status == "active":
+            repository.update_goal(goal_id=goal.id, user_id=current_user.id, status="reflect")
+
+    return MilestoneOut.from_milestone(updated)
