@@ -130,7 +130,7 @@ def test_check_in_rejects_neither_value_bool_nor_value_rating(
     )
 
     assert response.status_code == 400
-    assert "exactly one" in response.json()["detail"]
+    assert "value_bool" in response.json()["detail"]
 
 
 def test_check_in_rejects_both_value_bool_and_value_rating(
@@ -149,7 +149,7 @@ def test_check_in_rejects_both_value_bool_and_value_rating(
     )
 
     assert response.status_code == 400
-    assert "exactly one" in response.json()["detail"]
+    assert "value_bool" in response.json()["detail"]
 
 
 def test_check_in_defaults_checked_in_at_to_utc_now(client: TestClient, repo: InMemoryRepository):
@@ -223,3 +223,112 @@ def test_check_in_route_maps_repository_value_error_to_404(
     )
     assert response.status_code == 404
     assert response.json() == {"detail": "Experiment not found."}
+
+
+def test_check_in_rejects_value_rating_on_a_boolean_kind_experiment(
+    client: TestClient, repo: InMemoryRepository
+):
+    token = _signup_and_login(client, email="user@example.com")
+    experiment = _create_experiment(client, token, check_in_kind="boolean")
+    repo.update_experiment(
+        experiment_id=experiment["id"], user_id=experiment["user_id"], status="active"
+    )
+
+    response = client.post(
+        f"/experiments/{experiment['id']}/check-ins",
+        cookies={"session_id": token},
+        json={"value_rating": 3},
+    )
+
+    assert response.status_code == 400
+    assert "boolean" in response.json()["detail"]
+
+
+def test_check_in_rejects_value_bool_on_a_rating_kind_experiment(
+    client: TestClient, repo: InMemoryRepository
+):
+    token = _signup_and_login(client, email="user@example.com")
+    experiment = _create_experiment(client, token, check_in_kind="rating")
+    repo.update_experiment(
+        experiment_id=experiment["id"], user_id=experiment["user_id"], status="active"
+    )
+
+    response = client.post(
+        f"/experiments/{experiment['id']}/check-ins",
+        cookies={"session_id": token},
+        json={"value_bool": True},
+    )
+
+    assert response.status_code == 400
+    assert "rating" in response.json()["detail"]
+
+
+def test_check_in_rejects_out_of_range_value_rating(client: TestClient, repo: InMemoryRepository):
+    token = _signup_and_login(client, email="user@example.com")
+    experiment = _create_experiment(client, token, check_in_kind="rating")
+    repo.update_experiment(
+        experiment_id=experiment["id"], user_id=experiment["user_id"], status="active"
+    )
+
+    response = client.post(
+        f"/experiments/{experiment['id']}/check-ins",
+        cookies={"session_id": token},
+        json={"value_rating": 6},
+    )
+
+    assert response.status_code == 400
+    assert "between 1 and 5" in response.json()["detail"]
+
+
+def test_list_check_ins_returns_history_newest_first(client: TestClient, repo: InMemoryRepository):
+    token = _signup_and_login(client, email="user@example.com")
+    experiment = _create_experiment(client, token)
+    repo.update_experiment(
+        experiment_id=experiment["id"], user_id=experiment["user_id"], status="active"
+    )
+
+    client.post(
+        f"/experiments/{experiment['id']}/check-ins",
+        cookies={"session_id": token},
+        json={"value_bool": True, "checked_in_at": "2026-01-01T09:00:00Z"},
+    )
+    client.post(
+        f"/experiments/{experiment['id']}/check-ins",
+        cookies={"session_id": token},
+        json={"value_bool": False, "checked_in_at": "2026-01-02T09:00:00Z"},
+    )
+
+    response = client.get(
+        f"/experiments/{experiment['id']}/check-ins", cookies={"session_id": token}
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 2
+    assert body[0]["checked_in_at"].startswith("2026-01-02")
+    assert body[1]["checked_in_at"].startswith("2026-01-01")
+
+
+def test_list_check_ins_404s_for_nonexistent_or_foreign_experiment(
+    client: TestClient, repo: InMemoryRepository
+):
+    token_owner = _signup_and_login(client, email="owner@example.com")
+    experiment = _create_experiment(client, token_owner)
+
+    token_other = _signup_and_login(client, email="other@example.com")
+
+    response_foreign = client.get(
+        f"/experiments/{experiment['id']}/check-ins", cookies={"session_id": token_other}
+    )
+    response_nonexistent = client.get(
+        "/experiments/does-not-exist/check-ins", cookies={"session_id": token_other}
+    )
+
+    assert response_foreign.status_code == 404
+    assert response_nonexistent.status_code == 404
+    assert response_foreign.json() == response_nonexistent.json()
+
+
+def test_list_check_ins_unauthenticated_returns_401(client: TestClient):
+    response = client.get("/experiments/some-id/check-ins")
+    assert response.status_code == 401

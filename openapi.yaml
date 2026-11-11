@@ -378,6 +378,34 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+    get:
+      summary: List an experiment's check-in history, newest first
+      operationId: listCheckIns
+      tags: [check-ins]
+      parameters:
+        - $ref: "#/components/parameters/ExperimentId"
+      responses:
+        "200":
+          description: Check-in history.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CheckIn"
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Experiment not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
 components:
   securitySchemes:
     sessionCookie:

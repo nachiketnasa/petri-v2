@@ -465,13 +465,26 @@ def create_check_in(
         )
     # schema.sql's check_ins_check1 constraint requires exactly one of
     # value_bool/value_rating -- validate it here instead of letting a bad
-    # request crash through to a DB CheckViolation.
-    if (body.value_bool is None) == (body.value_rating is None):
-        raise HTTPException(
-            status_code=400,
-            detail="Provide exactly one of value_bool or value_rating, matching this "
-            f"experiment's check_in_kind ('{experiment.check_in_kind}').",
-        )
+    # request crash through to a DB CheckViolation. Beyond that, the one
+    # provided must actually match this experiment's own check_in_kind,
+    # chosen once at creation (#26): a boolean-kind experiment only ever
+    # accepts value_bool, a rating-kind one only ever accepts value_rating.
+    if experiment.check_in_kind == "boolean":
+        if body.value_bool is None or body.value_rating is not None:
+            raise HTTPException(
+                status_code=400,
+                detail="This experiment's check_in_kind is 'boolean': provide value_bool, "
+                "not value_rating.",
+            )
+    else:
+        if body.value_rating is None or body.value_bool is not None:
+            raise HTTPException(
+                status_code=400,
+                detail=f"This experiment's check_in_kind is '{experiment.check_in_kind}': "
+                "provide value_rating, not value_bool.",
+            )
+        if not (1 <= body.value_rating <= 5):
+            raise HTTPException(status_code=400, detail="value_rating must be between 1 and 5.")
     try:
         check_in = repository.add_check_in(
             experiment_id=id,
@@ -487,3 +500,20 @@ def create_check_in(
         # covers that - this should be unreachable in normal flow.
         raise HTTPException(status_code=404, detail="Experiment not found.")
     return CheckInOut.from_check_in(check_in)
+
+
+@app.get("/experiments/{id}/check-ins", response_model=list[CheckInOut])
+def list_check_ins(
+    id: str,
+    current_user: User = Depends(get_current_user),
+    repository: Repository = Depends(get_repository),
+) -> list[CheckInOut]:
+    experiment = repository.get_experiment(experiment_id=id, user_id=current_user.id)
+    if experiment is None:
+        # Same identical-404 treatment as GET /experiments/{id}.
+        raise HTTPException(status_code=404, detail="Experiment not found.")
+    check_ins = repository.list_check_ins(experiment_id=id, user_id=current_user.id)
+    return [
+        CheckInOut.from_check_in(c)
+        for c in sorted(check_ins, key=lambda c: c.checked_in_at, reverse=True)
+    ]

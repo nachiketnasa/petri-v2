@@ -52,7 +52,7 @@ function ExperimentDetail() {
   const [checkedInAt, setCheckedInAt] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
-  const [lastCheckIn, setLastCheckIn] = useState<CheckIn | null>(null)
+  const [checkIns, setCheckIns] = useState<CheckIn[] | null>(null)
 
   const [archiveMode, setArchiveMode] = useState<ArchiveMode>('retro')
   const [whatWorked, setWhatWorked] = useState('')
@@ -85,6 +85,15 @@ function ExperimentDetail() {
       .finally(() => setActivating(false))
   }
 
+  function fetchCheckIns() {
+    fetch(`${BASE_URL}/experiments/${experimentId}/check-ins`, { credentials: 'include' })
+      .then(async (res) => {
+        if (!res.ok) return
+        setCheckIns(await res.json())
+      })
+      .catch(() => {})
+  }
+
   useEffect(() => {
     fetch(`${BASE_URL}/experiments/${experimentId}`, { credentials: 'include' })
       .then(async (res) => {
@@ -93,6 +102,8 @@ function ExperimentDetail() {
         setExperiment(data)
       })
       .catch((err: Error) => setLoadError(err.message))
+    fetchCheckIns()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [experimentId])
 
   function handleSubmit(e: React.FormEvent) {
@@ -119,7 +130,7 @@ function ExperimentDetail() {
         const data = await res.json()
         if (!res.ok) throw new Error(data.detail)
         playTone('check-in-log')
-        setLastCheckIn(data)
+        fetchCheckIns()
         setValueBool(false)
         setValueRating('')
         setNote('')
@@ -236,6 +247,38 @@ function ExperimentDetail() {
               </div>
             )}
           </div>
+
+          <div className="raised" style={{ padding: 22 }}>
+            <div className="checkin-title" style={{ marginBottom: 14 }}>
+              Check in history
+            </div>
+            {checkIns === null && <p className="card-sub">Loading…</p>}
+            {checkIns !== null && checkIns.length === 0 && (
+              <p className="card-sub">No check-ins logged yet.</p>
+            )}
+            {checkIns !== null && checkIns.length > 0 && (
+              <div className="history">
+                {checkIns.map((checkIn) => {
+                  const done = checkIn.value_bool !== false
+                  return (
+                    <div className="hist-row" key={checkIn.id}>
+                      <div className={`hist-dot${done ? '' : ' skip'}`} />
+                      <div className="hist-date">
+                        {new Date(checkIn.checked_in_at).toLocaleDateString(undefined, {
+                          month: 'short',
+                          day: 'numeric',
+                        })}
+                      </div>
+                      <div className="hist-note">
+                        {checkIn.value_rating != null && `Rating: ${checkIn.value_rating}. `}
+                        {checkIn.note ?? (checkIn.value_bool === false ? 'Skipped.' : 'Done.')}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -297,9 +340,6 @@ function ExperimentDetail() {
               <button type="submit" disabled={submitting} className="btn btn-primary-exp" style={{ justifyContent: 'center' }}>
                 Save check in
               </button>
-              {lastCheckIn && (
-                <div className="card-sub">Last check in logged: {lastCheckIn.checked_in_at}</div>
-              )}
             </form>
           ) : (
             <div className="raised" style={{ padding: 22 }}>

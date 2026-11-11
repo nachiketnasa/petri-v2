@@ -47,6 +47,36 @@ const experiment = {
   archived_at: null,
 }
 
+type Resp = { ok: boolean; status?: number; json: () => Promise<unknown> }
+
+// A URL-aware fetch mock: GET .../check-ins always resolves to an empty
+// history unless a test overrides it, so every test doesn't have to care
+// about the history fetch fired alongside the main GET on mount. `routes`
+// maps a URL substring to either a fixed response or a one-shot queue of
+// responses (consumed in order, last entry sticks).
+function mockFetch(routes: Record<string, Resp | Resp[]>) {
+  const queues = new Map(
+    Object.entries(routes).map(([key, value]) => [key, Array.isArray(value) ? [...value] : value]),
+  )
+  const calls: Array<{ url: string; init?: RequestInit }> = []
+  const fn = vi.fn((url: string, init?: RequestInit) => {
+    calls.push({ url, init })
+    for (const [key, value] of queues) {
+      if (!url.includes(key)) continue
+      if (Array.isArray(value)) {
+        const next = value.length > 1 ? value.shift()! : value[0]
+        return Promise.resolve(next)
+      }
+      return Promise.resolve(value)
+    }
+    if (url.includes('/check-ins') && (!init || init.method === undefined)) {
+      return Promise.resolve({ ok: true, json: async () => [] })
+    }
+    throw new Error(`mockFetch: no route configured for ${url}`)
+  })
+  return { fn, calls }
+}
+
 describe('ExperimentDetail', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
@@ -55,17 +85,17 @@ describe('ExperimentDetail', () => {
   })
 
   it('fetches and renders the experiment on mount', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({ ok: true, json: async () => experiment }),
-    )
+    const { fn } = mockFetch({
+      '/experiments/exp-1': { ok: true, json: async () => experiment },
+    })
+    vi.stubGlobal('fetch', fn)
 
-    renderDetail("exp-1")
+    renderDetail('exp-1')
 
     await waitFor(() => expect(screen.getByText('Drink more water')).toBeInTheDocument())
     expect(screen.getByText('I will feel better')).toBeInTheDocument()
     expect(screen.getByText('Experiment, active')).toBeInTheDocument()
-    expect(fetch).toHaveBeenCalledWith(
+    expect(fn).toHaveBeenCalledWith(
       expect.stringContaining('/experiments/exp-1'),
       expect.objectContaining({ credentials: 'include' }),
     )
@@ -81,14 +111,45 @@ describe('ExperimentDetail', () => {
       }),
     )
 
-    renderDetail("missing")
+    renderDetail('missing')
 
     await waitFor(() =>
       expect(screen.getByRole('alert')).toHaveTextContent('Experiment not found'),
     )
   })
 
-  it('logs a check-in and shows it from the response without refetching', async () => {
+  it('shows the real check-in history fetched from the backend, newest first', async () => {
+    const history = [
+      {
+        id: 'ci-2',
+        experiment_id: 'exp-1',
+        value_bool: false,
+        value_rating: null,
+        note: 'skipped',
+        checked_in_at: '2026-01-02T09:00:00Z',
+      },
+      {
+        id: 'ci-1',
+        experiment_id: 'exp-1',
+        value_bool: true,
+        value_rating: null,
+        note: 'felt good',
+        checked_in_at: '2026-01-01T09:00:00Z',
+      },
+    ]
+    const { fn } = mockFetch({
+      '/experiments/exp-1/check-ins': { ok: true, json: async () => history },
+      '/experiments/exp-1': { ok: true, json: async () => experiment },
+    })
+    vi.stubGlobal('fetch', fn)
+
+    renderDetail('exp-1')
+
+    await waitFor(() => expect(screen.getByText('skipped')).toBeInTheDocument())
+    expect(screen.getByText('felt good')).toBeInTheDocument()
+  })
+
+  it('logs a check-in and refetches history to show it (not just the POST response)', async () => {
     const checkIn = {
       id: 'ci-1',
       experiment_id: 'exp-1',
@@ -97,32 +158,27 @@ describe('ExperimentDetail', () => {
       note: 'felt good',
       checked_in_at: '2026-01-02T09:00:00Z',
     }
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce({ ok: true, json: async () => experiment })
-      .mockResolvedValueOnce({ ok: true, status: 201, json: async () => checkIn })
-    vi.stubGlobal('fetch', fetchMock)
+    const { fn, calls } = mockFetch({
+      '/experiments/exp-1/check-ins': [
+        { ok: true, json: async () => [] },
+        { ok: true, status: 201, json: async () => checkIn },
+        { ok: true, json: async () => [checkIn] },
+      ],
+      '/experiments/exp-1': { ok: true, json: async () => experiment },
+    })
+    vi.stubGlobal('fetch', fn)
 
-    renderDetail("exp-1")
+    renderDetail('exp-1')
     await waitFor(() => expect(screen.getByText('Drink more water')).toBeInTheDocument())
 
     fireEvent.click(screen.getByRole('checkbox', { name: 'Done today' }))
     fireEvent.change(screen.getByLabelText(/Note/), { target: { value: 'felt good' } })
     fireEvent.click(screen.getByRole('button', { name: 'Save check in' }))
 
-    await waitFor(() =>
-      expect(screen.getByText(/Last check in logged: 2026-01-02T09:00:00Z/)).toBeInTheDocument(),
-    )
+    await waitFor(() => expect(screen.getByText('felt good')).toBeInTheDocument())
     expect(playTone).toHaveBeenCalledWith('check-in-log')
-    expect(fetchMock).toHaveBeenCalledTimes(2)
-    expect(fetchMock).toHaveBeenLastCalledWith(
-      expect.stringContaining('/experiments/exp-1/check-ins'),
-      expect.objectContaining({
-        method: 'POST',
-        credentials: 'include',
-        body: JSON.stringify({ value_bool: true, note: 'felt good' }),
-      }),
-    )
+    const postCall = calls.find((c) => c.init?.method === 'POST')
+    expect(postCall?.init?.body).toBe(JSON.stringify({ value_bool: true, note: 'felt good' }))
   })
 
   it('sends value_bool: false (not omitted) when logging an unchecked boolean day', async () => {
@@ -134,22 +190,23 @@ describe('ExperimentDetail', () => {
       note: null,
       checked_in_at: '2026-01-02T09:00:00Z',
     }
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce({ ok: true, json: async () => experiment })
-      .mockResolvedValueOnce({ ok: true, status: 201, json: async () => checkIn })
-    vi.stubGlobal('fetch', fetchMock)
+    const { fn, calls } = mockFetch({
+      '/experiments/exp-1/check-ins': [
+        { ok: true, json: async () => [] },
+        { ok: true, status: 201, json: async () => checkIn },
+      ],
+      '/experiments/exp-1': { ok: true, json: async () => experiment },
+    })
+    vi.stubGlobal('fetch', fn)
 
     renderDetail('exp-1')
     await waitFor(() => expect(screen.getByText('Drink more water')).toBeInTheDocument())
 
     fireEvent.click(screen.getByRole('button', { name: 'Save check in' }))
 
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2))
-    expect(fetchMock).toHaveBeenLastCalledWith(
-      expect.stringContaining('/experiments/exp-1/check-ins'),
-      expect.objectContaining({ body: JSON.stringify({ value_bool: false }) }),
-    )
+    await waitFor(() => expect(calls.some((c) => c.init?.method === 'POST')).toBe(true))
+    const postCall = calls.find((c) => c.init?.method === 'POST')
+    expect(postCall?.init?.body).toBe(JSON.stringify({ value_bool: false }))
   })
 
   it('sends value_rating instead of value_bool for a rating-kind experiment', async () => {
@@ -162,11 +219,14 @@ describe('ExperimentDetail', () => {
       note: null,
       checked_in_at: '2026-01-02T09:00:00Z',
     }
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce({ ok: true, json: async () => ratingExperiment })
-      .mockResolvedValueOnce({ ok: true, status: 201, json: async () => checkIn })
-    vi.stubGlobal('fetch', fetchMock)
+    const { fn, calls } = mockFetch({
+      '/experiments/exp-1/check-ins': [
+        { ok: true, json: async () => [] },
+        { ok: true, status: 201, json: async () => checkIn },
+      ],
+      '/experiments/exp-1': { ok: true, json: async () => ratingExperiment },
+    })
+    vi.stubGlobal('fetch', fn)
 
     renderDetail('exp-1')
     await waitFor(() => expect(screen.getByText('Drink more water')).toBeInTheDocument())
@@ -174,20 +234,18 @@ describe('ExperimentDetail', () => {
     fireEvent.change(screen.getByLabelText(/Rating/), { target: { value: '4' } })
     fireEvent.click(screen.getByRole('button', { name: 'Save check in' }))
 
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2))
-    expect(fetchMock).toHaveBeenLastCalledWith(
-      expect.stringContaining('/experiments/exp-1/check-ins'),
-      expect.objectContaining({ body: JSON.stringify({ value_rating: 4 }) }),
-    )
+    await waitFor(() => expect(calls.some((c) => c.init?.method === 'POST')).toBe(true))
+    const postCall = calls.find((c) => c.init?.method === 'POST')
+    expect(postCall?.init?.body).toBe(JSON.stringify({ value_rating: 4 }))
   })
 
   it('does not show the check-in form and shows the status when not active', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({ ok: true, json: async () => ({ ...experiment, status: 'backlog' }) }),
-    )
+    const { fn } = mockFetch({
+      '/experiments/exp-1': { ok: true, json: async () => ({ ...experiment, status: 'backlog' }) },
+    })
+    vi.stubGlobal('fetch', fn)
 
-    renderDetail("exp-1")
+    renderDetail('exp-1')
 
     await waitFor(() => expect(screen.getByText('Drink more water')).toBeInTheDocument())
     expect(screen.queryByRole('button', { name: 'Save check in' })).not.toBeInTheDocument()
@@ -197,17 +255,16 @@ describe('ExperimentDetail', () => {
   })
 
   it('shows the backend error text on a rejected check-in', async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce({ ok: true, json: async () => experiment })
-      .mockResolvedValueOnce({
-        ok: false,
-        status: 400,
-        json: async () => ({ detail: 'Experiment is not active' }),
-      })
-    vi.stubGlobal('fetch', fetchMock)
+    const { fn } = mockFetch({
+      '/experiments/exp-1/check-ins': [
+        { ok: true, json: async () => [] },
+        { ok: false, status: 400, json: async () => ({ detail: 'Experiment is not active' }) },
+      ],
+      '/experiments/exp-1': { ok: true, json: async () => experiment },
+    })
+    vi.stubGlobal('fetch', fn)
 
-    renderDetail("exp-1")
+    renderDetail('exp-1')
     await waitFor(() => expect(screen.getByText('Drink more water')).toBeInTheDocument())
 
     fireEvent.click(screen.getByRole('button', { name: 'Save check in' }))
@@ -220,13 +277,13 @@ describe('ExperimentDetail', () => {
 
   it('archives via the retro path and hides both forms on success', async () => {
     const archived = { ...experiment, status: 'archived' }
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce({ ok: true, json: async () => experiment })
-      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => archived })
-    vi.stubGlobal('fetch', fetchMock)
+    const { fn, calls } = mockFetch({
+      '/experiments/exp-1/archive': { ok: true, status: 200, json: async () => archived },
+      '/experiments/exp-1': { ok: true, json: async () => experiment },
+    })
+    vi.stubGlobal('fetch', fn)
 
-    renderDetail("exp-1")
+    renderDetail('exp-1')
     await waitFor(() => expect(screen.getByText('Drink more water')).toBeInTheDocument())
 
     fireEvent.change(screen.getByPlaceholderText('What worked'), { target: { value: 'consistency' } })
@@ -235,9 +292,8 @@ describe('ExperimentDetail', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Archive' }))
 
     await waitFor(() => expect(screen.getByText('Experiment, archived')).toBeInTheDocument())
-    expect(fetchMock).toHaveBeenCalledTimes(2)
-    expect(fetchMock).toHaveBeenLastCalledWith(
-      expect.stringContaining('/experiments/exp-1/archive'),
+    const archiveCall = calls.find((c) => c.url.includes('/archive'))
+    expect(archiveCall?.init).toEqual(
       expect.objectContaining({
         method: 'POST',
         credentials: 'include',
@@ -250,13 +306,13 @@ describe('ExperimentDetail', () => {
 
   it('archives via the abandon-early path and hides both forms on success', async () => {
     const archived = { ...experiment, status: 'archived', abandon_reason: 'lost interest' }
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce({ ok: true, json: async () => experiment })
-      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => archived })
-    vi.stubGlobal('fetch', fetchMock)
+    const { fn, calls } = mockFetch({
+      '/experiments/exp-1/archive': { ok: true, status: 200, json: async () => archived },
+      '/experiments/exp-1': { ok: true, json: async () => experiment },
+    })
+    vi.stubGlobal('fetch', fn)
 
-    renderDetail("exp-1")
+    renderDetail('exp-1')
     await waitFor(() => expect(screen.getByText('Drink more water')).toBeInTheDocument())
 
     fireEvent.click(screen.getByRole('button', { name: 'Switch to abandon early' }))
@@ -264,8 +320,8 @@ describe('ExperimentDetail', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Archive' }))
 
     await waitFor(() => expect(screen.getByText('Experiment, archived')).toBeInTheDocument())
-    expect(fetchMock).toHaveBeenLastCalledWith(
-      expect.stringContaining('/experiments/exp-1/archive'),
+    const archiveCall = calls.find((c) => c.url.includes('/archive'))
+    expect(archiveCall?.init).toEqual(
       expect.objectContaining({
         method: 'POST',
         credentials: 'include',
@@ -275,27 +331,30 @@ describe('ExperimentDetail', () => {
   })
 
   it('blocks an incomplete archive submission client-side with no fetch call', async () => {
-    const fetchMock = vi.fn().mockResolvedValueOnce({ ok: true, json: async () => experiment })
-    vi.stubGlobal('fetch', fetchMock)
+    const { fn } = mockFetch({
+      '/experiments/exp-1': { ok: true, json: async () => experiment },
+    })
+    vi.stubGlobal('fetch', fn)
 
-    renderDetail("exp-1")
+    renderDetail('exp-1')
     await waitFor(() => expect(screen.getByText('Drink more water')).toBeInTheDocument())
+    const callsBefore = fn.mock.calls.length
 
     fireEvent.change(screen.getByPlaceholderText('What worked'), { target: { value: 'consistency' } })
     fireEvent.click(screen.getByRole('button', { name: 'Archive' }))
 
-    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fn.mock.calls.length).toBe(callsBefore)
     expect(screen.getByRole('alert')).toHaveTextContent(/fill in what worked/i)
   })
 
   it('activates a backlog experiment and shows the result status', async () => {
     const backlogExperiment = { ...experiment, status: 'backlog' }
     const activated = { ...experiment, status: 'active' }
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce({ ok: true, json: async () => backlogExperiment })
-      .mockResolvedValueOnce({ ok: true, json: async () => activated })
-    vi.stubGlobal('fetch', fetchMock)
+    const { fn, calls } = mockFetch({
+      '/experiments/exp-1/activate': { ok: true, json: async () => activated },
+      '/experiments/exp-1': { ok: true, json: async () => backlogExperiment },
+    })
+    vi.stubGlobal('fetch', fn)
 
     renderDetail('exp-1')
     await waitFor(() => expect(screen.getByText('Drink more water')).toBeInTheDocument())
@@ -303,10 +362,8 @@ describe('ExperimentDetail', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Activate' }))
 
     await waitFor(() => expect(screen.getByText('Experiment, active')).toBeInTheDocument())
-    expect(fetchMock).toHaveBeenLastCalledWith(
-      expect.stringContaining('/experiments/exp-1/activate'),
-      expect.objectContaining({ method: 'POST', credentials: 'include' }),
-    )
+    const activateCall = calls.find((c) => c.url.includes('/activate'))
+    expect(activateCall?.init).toEqual(expect.objectContaining({ method: 'POST', credentials: 'include' }))
   })
 
   it('refetches the shared experiments list after activating, so the Dashboard is not stale', async () => {
@@ -319,6 +376,9 @@ describe('ExperimentDetail', () => {
       }
       if (url.endsWith('/experiments/exp-1')) {
         return Promise.resolve({ ok: true, json: async () => backlogExperiment })
+      }
+      if (url.includes('/check-ins')) {
+        return Promise.resolve({ ok: true, json: async () => [] })
       }
       // AuthProvider's own GET /experiments (the list Dashboard reads).
       listCalls.push(url)
@@ -338,15 +398,15 @@ describe('ExperimentDetail', () => {
 
   it('shows the backend error when activating fails (e.g. WIP cap already reached)', async () => {
     const backlogExperiment = { ...experiment, status: 'backlog' }
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce({ ok: true, json: async () => backlogExperiment })
-      .mockResolvedValueOnce({
+    const { fn } = mockFetch({
+      '/experiments/exp-1/activate': {
         ok: false,
         status: 400,
         json: async () => ({ detail: 'You already have 2 active experiments.' }),
-      })
-    vi.stubGlobal('fetch', fetchMock)
+      },
+      '/experiments/exp-1': { ok: true, json: async () => backlogExperiment },
+    })
+    vi.stubGlobal('fetch', fn)
 
     renderDetail('exp-1')
     await waitFor(() => expect(screen.getByText('Drink more water')).toBeInTheDocument())
@@ -359,17 +419,17 @@ describe('ExperimentDetail', () => {
   })
 
   it('shows the backend error text on a rejected archive submission', async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce({ ok: true, json: async () => experiment })
-      .mockResolvedValueOnce({
+    const { fn } = mockFetch({
+      '/experiments/exp-1/archive': {
         ok: false,
         status: 400,
         json: async () => ({ detail: 'Experiment is not active or reflect' }),
-      })
-    vi.stubGlobal('fetch', fetchMock)
+      },
+      '/experiments/exp-1': { ok: true, json: async () => experiment },
+    })
+    vi.stubGlobal('fetch', fn)
 
-    renderDetail("exp-1")
+    renderDetail('exp-1')
     await waitFor(() => expect(screen.getByText('Drink more water')).toBeInTheDocument())
 
     fireEvent.change(screen.getByPlaceholderText('What worked'), { target: { value: 'consistency' } })
