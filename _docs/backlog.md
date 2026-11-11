@@ -336,6 +336,35 @@ Split out while auditing #2's full scope against its MVP checklist.
 
 ---
 
+## order-04g · #31 — Auth: expose current signed-in user (display_name) for greeting
+
+- **Status**: OPEN
+- **Labels**: backend, auth
+- **Link**: https://github.com/nachiketnasa/petri-v2/issues/31
+
+## Goal
+
+A way for the frontend to know the signed-in user's `display_name` (and `timezone`) on any page load, not only in the instant right after sign-up/sign-in — needed so the calm greeting screen (#10) can render "Good morning, <name>" after a refresh, not just immediately post-login.
+
+## Acceptance criteria
+
+- [ ] A signed-in request (valid session cookie) to the new endpoint returns the user's `id`, `email`, `display_name`, `timezone`, `created_at` — the same shape `/auth/signup` and `/auth/login` already return.
+- [ ] A request with no session cookie, or an expired one, returns 401 with a `detail` message, same error shape as `GET /experiments`'s 401.
+- [ ] No other user's data is ever returned — only the session's own user.
+- [ ] Documented in `openapi.yaml` alongside the existing auth paths.
+
+## Out of scope
+
+- Any frontend change to consume this (that's part of grooming #10's greeting screen, or a later checklist line on it).
+- Session TTL/expiration behavior itself — tracked separately (#20, order-04b).
+
+## Constraints
+
+- Backend only (FastAPI), follows the existing repository-interface pattern already used for experiments.
+- Reuse the existing session-cookie auth dependency already used by `GET /experiments`, don't invent a second auth check.
+
+---
+
 ## order-05 · #4 — Experiments: CRUD + lifecycle + check-ins + retro gate
 
 - **Status**: OPEN
@@ -470,6 +499,37 @@ Ref: `_docs/specs.md` → Core entities (check-ins).
 
 ---
 
+## order-05d · #32 — Check-ins: compute and expose per-experiment streak count
+
+- **Status**: OPEN
+- **Labels**: backend
+- **Link**: https://github.com/nachiketnasa/petri-v2/issues/32
+
+## Goal
+
+A computed "streak" (consecutive cadence periods logged without a gap) available per experiment, so the dashboard (#10) can show a real, persistent streak number instead of a placeholder. Mirrors how "Check-in Due" is a derived, non-persisted value (#27, order-05b) rather than a stored column.
+
+## Acceptance criteria
+
+- [ ] Streak is computed from check-in history (depends on #28, order-05c, which adds the GET endpoint to list an experiment's check-ins — streak can't be computed without it).
+- [ ] Streak counts consecutive completed cadence periods up to and including the most recently elapsed one; a single missed cadence period resets it to 0 (same "nothing sold, nothing lost beyond the number resetting" framing as `_docs/specs.md`'s Streaks section — no freeze/purchase mechanic, this issue is read-only computation).
+- [ ] Exposed via the API (either a field on the experiment representation, or a small dedicated endpoint) so the frontend doesn't reimplement the cadence-vs-check-in-timestamp math itself.
+- [ ] Computed in the user's own timezone, consistent with how cadence due/overdue is computed elsewhere (per `_docs/specs.md`'s Authentication section: "Cadence due/overdue state is computed in the user's own timezone, not server time").
+- [ ] Unit tests cover: an on-time streak continuing, a missed period resetting to 0, and a brand-new experiment with no check-ins yet reading 0 (not null, not an error).
+
+## Out of scope
+
+- Any UI to display the streak — that's #10's own dashboard acceptance criteria.
+- Milestone/goal streaks — goals don't exist yet (#5, order-14); revisit once they do.
+- Any loss-aversion mechanic (streak freezes, social streaks) — explicitly a non-goal per `_docs/specs.md`.
+
+## Constraints
+
+- Backend only. Depends on #28 (order-05c) landing first for check-in history data to compute from.
+- Follows the existing repository-interface pattern; no new persisted "streak" column needed if it can stay a derived read, consistent with how Check-in Due (#27) is handled.
+
+---
+
 ## order-06 · #7 — Enforce work-in-progress limits (2 experiments + 1 goal)
 
 - **Status**: CLOSED
@@ -510,21 +570,55 @@ A user can be running at most 2 experiments Active at the same time; a 3rd activ
 - **Labels**: frontend, design
 - **Link**: https://github.com/nachiketnasa/petri-v2/issues/10
 
-## What
-Dashboard and the calm landing/greeting screen.
+## Goal
+
+A signed-in user, right after sign-in, lands on a calm time-of-day greeting (not the dashboard directly); from there they deliberately open the full dashboard, which shows a card grid of their experiments plus WIP, ratio, streak, and Backlog info. Visual treatment follows `_docs/specs.md`'s neumorphic "natural makeup" design system, not the current plain default-Vite styling.
 
 ## Acceptance criteria
-- Landing: time-of-day greeting + a one-line due-today count, no stat grid/cards. Settings toggle to default straight to the dashboard instead.
-- Dashboard: card grid, Experiments/Goals/Both filter, WIP count tiles, completed-vs-abandoned ratio, Backlog section.
-- Streak shown visibly (Duolingo-style number) — no streak freezes, no social/friend-streak features.
 
-Ref: `_docs/specs.md` → Landing screen and dashboard, Streaks.
+**Routing / greeting screen**
 
+- [ ] After a successful sign-in, the user lands on a new greeting screen, not directly on `/dashboard` (today `Home` redirects straight to `/dashboard` in `App.tsx` — that redirect target changes to the greeting screen).
+- [ ] Greeting text reads a time-of-day salutation + the user's `display_name` (e.g. "Good morning, Nachiket."), computed from the browser's local clock.
+- [ ] One quiet line below the greeting states how many things are due today. No stat grid, no cards, no color blocks anywhere on this screen.
+- [ ] Zero due today reads as a real sentence ("Nothing due today"), not "0 things due today."
+- [ ] A single explicit action ("Open dashboard" or equivalent) navigates to `/dashboard`. Nothing on this screen is a dashboard preview.
+- [ ] Refreshing the page while signed in still shows the correct name (not blank/undefined) — see Out of scope re: `/auth/me`.
 
+**Dashboard**
 
-## Implementation tasks (MVP slice)
+- [ ] Each experiment renders as a neumorphic card (soft dual-tone shadow, no hairline border, sage green accent) in a responsive grid — replacing the current plain `<ul><li>` three-line list in `Dashboard.tsx`.
+- [ ] An Experiments / Goals / Both filter control is present and defaults to "Both." Selecting "Goals" or "Both" shows an empty/zero state for goals (see Out of scope — no goal data exists yet); selecting "Experiments" or "Both" shows the real experiment cards.
+- [ ] A WIP tile shows the live experiment count against the cap, e.g. "Experiments 1/2," computed by counting `status === 'Active'` in the already-fetched experiments list. A goal WIP tile shows a static "Goals 0/1" until goals exist.
+- [ ] A completed-vs-abandoned ratio tile is computed from the same experiment list: abandoned = `ended_early === true`, completed = `status === 'Archived' && !ended_early`. Displays as e.g. "3 completed · 1 abandoned."
+- [ ] A streak number is shown prominently, Duolingo-style (large, set in IBM Plex Mono). No backend streak data exists yet (see Out of scope), so the tile renders in its final position/typography with a muted placeholder (e.g. "—") rather than a fabricated number.
+- [ ] A Backlog section lists experiments with `status === 'Backlog'` separately from the active grid (title + cadence type only, same card style, no extra fields).
+- [ ] Empty state (no experiments at all): one calm message (e.g. "No experiments yet.") instead of four empty section headers; the existing "New experiment" link stays visible.
+- [ ] 10+ experiments: grid wraps responsively, no horizontal scroll, no fixed per-row count.
+- [ ] A long title wraps or truncates with an ellipsis (full title available via a `title` attribute) without breaking the card or pushing the WIP/ratio tiles out of place.
+- [ ] While `GET /experiments` is in flight, the dashboard shows one loading indicator — no partial grid, no empty-state flash before data arrives.
+- [ ] On a non-ok response (including 401), the existing `role="alert"` error text renders alone — no grid, tiles, ratio, or streak placeholder alongside it.
+- [ ] Both screens respect the existing light/dark `prefers-color-scheme` variables already defined in `index.css` — no new hardcoded colors that break dark mode.
 
-- [x] Frontend: dashboard card grid listing the signed-in user's experiments (MVP: list + stage only, filters/streak/ratio tiles can follow once data exists).
+## Out of scope
+
+- Goals actually appearing in the filter/grid/WIP tile — the Goals backend doesn't exist yet. Tracked in #5 (Goals CRUD, `order-14`) and #29 (goal WIP limit, `order-14b`); revisit this dashboard once those ship.
+- A Settings toggle to default straight to the dashboard — the Settings screen itself doesn't exist yet. Tracked in #12 (`order-11`). This issue ships greeting-first as the only behavior for now; #12 adds the opt-out toggle.
+- The due-today count's underlying computation — depends on the Check-in Due derived badge, tracked in #27 (`order-05b`, currently open). Use that computation once it lands rather than inventing a separate ad hoc calculation here.
+- The real streak number — no backend data exists to compute it. New follow-up filed: #32 (`order-05d`).
+- The signed-in user's `display_name` surviving a page reload — `AuthContext` only has it transiently right after sign-up/sign-in via the `onAuthenticated` callback, nothing on reload (no `/auth/me`-style endpoint exists). New follow-up filed: #31 (`order-04g`).
+- Full 4-theme theming (Petri Light/Dark, Solarized Light/Dark) — Settings screen, #12 (`order-11`).
+- The unauthenticated public landing page — a different screen for a different audience, #19 (`order-09`).
+- Calendar, Other tasks, and the creation wizard — unrelated screens, not touched here (#11, #8, #13).
+
+## Constraints
+
+- Files: `frontend/src/Dashboard.tsx` + `Dashboard.test.tsx`, a new greeting component + its test, `frontend/src/App.tsx` (routing change only), plus whatever CSS file(s) carry the new neumorphic styling.
+- Reuse the existing `BASE_URL` / `credentials: 'include'` / fetch-then-catch-finally pattern already used across `AuthForm.tsx`, `AuthContext.tsx`, `ExperimentDetail.tsx` — no new HTTP library.
+- Reuse `AuthContext`'s existing `experiments` / `experimentsError` / `signedIn` state for the WIP and ratio tiles — don't add a second `GET /experiments` fetch.
+- No new routing library beyond the already-installed `react-router-dom`; no new global state library.
+- Follow `_docs/specs.md`'s "Design system" section: sage green for experiment cards (clay/terracotta is reserved for goals, applied once goals exist), IBM Plex Mono for the streak number and any day-count figures, no em dashes or hyphens used as punctuation in any new copy.
+- Don't block the rest of this issue on the two new backend follow-ups (#31, #32) — ship the streak tile and the greeting's name with the placeholder/deferred behavior described above so everything else lands now.
 
 ---
 
