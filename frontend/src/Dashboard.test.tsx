@@ -69,6 +69,28 @@ describe('Dashboard', () => {
     expect(screen.getByRole('link', { name: 'New experiment' })).toBeInTheDocument()
   })
 
+  it('shows the stats row and goal cards for a user with goals but zero experiments', async () => {
+    stubExperiments(
+      [],
+      [
+        {
+          id: 'g1',
+          title: 'Run a 10k',
+          start_date: '2026-01-01',
+          target_date: '2026-06-01',
+          status: 'backlog',
+          milestones: [],
+        },
+      ],
+    )
+
+    renderDashboard()
+
+    await waitFor(() => expect(screen.getByText('Run a 10k')).toBeInTheDocument())
+    expect(screen.queryByText('No experiments yet.')).not.toBeInTheDocument()
+    expect(document.querySelector('.stats-row')).toBeInTheDocument()
+  })
+
   it('shows the backend error text alone on a failed fetch, with no grid or tiles', async () => {
     vi.stubGlobal(
       'fetch',
@@ -197,6 +219,65 @@ describe('Dashboard', () => {
 
     expect(screen.getByRole('heading', { name: 'Goals backlog' })).toBeInTheDocument()
     expect(screen.getByText('Learn piano')).toBeInTheDocument()
+  })
+
+  it('activates a backlog goal and refetches the dashboard', async () => {
+    let status = 'backlog'
+    const fetchMock = vi.fn((url: string) => {
+      if (url.includes('/goals/g1/activate')) {
+        status = 'active'
+        return Promise.resolve({ ok: true, json: async () => ({ id: 'g1', status: 'active' }) })
+      }
+      if (url.includes('/goals')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => [
+            { id: 'g1', title: 'Learn piano', start_date: '2026-01-01', target_date: '2026-12-01', status, milestones: [] },
+          ],
+        })
+      }
+      return Promise.resolve({ ok: true, json: async () => [] })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderDashboard()
+
+    await waitFor(() => expect(screen.getByText('Learn piano')).toBeInTheDocument())
+    expect(screen.getByRole('heading', { name: 'Goals backlog' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Activate' }))
+
+    await waitFor(() => expect(screen.getByText('Goal, active')).toBeInTheDocument())
+    expect(screen.queryByRole('heading', { name: 'Goals backlog' })).not.toBeInTheDocument()
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/goals/g1/activate'),
+      expect.objectContaining({ method: 'POST', credentials: 'include' }),
+    )
+  })
+
+  it('shows the backend error on a failed goal activation, without crashing the card', async () => {
+    const fetchMock = vi.fn((url: string) => {
+      if (url.includes('/goals/g1/activate')) {
+        return Promise.resolve({ ok: false, status: 400, json: async () => ({ detail: 'A goal is already active.' }) })
+      }
+      if (url.includes('/goals')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => [
+            { id: 'g1', title: 'Learn piano', start_date: '2026-01-01', target_date: '2026-12-01', status: 'backlog', milestones: [] },
+          ],
+        })
+      }
+      return Promise.resolve({ ok: true, json: async () => [] })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderDashboard()
+
+    await waitFor(() => expect(screen.getByText('Learn piano')).toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button', { name: 'Activate' }))
+
+    await waitFor(() => expect(screen.getByText('A goal is already active.')).toBeInTheDocument())
   })
 
   it('filters to Experiments only, hiding the Goals empty state', async () => {

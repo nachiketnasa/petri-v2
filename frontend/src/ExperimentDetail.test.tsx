@@ -311,7 +311,7 @@ describe('ExperimentDetail', () => {
 
     fireEvent.change(screen.getByPlaceholderText('What worked'), { target: { value: 'consistency' } })
     fireEvent.change(screen.getByPlaceholderText("What didn't"), { target: { value: 'mornings' } })
-    fireEvent.change(screen.getByPlaceholderText('Decision'), { target: { value: 'continue' } })
+    fireEvent.click(screen.getByRole('radio', { name: 'Continue' }))
     fireEvent.click(screen.getByRole('button', { name: 'Archive' }))
 
     await waitFor(() => expect(screen.getByText('Experiment, archived')).toBeInTheDocument())
@@ -457,7 +457,7 @@ describe('ExperimentDetail', () => {
 
     fireEvent.change(screen.getByPlaceholderText('What worked'), { target: { value: 'consistency' } })
     fireEvent.change(screen.getByPlaceholderText("What didn't"), { target: { value: 'mornings' } })
-    fireEvent.change(screen.getByPlaceholderText('Decision'), { target: { value: 'continue' } })
+    fireEvent.click(screen.getByRole('radio', { name: 'Continue' }))
     fireEvent.click(screen.getByRole('button', { name: 'Archive' }))
 
     await waitFor(() =>

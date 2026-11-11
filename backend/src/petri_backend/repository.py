@@ -137,6 +137,7 @@ class Milestone:
     cadence_days: int | None
     check_in_kind: str
     target_date: date | None
+    started_at: datetime | None
     status: str
     ended_early: bool
     abandon_reason: str | None
@@ -322,6 +323,25 @@ class Repository(ABC):
 
     @abstractmethod
     def update_milestone(self, *, milestone_id: str, user_id: str, **fields) -> Milestone | None: ...
+
+    @abstractmethod
+    def add_milestone(
+        self,
+        *,
+        goal_id: str,
+        user_id: str,
+        title: str,
+        cadence_type: str,
+        cadence_days: int | None,
+        check_in_kind: str,
+        target_date: date | None,
+    ) -> Milestone | None:
+        """Appends one milestone at the end of goal_id's ordered list
+        (order_index = current max + 1). Returns None if no such goal is
+        owned by user_id. Callers enforce the "only while backlog" rule
+        (_docs/specs.md "Milestone" -- locked once Active) -- this layer
+        just appends; it doesn't know about goal lifecycle status."""
+        ...
 
     @abstractmethod
     def add_milestone_check_in(

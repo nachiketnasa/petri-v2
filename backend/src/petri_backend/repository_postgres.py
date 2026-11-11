@@ -104,7 +104,7 @@ _GOAL_COLUMNS = (
 
 _MILESTONE_COLUMNS = (
     "id, goal_id, order_index, title, cadence_type, cadence_days, "
-    "check_in_kind, target_date, status, ended_early, abandon_reason, "
+    "check_in_kind, target_date, started_at, status, ended_early, abandon_reason, "
     "created_at, updated_at, archived_at"
 )
 
@@ -135,6 +135,7 @@ _MILESTONE_UPDATABLE_FIELDS = {
     "cadence_days",
     "check_in_kind",
     "target_date",
+    "started_at",
     "status",
     "ended_early",
     "abandon_reason",
@@ -284,12 +285,13 @@ def _row_to_milestone(row: tuple) -> Milestone:
         cadence_days=row[5],
         check_in_kind=row[6],
         target_date=row[7],
-        status=row[8],
-        ended_early=row[9],
-        abandon_reason=row[10],
-        created_at=row[11],
-        updated_at=row[12],
-        archived_at=row[13],
+        started_at=row[8],
+        status=row[9],
+        ended_early=row[10],
+        abandon_reason=row[11],
+        created_at=row[12],
+        updated_at=row[13],
+        archived_at=row[14],
     )
 
 
@@ -718,6 +720,37 @@ class PostgresRepository(Repository):
             )
             row = cur.fetchone()
             return _row_to_milestone(row) if row else None
+
+    def add_milestone(
+        self,
+        *,
+        goal_id: str,
+        user_id: str,
+        title: str,
+        cadence_type: str,
+        cadence_days: int | None,
+        check_in_kind: str,
+        target_date,
+    ) -> Milestone | None:
+        if self.get_goal(goal_id=goal_id, user_id=user_id) is None:
+            return None
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute(
+                "select coalesce(max(order_index), -1) + 1 from milestones where goal_id = %s",
+                (goal_id,),
+            )
+            next_index = cur.fetchone()[0]
+            cur.execute(
+                f"""
+                insert into milestones
+                    (goal_id, order_index, title, cadence_type, cadence_days,
+                     check_in_kind, target_date)
+                values (%s, %s, %s, %s, %s, %s, %s)
+                returning {_MILESTONE_COLUMNS}
+                """,
+                (goal_id, next_index, title, cadence_type, cadence_days, check_in_kind, target_date),
+            )
+            return _row_to_milestone(cur.fetchone())
 
     def add_milestone_check_in(
         self,

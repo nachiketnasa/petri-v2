@@ -138,6 +138,79 @@ class TestActivateGoal:
         assert response.status_code == 400
 
 
+class TestAddMilestone:
+    def test_appends_a_milestone_to_a_backlog_goal(self, client: TestClient):
+        token = _signup_and_login(client)
+        goal = _create_goal(client, token)
+
+        response = client.post(
+            f"/goals/{goal['id']}/milestones",
+            cookies={"session_id": token},
+            json={"title": "Run a half marathon", "cadence_type": "weekly"},
+        )
+
+        assert response.status_code == 201
+        body = response.json()
+        assert len(body["milestones"]) == 3
+        assert body["milestones"][2]["title"] == "Run a half marathon"
+        assert body["milestones"][2]["order_index"] == 2
+        assert body["milestones"][2]["status"] == "backlog"
+
+    def test_rejects_adding_a_milestone_to_an_active_goal(self, client: TestClient):
+        token = _signup_and_login(client)
+        goal = _create_goal(client, token)
+        client.post(f"/goals/{goal['id']}/activate", cookies={"session_id": token})
+
+        response = client.post(
+            f"/goals/{goal['id']}/milestones",
+            cookies={"session_id": token},
+            json={"title": "Too late", "cadence_type": "weekly"},
+        )
+
+        assert response.status_code == 400
+        assert "backlog" in response.json()["detail"].lower()
+
+    def test_rejects_a_custom_cadence_milestone_missing_cadence_days(self, client: TestClient):
+        token = _signup_and_login(client)
+        goal = _create_goal(client, token)
+
+        response = client.post(
+            f"/goals/{goal['id']}/milestones",
+            cookies={"session_id": token},
+            json={"title": "M3", "cadence_type": "custom"},
+        )
+
+        assert response.status_code == 400
+
+    def test_requires_authentication(self, client: TestClient):
+        response = client.post(
+            "/goals/does-not-matter/milestones",
+            json={"title": "M3", "cadence_type": "weekly"},
+        )
+
+        assert response.status_code == 401
+
+    def test_unknown_or_foreign_goal_returns_generic_404(self, client: TestClient):
+        token = _signup_and_login(client)
+        other_token = _signup_and_login(client, email="other@example.com")
+        goal = _create_goal(client, other_token)
+
+        response_foreign = client.post(
+            f"/goals/{goal['id']}/milestones",
+            cookies={"session_id": token},
+            json={"title": "M3", "cadence_type": "weekly"},
+        )
+        response_missing = client.post(
+            "/goals/does-not-exist/milestones",
+            cookies={"session_id": token},
+            json={"title": "M3", "cadence_type": "weekly"},
+        )
+
+        assert response_foreign.status_code == 404
+        assert response_missing.status_code == 404
+        assert response_foreign.json() == response_missing.json()
+
+
 class TestMilestoneCheckIns:
     def _active_goal(self, client: TestClient, token: str):
         goal = _create_goal(client, token)
@@ -263,6 +336,23 @@ class TestMilestoneArchiveAndSequencing:
         )
 
         assert response.status_code == 400
+
+    def test_rejects_a_decision_outside_the_fixed_set(self, client: TestClient):
+        # _docs/schema.sql's retros.decision CHECK constraint only allows
+        # continue/stop/pivot/iterate -- this must 400 here, not 500 once it
+        # reaches Postgres.
+        token = _signup_and_login(client)
+        goal = self._active_goal(client, token)
+        first_id = goal["milestones"][0]["id"]
+
+        response = client.post(
+            f"/milestones/{first_id}/archive",
+            cookies={"session_id": token},
+            json={"what_worked": "a", "what_didnt": "b", "decision": "Done"},
+        )
+
+        assert response.status_code == 400
+        assert "decision" in response.json()["detail"].lower()
 
 
 class TestArchiveGoal:

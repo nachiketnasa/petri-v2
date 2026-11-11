@@ -36,6 +36,7 @@ def test_implements_exactly_the_interface_methods():
         "list_milestones",
         "get_milestone",
         "update_milestone",
+        "add_milestone",
         "add_milestone_check_in",
         "list_milestone_check_ins",
         "add_goal_retro",

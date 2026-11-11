@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { useAuth } from './AuthContext'
 import {
   addDays,
   addMonths,
-  dayDiff,
   dayStatus,
   getMonthGridDays,
   getWeekDays,
@@ -20,7 +19,6 @@ const BASE_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8000'
 type Marker = { key: string; label: string; status: DayStatus; kind: 'experiment' | 'goal' }
 
 type ViewMode = 'week' | 'month'
-type Scope = 'cadence' | 'all'
 
 const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
@@ -75,28 +73,15 @@ function DayCell({
 
 function Calendar() {
   const { experiments, goals } = useAuth()
-  const { experimentId } = useParams<{ experimentId?: string }>()
   const [view, setView] = useState<ViewMode>('month')
   const [anchor, setAnchor] = useState(() => new Date())
-  const [scope, setScope] = useState<Scope>(experimentId ? 'cadence' : 'all')
 
-  const contextExperiment = useMemo(
-    () => experiments?.find((e) => e.id === experimentId) ?? null,
-    [experiments, experimentId],
+  const scopedExperiments = useMemo(
+    () => (experiments ? experiments.filter((e) => e.status === 'active') : []),
+    [experiments],
   )
 
-  const scopedExperiments = useMemo(() => {
-    if (!experiments) return []
-    if (scope === 'cadence') return contextExperiment ? [contextExperiment] : []
-    return experiments.filter((e) => e.status === 'active')
-  }, [experiments, scope, contextExperiment])
-
-  // Goals don't have a "this cadence only" view of their own (that scope is
-  // an experiment concept) -- they only ever show up under "all active".
-  const scopedGoals = useMemo(() => {
-    if (scope !== 'all' || !goals) return []
-    return goals.filter((g) => g.status === 'active')
-  }, [goals, scope])
+  const scopedGoals = useMemo(() => (goals ? goals.filter((g) => g.status === 'active') : []), [goals])
 
   // Real completed-vs-missed marking (#35) needs each scoped experiment's
   // persisted check-in history (#28), not just same-session state -- keyed
@@ -120,14 +105,34 @@ function Calendar() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scopedExperiments.map((e) => e.id).join(',')])
 
+  const activeMilestoneIds = scopedGoals
+    .map((g) => g.milestones.find((m) => m.status === 'active')?.id)
+    .filter((id): id is string => !!id)
+
+  const [checkInDatesByMilestone, setCheckInDatesByMilestone] = useState<
+    Record<string, Set<string>>
+  >({})
+
+  useEffect(() => {
+    activeMilestoneIds.forEach((milestoneId) => {
+      fetch(`${BASE_URL}/milestones/${milestoneId}/check-ins`, { credentials: 'include' })
+        .then(async (res) => {
+          if (!res.ok) return
+          const checkIns: { checked_in_at: string }[] = await res.json()
+          const dates = new Set(checkIns.map((c) => toLocalDateKey(new Date(c.checked_in_at))))
+          setCheckInDatesByMilestone((prev) => ({ ...prev, [milestoneId]: dates }))
+        })
+        .catch(() => {})
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeMilestoneIds.join(',')])
+
   const today = new Date()
 
   const weekDays = useMemo(() => getWeekDays(anchor), [anchor])
   const monthDays = useMemo(() => getMonthGridDays(anchor), [anchor])
 
   function markersFor(date: Date): Marker[] {
-    const dateKey = toLocalDateKey(date)
-
     const experimentMarkers: Marker[] = scopedExperiments
       .filter((e) => isCadenceDay(e, date))
       .map((experiment) => ({
@@ -137,20 +142,32 @@ function Calendar() {
         kind: 'experiment' as const,
       }))
 
-    // Goals/milestones have no recurring cadence of their own in the data
-    // (no stored "milestone started on" date) -- what's real is the goal's
-    // own target_date and each milestone's optional target_date, so those
-    // are what get marked: a due-date marker, not a cadence occurrence.
-    const goalMarkers: Marker[] = scopedGoals
-      .filter((goal) => goal.target_date === dateKey || goal.milestones.some((m) => m.target_date === dateKey))
-      .map((goal) => ({
-        key: `goal-${goal.id}`,
-        label: goal.title,
-        status: dayDiff(today, date) >= 0 ? 'upcoming' : 'missed',
-        kind: 'goal' as const,
-      }))
+    // A milestone runs its own cadence exactly like an experiment, anchored
+    // at started_at (set when it becomes active -- see #5's activate/archive
+    // transitions) and bounded by its own optional target_date, not a day
+    // count. Only the active milestone of each active goal has a real
+    // schedule; others are still locked in the backlog.
+    const milestoneMarkers: Marker[] = scopedGoals.flatMap((goal) => {
+      const activeMilestone = goal.milestones.find((m) => m.status === 'active')
+      if (!activeMilestone?.started_at) return []
+      const cadenceShape = {
+        cadence_type: activeMilestone.cadence_type,
+        cadence_days: activeMilestone.cadence_days,
+        start_date: toLocalDateKey(new Date(activeMilestone.started_at)),
+        target_date: activeMilestone.target_date,
+      }
+      if (!isCadenceDay(cadenceShape, date)) return []
+      return [
+        {
+          key: `goal-${goal.id}`,
+          label: `${goal.title} — ${activeMilestone.title}`,
+          status: dayStatus(date, today, checkInDatesByMilestone[activeMilestone.id] ?? new Set()),
+          kind: 'goal' as const,
+        },
+      ]
+    })
 
-    return [...experimentMarkers, ...goalMarkers]
+    return [...experimentMarkers, ...milestoneMarkers]
   }
 
   function goPrev() {
@@ -168,28 +185,6 @@ function Calendar() {
       </div>
 
       <div className="calendar-controls">
-        <div className="raised-sm segmented" role="radiogroup" aria-label="Scope">
-          <button
-            type="button"
-            role="radio"
-            aria-checked={scope === 'cadence'}
-            className={`seg-btn${scope === 'cadence' ? ' active' : ''}`}
-            onClick={() => setScope('cadence')}
-            disabled={!contextExperiment}
-          >
-            This cadence only
-          </button>
-          <button
-            type="button"
-            role="radio"
-            aria-checked={scope === 'all'}
-            className={`seg-btn${scope === 'all' ? ' active' : ''}`}
-            onClick={() => setScope('all')}
-          >
-            All active
-          </button>
-        </div>
-
         <div className="raised-sm segmented" role="radiogroup" aria-label="Calendar view">
           <button
             type="button"
@@ -224,9 +219,11 @@ function Calendar() {
         </button>
       </div>
 
-      {experiments && experiments.filter((e) => e.status === 'active').length === 0 && (
-        <p className="calendar-empty-state">No active experiments yet.</p>
-      )}
+      {experiments &&
+        scopedExperiments.length === 0 &&
+        scopedGoals.every((g) => !g.milestones.some((m) => m.status === 'active')) && (
+          <p className="calendar-empty-state">No active experiments or goals yet.</p>
+        )}
 
       <div className="raised" style={{ padding: 26 }}>
         <div className="calendar-weekday-header">

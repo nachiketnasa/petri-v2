@@ -59,7 +59,7 @@ def test_archive_via_retro_path_succeeds(client: TestClient, repo: InMemoryRepos
     response = client.post(
         f"/experiments/{experiment['id']}/archive",
         cookies={"session_id": token},
-        json={"what_worked": "a", "what_didnt": "b", "decision": "c"},
+        json={"what_worked": "a", "what_didnt": "b", "decision": "continue"},
     )
     assert response.status_code == 200
     body = response.json()
@@ -136,7 +136,7 @@ def test_archive_rejected_when_both_retro_and_abandon_supplied(
         json={
             "what_worked": "a",
             "what_didnt": "b",
-            "decision": "c",
+            "decision": "continue",
             "abandon_reason": "lost motivation",
         },
     )

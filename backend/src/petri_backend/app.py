@@ -358,6 +358,15 @@ def _classify_archive_body(body: "ArchiveExperimentRequest") -> bool:
             detail="Must supply either a complete retro (what_worked, what_didnt, "
             "decision) or an abandon_reason, not both or neither.",
         )
+    # _docs/schema.sql's retros table constrains decision to this fixed set
+    # (a CHECK constraint, not just a free-text field) -- validated here so
+    # a bad value 400s cleanly instead of 500ing as an unhandled Postgres
+    # CheckViolation once it reaches the repository.
+    if is_retro and body.decision not in ("continue", "stop", "pivot", "iterate"):
+        raise HTTPException(
+            status_code=400,
+            detail="decision must be one of 'continue', 'stop', 'pivot', 'iterate'.",
+        )
     return is_retro
 
 
@@ -878,6 +887,7 @@ class MilestoneOut(BaseModel):
     cadence_days: int | None
     check_in_kind: str
     target_date: date | None
+    started_at: datetime | None
     status: str
     ended_early: bool
     abandon_reason: str | None
@@ -896,6 +906,7 @@ class MilestoneOut(BaseModel):
             cadence_days=m.cadence_days,
             check_in_kind=m.check_in_kind,
             target_date=m.target_date,
+            started_at=m.started_at,
             status=m.status,
             ended_early=m.ended_early,
             abandon_reason=m.abandon_reason,
@@ -1006,6 +1017,44 @@ def get_goal(
     return _goal_out(repository, goal, current_user.id)
 
 
+@app.post("/goals/{id}/milestones", status_code=201, response_model=GoalOut)
+def add_milestone(
+    id: str,
+    body: MilestoneSpec,
+    current_user: User = Depends(get_current_user),
+    repository: Repository = Depends(get_repository),
+) -> GoalOut:
+    goal = repository.get_goal(goal_id=id, user_id=current_user.id)
+    if goal is None:
+        raise HTTPException(status_code=404, detail="Goal not found.")
+    # _docs/specs.md "Milestone": locked once the goal is Active -- adding
+    # one is only ever a backlog-time edit, same as #5's own AC. Once
+    # active, the only sanctioned change is abandoning the current
+    # milestone with a reason (POST /milestones/{id}/archive), which
+    # advances to the next already-locked milestone -- not appending a new
+    # one into the running sequence.
+    if goal.status != "backlog":
+        raise HTTPException(
+            status_code=400,
+            detail="Milestones can only be added while the goal is in backlog.",
+        )
+    if body.cadence_type == "custom" and body.cadence_days is None:
+        raise HTTPException(
+            status_code=400,
+            detail="cadence_days is required when cadence_type is 'custom'.",
+        )
+    repository.add_milestone(
+        goal_id=id,
+        user_id=current_user.id,
+        title=body.title,
+        cadence_type=body.cadence_type,
+        cadence_days=body.cadence_days,
+        check_in_kind=body.check_in_kind or "boolean",
+        target_date=body.target_date,
+    )
+    return _goal_out(repository, goal, current_user.id)
+
+
 @app.post("/goals/{id}/activate", response_model=GoalOut)
 def activate_goal(
     id: str,
@@ -1023,7 +1072,10 @@ def activate_goal(
     milestones = repository.list_milestones(goal_id=id, user_id=current_user.id)
     if milestones:
         repository.update_milestone(
-            milestone_id=milestones[0].id, user_id=current_user.id, status="active"
+            milestone_id=milestones[0].id,
+            user_id=current_user.id,
+            status="active",
+            started_at=datetime.now(timezone.utc),
         )
     return _goal_out(repository, updated, current_user.id)
 
@@ -1166,7 +1218,10 @@ def archive_milestone(
     )
     if next_milestone is not None:
         repository.update_milestone(
-            milestone_id=next_milestone.id, user_id=current_user.id, status="active"
+            milestone_id=next_milestone.id,
+            user_id=current_user.id,
+            status="active",
+            started_at=datetime.now(timezone.utc),
         )
     else:
         goal = repository.get_goal(goal_id=milestone.goal_id, user_id=current_user.id)

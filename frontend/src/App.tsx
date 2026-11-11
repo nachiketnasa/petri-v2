@@ -6,6 +6,7 @@ import AuthForm from './AuthForm'
 import Landing from './Landing'
 import Dashboard from './Dashboard'
 import ExperimentDetail from './ExperimentDetail'
+import GoalDetail from './GoalDetail'
 import Calendar from './Calendar'
 import Greeting, { rememberDisplayName } from './Greeting'
 import NewExperimentForm from './NewExperimentForm'
@@ -124,15 +125,15 @@ function AppRoutes() {
           }
         />
         <Route
-          path="/calendar"
+          path="/goals/:id"
           element={
             <RequireAuth>
-              <Calendar />
+              <GoalDetail />
             </RequireAuth>
           }
         />
         <Route
-          path="/calendar/:experimentId"
+          path="/calendar"
           element={
             <RequireAuth>
               <Calendar />

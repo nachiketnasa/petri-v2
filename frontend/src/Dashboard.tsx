@@ -4,6 +4,8 @@ import { useAuth, type Experiment, type Goal } from './AuthContext'
 import { getStoredDisplayName } from './Greeting'
 import './neumorphic.css'
 
+const BASE_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8000'
+
 type Filter = 'Both' | 'Experiments' | 'Goals'
 
 const FILTERS: Filter[] = ['Experiments', 'Both', 'Goals']
@@ -52,9 +54,34 @@ function ExperimentCard({
   )
 }
 
-function GoalCard({ goal, variant = 'active' }: { goal: Goal; variant?: 'active' | 'backlog' }) {
+function GoalCard({
+  goal,
+  variant = 'active',
+  onActivated,
+}: {
+  goal: Goal
+  variant?: 'active' | 'backlog'
+  onActivated?: () => void
+}) {
+  const [activating, setActivating] = useState(false)
+  const [activateError, setActivateError] = useState<string | null>(null)
+
+  function handleActivate() {
+    setActivating(true)
+    setActivateError(null)
+
+    fetch(`${BASE_URL}/goals/${goal.id}/activate`, { method: 'POST', credentials: 'include' })
+      .then(async (res) => {
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.detail)
+        onActivated?.()
+      })
+      .catch((err: Error) => setActivateError(err.message))
+      .finally(() => setActivating(false))
+  }
+
   return (
-    <div className="raised card">
+    <Link to={`/goals/${goal.id}`} aria-label={goal.title} className="raised card" style={{ textDecoration: 'none', color: 'inherit' }}>
       <div>
         <span className={variant === 'backlog' ? 'badge badge-muted' : 'badge badge-goal'}>
           {variant === 'backlog' ? 'Backlog' : `Goal, ${goal.status}`}
@@ -67,12 +94,28 @@ function GoalCard({ goal, variant = 'active' }: { goal: Goal; variant?: 'active'
       <div className="card-foot">
         <div className="streak mono">{goal.milestones.length} milestone{goal.milestones.length === 1 ? '' : 's'}</div>
       </div>
-    </div>
+      {variant === 'backlog' && (
+        <>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault()
+              handleActivate()
+            }}
+            disabled={activating}
+            className="btn btn-primary-goal"
+          >
+            Activate
+          </button>
+          {activateError && <p role="alert">{activateError}</p>}
+        </>
+      )}
+    </Link>
   )
 }
 
 function Dashboard() {
-  const { experiments, experimentsError: error, goals, signOut } = useAuth()
+  const { experiments, experimentsError: error, goals, signOut, refetch } = useAuth()
   const [filter, setFilter] = useState<Filter>('Both')
   const navigate = useNavigate()
   const displayName = getStoredDisplayName()
@@ -101,6 +144,12 @@ function Dashboard() {
 
   const showExperiments = filter === 'Both' || filter === 'Experiments'
   const showGoals = filter === 'Both' || filter === 'Goals'
+
+  // Whether there's anything at all to show -- gated on experiments OR
+  // goals having content, not just experiments, so a user with goals but
+  // zero experiments (or vice versa) doesn't get stuck on the "nothing
+  // here yet" empty state.
+  const hasAnyItems = (experiments && experiments.length > 0) || (goals && goals.length > 0)
 
   return (
     <div>
@@ -156,7 +205,7 @@ function Dashboard() {
 
         {!error && !experiments && <p>Loading…</p>}
 
-        {!error && experiments && experiments.length === 0 && (
+        {!error && experiments && !hasAnyItems && (
           <>
             <p>No experiments yet.</p>
             <div style={{ display: 'flex', gap: 10 }}>
@@ -170,7 +219,7 @@ function Dashboard() {
           </>
         )}
 
-        {!error && experiments && experiments.length > 0 && (
+        {!error && experiments && hasAnyItems && (
           <>
             <div className="stats-row">
               <div className="raised stat-tile">
@@ -262,7 +311,7 @@ function Dashboard() {
                         </div>
                         <div className="card-grid">
                           {goalBacklog.map((goal) => (
-                            <GoalCard key={goal.id} goal={goal} variant="backlog" />
+                            <GoalCard key={goal.id} goal={goal} variant="backlog" onActivated={refetch} />
                           ))}
                         </div>
                       </>

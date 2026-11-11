@@ -664,6 +664,50 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /goals/{id}/milestones:
+    post:
+      summary: Append one milestone to a backlog goal's locked list
+      operationId: addMilestone
+      tags: [goals]
+      parameters:
+        - $ref: "#/components/parameters/GoalId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MilestoneSpec"
+      responses:
+        "201":
+          description: >-
+            Milestone appended (order_index = current count), goal
+            returned with its full milestone list.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Goal"
+        "400":
+          description: >-
+            Missing/invalid field, or the goal is not in backlog status --
+            milestones are locked once a goal is Active (see "Milestone" in
+            _docs/specs.md).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Goal not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /goals/{id}/activate:
     post:
       summary: Activate a backlog goal (also activates its first milestone)

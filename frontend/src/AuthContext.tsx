@@ -20,7 +20,9 @@ export type Milestone = {
   title: string
   cadence_type: string
   cadence_days?: number | null
+  check_in_kind: string
   target_date?: string | null
+  started_at?: string | null
   status: string
 }
 

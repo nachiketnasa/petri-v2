@@ -69,6 +69,10 @@ export type CadenceExperiment = {
   cadence_days?: number | null
   start_date?: string | null
   target_days?: number | null
+  // A milestone has no target_days (day count); it has an optional
+  // target_date instead. Both bounds are independent and optional so the
+  // same function covers experiments and milestones.
+  target_date?: string | null
 }
 
 /** Whole-day difference between two local dates (b - a), ignoring time-of-day. */
@@ -108,6 +112,7 @@ export function isCadenceDay(experiment: CadenceExperiment, date: Date): boolean
   const diff = dayDiff(start, date)
   if (diff < 0) return false
   if (experiment.target_days != null && diff >= experiment.target_days) return false
+  if (experiment.target_date && dayDiff(date, parseLocalDate(experiment.target_date)) < 0) return false
 
   switch (experiment.cadence_type) {
     case 'daily':

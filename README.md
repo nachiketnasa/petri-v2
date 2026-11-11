@@ -2,6 +2,69 @@
 
 A small, contained space to run an experiment and watch it grow.
 
+## For the evaluator
+
+If you're grading this as an assigned evaluator from the **AI DevTools Zoomcamp 2026
+cohort**, this section is for you.
+
+### Running it locally (no Resend account needed)
+
+```bash
+git clone https://github.com/nachiketnasa/petri-v2.git
+cd petri-v2
+docker compose up --build
+```
+
+That's the whole setup — one command, no `.env` file required. Postgres, the FastAPI
+backend, and the Vite frontend each start as their own container.
+
+- Frontend: http://localhost:5173
+- Backend / OpenAPI docs: http://localhost:8000/docs
+
+**Email, without a Resend API key.** The app sends real email (sign-up verification
+codes, password reset links) through [Resend](https://resend.com). You don't need an
+account to evaluate it: with no `RESEND_API_KEY` set, the backend logs the code/link to
+stdout instead of sending it, rather than failing or behaving differently — this is a
+real code path (`backend/src/petri_backend/email.py`), not a demo-only shim. To grab a
+code or link while testing:
+
+```bash
+docker compose logs backend | grep -A2 "EMAIL ("
+```
+
+Sign up, then look there for the 6-digit verification code (or use "Resend code" on
+the verify screen to get a fresh one). Same for "Forgot password."
+
+If you'd rather see real delivery, set `RESEND_API_KEY` (and `EMAIL_FROM_ADDRESS`,
+once sent from a domain verified on your Resend account) in a root `.env` file before
+`docker compose up` — `docker-compose.yml` already passes both through.
+
+### Self-assessment against the grading rubric
+
+12 criteria, 24 points, 10 to pass. Scored against this repository as submitted —
+not a claim, a pointer to the actual evidence for each line, so you can check it
+yourself:
+
+| # | Criterion | Self-score | Evidence |
+|---|---|---|---|
+| 1 | Problem description | 2 / 2 | This README's [problem](#the-problem) and [functionality](#functionality) sections. |
+| 2 | Product specification | 2 / 2 | [`_docs/specs.md`](_docs/specs.md) (entities, user stories, acceptance criteria); public tracker at [Issues](https://github.com/nachiketnasa/petri-v2/issues), snapshotted in [`_docs/backlog.md`](_docs/backlog.md). |
+| 3 | Agent team specification | 2 / 2 | [`_docs/process.md`](_docs/process.md) (PM → Engineer → QA lifecycle) and [`_docs/team/`](_docs/team) (one file per role). |
+| 4 | Context management | 2 / 2 | [`AGENTS.md`](AGENTS.md) indexes every doc below it; each is scoped to one concern. |
+| 5 | Application | 2 / 2 | `docker compose up --build` runs frontend + backend + Postgres together; see [Running it locally](#running-it-locally-no-resend-account-needed) above. |
+| 6 | Testing | 2 / 2 | Backend: `cd backend && uv run pytest` (unit + integration against real Postgres, see `backend/tests/test_repository_postgres.py`). Frontend: `cd frontend && npm test` (Vitest + React Testing Library). |
+| 7 | Containerization | 2 / 2 | Single `docker-compose.yml` for all three services. |
+| 8 | Deployment | 0 / 2 | Not deployed yet. `_docs/specs.md`'s Tech stack section names the intended target (a VPS, `petri.nachiketnasa.com`), not yet acted on. |
+| 9 | CI/CD | 0 / 3 | No `.github/workflows` yet. |
+| 10 | Observability | 0 / 2 | No metrics/traces/structured logs with request correlation yet. |
+| 11 | Alerting | 0 / 1 | None yet. |
+| 12 | On-call agent | 0 / 2 | None yet. |
+| | **Total** | **14 / 24** | Pass threshold is 10. |
+
+The honest gap is entirely in the ops layer (deployment, CI/CD, observability,
+alerting, on-call) — nothing in the product, spec, testing, or containerization rows
+above is partial credit.
+
 ## The problem
 
 Most people either commit to nothing (a vague New Year's resolution that dies in a
@@ -183,8 +246,13 @@ criterion, and explicit non-goal, lives in [`_docs/specs.md`](_docs/specs.md). I
 
 ## Status
 
-Pre-code. The product spec and the UI mockups (neumorphic design system, every planned
-screen) are done; the OpenAPI contract and backend come next.
+Full-stack and functional: every feature in this document is built and running —
+signup/sign-in (email+password, TOTP 2FA), experiments and goals/milestones end to
+end (create, activate, check in, complete via retro or abandon), the calendar,
+sharing/likes/comments, Settings, and Other tasks. Backed by real integration tests
+against Postgres, not just the in-memory repository. Not yet done: a deployed public
+URL, CI/CD, and observability/alerting (see the evaluator table above for the exact
+breakdown).
 
 ## Credits and disclaimers
 

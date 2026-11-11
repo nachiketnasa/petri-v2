@@ -6,6 +6,15 @@ import './neumorphic.css'
 
 const BASE_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8000'
 
+// Matches _docs/schema.sql's retros.decision CHECK constraint exactly --
+// not free text, so the backend never 400s a value this UI could produce.
+const DECISION_OPTIONS = [
+  { value: 'continue', label: 'Continue' },
+  { value: 'stop', label: 'Stop' },
+  { value: 'pivot', label: 'Pivot' },
+  { value: 'iterate', label: 'Iterate' },
+] as const
+
 type Experiment = {
   id: string
   user_id: string
@@ -208,7 +217,7 @@ function ExperimentDetail() {
                 <span className="badge badge-exp">Experiment, {experiment.status}</span>
                 {experiment.check_in_due && <span className="badge badge-exp">due today</span>}
               </div>
-              <Link to={`/calendar/${experiment.id}`} className="btn btn-text">
+              <Link to="/calendar" className="btn btn-text">
                 View on calendar
               </Link>
             </div>
@@ -376,13 +385,23 @@ function ExperimentDetail() {
                     onChange={(e) => setWhatDidnt(e.target.value)}
                     className="input"
                   />
-                  <input
-                    type="text"
-                    placeholder="Decision"
-                    value={decision}
-                    onChange={(e) => setDecision(e.target.value)}
-                    className="input"
-                  />
+                  <div className="auth-field">
+                    <label className="label">Decision</label>
+                    <div className="raised-sm segmented" role="radiogroup" aria-label="Decision">
+                      {DECISION_OPTIONS.map((option) => (
+                        <button
+                          key={option.value}
+                          type="button"
+                          role="radio"
+                          aria-checked={decision === option.value}
+                          className={`seg-btn${decision === option.value ? ' active' : ''}`}
+                          onClick={() => setDecision(option.value)}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </>
               ) : (
                 <input

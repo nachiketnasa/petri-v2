@@ -287,6 +287,7 @@ class InMemoryRepository(Repository):
                 cadence_days=spec.get("cadence_days"),
                 check_in_kind=spec.get("check_in_kind") or "boolean",
                 target_date=spec.get("target_date"),
+                started_at=None,
                 status="backlog",
                 ended_early=False,
                 abandon_reason=None,
@@ -340,6 +341,42 @@ class InMemoryRepository(Repository):
             return None
         for key, value in fields.items():
             setattr(milestone, key, value)
+        return milestone
+
+    def add_milestone(
+        self,
+        *,
+        goal_id: str,
+        user_id: str,
+        title: str,
+        cadence_type: str,
+        cadence_days: int | None,
+        check_in_kind: str,
+        target_date,
+    ) -> Milestone | None:
+        if self.get_goal(goal_id=goal_id, user_id=user_id) is None:
+            return None
+        siblings = [m for m in self._milestones.values() if m.goal_id == goal_id]
+        next_index = (max((m.order_index for m in siblings), default=-1)) + 1
+        now = _utcnow()
+        milestone = Milestone(
+            id=str(uuid.uuid4()),
+            goal_id=goal_id,
+            order_index=next_index,
+            title=title,
+            cadence_type=cadence_type,
+            cadence_days=cadence_days,
+            check_in_kind=check_in_kind,
+            target_date=target_date,
+            started_at=None,
+            status="backlog",
+            ended_early=False,
+            abandon_reason=None,
+            created_at=now,
+            updated_at=now,
+            archived_at=None,
+        )
+        self._milestones[milestone.id] = milestone
         return milestone
 
     def add_milestone_check_in(

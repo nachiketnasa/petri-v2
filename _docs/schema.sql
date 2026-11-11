@@ -169,6 +169,12 @@ create table milestones (
   cadence_days  smallint,
   check_in_kind text not null check (check_in_kind in ('boolean','rating')),
   target_date   date,
+  started_at    timestamptz, -- set when this milestone becomes active; the
+                              -- cadence anchor its own occurrences count
+                              -- from, same role start_date plays for an
+                              -- experiment (milestones have no start_date
+                              -- of their own since they're locked up front,
+                              -- before any one of them is running).
   status        text not null default 'backlog'
                   check (status in ('backlog','active','reflect','archived')),
   ended_early    boolean not null default false,

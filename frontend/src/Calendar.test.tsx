@@ -136,7 +136,7 @@ describe('Calendar', () => {
     expect(label()).toBe(initial)
   })
 
-  it('shows per-day markers for a daily cadence experiment under "all active" scope', async () => {
+  it('shows per-day markers for a daily cadence experiment', async () => {
     vi.setSystemTime(new Date(2026, 10, 11))
     stubExperiments([
       {
@@ -184,7 +184,7 @@ describe('Calendar', () => {
     expect(markedDayNumbers).toEqual([1, 4, 7, 10, 13])
   })
 
-  it('shows a goal marker on its target_date under "all active" scope', async () => {
+  it('shows per-day markers for an active milestone, anchored at its started_at, like an experiment', async () => {
     vi.setSystemTime(new Date(2026, 10, 11))
     stubExperiments(
       [],
@@ -193,69 +193,60 @@ describe('Calendar', () => {
           id: 'g1',
           title: 'Run a 10k',
           start_date: '2026-01-01',
-          target_date: '2026-11-20',
+          target_date: '2026-12-01',
           status: 'active',
-          milestones: [],
+          milestones: [
+            {
+              id: 'm1',
+              title: 'Run 5k',
+              cadence_type: 'daily',
+              check_in_kind: 'boolean',
+              started_at: '2026-11-01T00:00:00Z',
+              status: 'active',
+            },
+          ],
         },
       ],
     )
     renderCalendar()
 
     await waitFor(() => expect(document.querySelector('.calendar-grid-month')).toBeInTheDocument())
-    const day20 = screen.getByText('20').closest('.calendar-day')
-    expect(day20?.querySelector('.calendar-marker-goal')).toBeTruthy()
+    const inMonthCells = document.querySelectorAll('.calendar-day:not(.calendar-day-faded)')
+    inMonthCells.forEach((cell) => {
+      expect(cell.querySelector('.calendar-marker-goal')).toBeTruthy()
+    })
   })
 
-  it('does not show a goal marker in "this cadence only" scope', async () => {
+  it('does not mark anything for an active goal whose active milestone has no started_at yet (defensive)', async () => {
     vi.setSystemTime(new Date(2026, 10, 11))
     stubExperiments(
-      [{ id: 'e1', title: 'Cold showers', cadence_type: 'daily', start_date: '2026-11-01', status: 'active' }],
+      [],
       [
         {
           id: 'g1',
           title: 'Run a 10k',
           start_date: '2026-01-01',
-          target_date: '2026-11-20',
+          target_date: '2026-12-01',
           status: 'active',
-          milestones: [],
+          milestones: [
+            { id: 'm1', title: 'Run 5k', cadence_type: 'daily', check_in_kind: 'boolean', status: 'active' },
+          ],
         },
       ],
     )
-    renderCalendar('/calendar/e1')
+    renderCalendar()
 
     await waitFor(() => expect(document.querySelector('.calendar-grid-month')).toBeInTheDocument())
     expect(document.querySelectorAll('.calendar-marker-goal')).toHaveLength(0)
   })
 
-  it('scope toggle switches markers between "this cadence only" and "all active" without reload', async () => {
-    vi.setSystemTime(new Date(2026, 10, 11))
-    stubExperiments([
-      { id: '1', title: 'Cadence A', cadence_type: 'daily', start_date: '2026-11-01', status: 'active' },
-      { id: '2', title: 'Cadence B', cadence_type: 'daily', start_date: '2026-11-01', status: 'active' },
-    ])
-    renderCalendar('/calendar/1')
-
-    await waitFor(() => expect(document.querySelector('.calendar-grid-month')).toBeInTheDocument())
-
-    // "this cadence only" is available because the calendar was opened from
-    // experiment 1's context, and starts selected.
-    expect(screen.getByRole('radio', { name: 'This cadence only' })).toBeChecked()
-    const nov11Cell = () =>
-      Array.from(document.querySelectorAll('.calendar-day')).find(
-        (cell) => cell.querySelector('.calendar-day-number')?.textContent === '11',
-      )!
-    expect(nov11Cell().querySelectorAll('.calendar-marker')).toHaveLength(1)
-
-    fireEvent.click(screen.getByRole('radio', { name: 'All active' }))
-    expect(nov11Cell().querySelectorAll('.calendar-marker')).toHaveLength(2)
-  })
-
-  it('does not offer "Other tasks" in the scope toggle', async () => {
+  it('does not offer a scope toggle', async () => {
     stubExperiments([])
     renderCalendar()
 
-    await waitFor(() => expect(screen.getByRole('radiogroup', { name: 'Scope' })).toBeInTheDocument())
-    expect(screen.queryByText('Other tasks')).not.toBeInTheDocument()
+    await waitFor(() => expect(document.querySelector('.calendar-grid-month')).toBeInTheDocument())
+    expect(screen.queryByRole('radiogroup', { name: 'Scope' })).not.toBeInTheDocument()
+    expect(screen.queryByText('This cadence only')).not.toBeInTheDocument()
   })
 
   it('marks a past scheduled day with a real check-in as completed (#35)', async () => {
@@ -303,13 +294,43 @@ describe('Calendar', () => {
     await waitFor(() => expect(day20.querySelector('.calendar-marker-upcoming')).toBeTruthy())
   })
 
-  it('empty state: zero active experiments renders the grid and nav normally, with no markers and no error', async () => {
+  it('empty state: zero active experiments or goals renders the grid and nav normally, with no markers and no error', async () => {
     stubExperiments([])
     renderCalendar()
 
-    await waitFor(() => expect(screen.getByText('No active experiments yet.')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('No active experiments or goals yet.')).toBeInTheDocument())
     expect(document.querySelector('.calendar-grid-month')).toBeInTheDocument()
     expect(document.querySelectorAll('.calendar-marker')).toHaveLength(0)
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('does not show the empty state when there are zero active experiments but an active goal milestone exists', async () => {
+    vi.setSystemTime(new Date(2026, 10, 11))
+    stubExperiments(
+      [],
+      [
+        {
+          id: 'g1',
+          title: 'Run a 10k',
+          start_date: '2026-01-01',
+          target_date: '2026-12-01',
+          status: 'active',
+          milestones: [
+            {
+              id: 'm1',
+              title: 'Run 5k',
+              cadence_type: 'daily',
+              check_in_kind: 'boolean',
+              started_at: '2026-11-01T00:00:00Z',
+              status: 'active',
+            },
+          ],
+        },
+      ],
+    )
+    renderCalendar()
+
+    await waitFor(() => expect(document.querySelector('.calendar-marker-goal')).toBeInTheDocument())
+    expect(screen.queryByText('No active experiments or goals yet.')).not.toBeInTheDocument()
   })
 })

@@ -153,6 +153,12 @@ describe('isCadenceDay', () => {
     expect(isCadenceDay(experiment, localDate(2026, 10, 5))).toBe(true) // day 4, last day
     expect(isCadenceDay(experiment, localDate(2026, 10, 6))).toBe(false) // day 5, past the run
   })
+
+  it('stops matching past target_date (a milestone bound, not a day count)', () => {
+    const milestone = { cadence_type: 'daily', start_date: '2026-11-01', target_date: '2026-11-05' }
+    expect(isCadenceDay(milestone, localDate(2026, 10, 5))).toBe(true) // on target_date, still matches
+    expect(isCadenceDay(milestone, localDate(2026, 10, 6))).toBe(false) // past target_date
+  })
 })
 
 describe('dayStatus', () => {
