@@ -657,20 +657,63 @@ A signed-in user, right after sign-in, lands on a calm time-of-day greeting (not
 - **Labels**: frontend, design
 - **Link**: https://github.com/nachiketnasa/petri-v2/issues/13
 
-## What
-Multi-step creation wizard for a new experiment or goal, with a side progress rail.
+## Goal
+
+Replace today's single long new-experiment form with a 3-step wizard (Details -> Cadence -> Review) plus a vertical side progress rail showing the user's position, while still submitting through the same, already-working `POST /experiments` call. This pass covers the experiment branch only; the goal branch is deferred (see Out of scope).
 
 ## Acceptance criteria
-- Steps: details → cadence (experiment) or milestones (goal) → review.
-- Goal's milestone step is where the full, locked milestone list is defined.
 
-Ref: `_docs/specs.md` → Creating an experiment or a goal.
+**Steps and fields**
 
+- [ ] The wizard renders at the same route as today, `/experiments/new`, replacing the current single-screen `NewExperimentForm`.
+- [ ] Step 1, "Details": `title` and `hypothesis` text inputs. Both required to advance.
+- [ ] Step 2, "Cadence": `cadence_type`, `target_days` (required); `cadence_days` input appears only when `cadence_type === 'custom'` and is required in that case; `check_in_kind` and `start_date` remain optional, same as today.
+- [ ] Step 3, "Review": a read-only summary of every value entered in Steps 1-2 (labeled, e.g. "Title: ...", "Hypothesis: ...", "Cadence: ..."), a "Back" control, and the submit action ("Create experiment"). No form inputs live on this step.
 
+**Side progress rail**
 
-## Implementation tasks (MVP slice)
+- [ ] A vertical rail is visible beside the step content at all times, listing all three step names ("Details", "Cadence", "Review").
+- [ ] The current step is visually distinguished (e.g. sage accent/bold) from the other two.
+- [ ] Steps already completed show a distinct completed state (e.g. a checkmark), visually different from both the current step and not-yet-reached steps.
+- [ ] Clicking a completed step's label in the rail navigates back to that step with its previously entered values still populated (see data-persistence criterion below).
+- [ ] A step not yet reached is not clickable and cannot be jumped to directly (no skipping Step 2's validation by clicking straight to "Review").
 
-- [x] Frontend: plain new-experiment form (hypothesis, cadence, target duration) wired to `POST /experiments`. The multi-step wizard + side progress rail is a follow-up polish pass once the fields and the request round-trip work.
+**Validation**
+
+- [ ] Attempting "Next" on Step 1 with `title` or `hypothesis` empty shows an inline error and does not advance.
+- [ ] Attempting "Next" on Step 2 with `cadence_type` or `target_days` empty, or `cadence_days` empty while `cadence_type === 'custom'`, shows an inline error (reusing today's existing error copy where applicable) and does not advance.
+- [ ] No additional validation happens on Review beyond what Steps 1-2 already enforced; Review's own possible error is only a failed submit (see below).
+
+**Submit**
+
+- [ ] Clicking "Create experiment" on Review sends the same request shape `NewExperimentForm.tsx` sends today: `POST {BASE_URL}/experiments`, `credentials: 'include'`, JSON body built from the three steps' values, omitting `cadence_days`/`check_in_kind`/`start_date` when empty exactly as today.
+- [ ] The submit button is disabled while the request is in flight (mirrors today's `submitting` state).
+- [ ] On success: `refetch()` from `useAuth()` is called and the user is navigated to `/dashboard`, same as today.
+- [ ] On a non-ok response (400 or 401), the backend's `detail` message renders via `role="alert"` on the Review step; the user stays on Review with their data intact and can retry.
+
+**Edge cases**
+
+- [ ] Data entered on Step 1/2 is still present if the user goes Back to Step 1/2 from Review, or forward again to Review — wizard state lives above the per-step views, not reset on step mount.
+- [ ] Navigating away mid-wizard (sign out, clicking another link) simply abandons the in-progress entry with no confirmation prompt and no draft saved — same "no persistence" behavior as today's form, just now spread across steps instead of one screen.
+- [ ] The browser back button, when pressed mid-wizard, navigates away from `/experiments/new` entirely (back to wherever the user came from) rather than stepping back within the wizard — step navigation only happens via the rail/in-wizard Back control, not the browser history stack.
+- [ ] All interactive elements (Next/Back buttons, rail step labels, inputs) are real, focusable `<button>`/`<input>` elements reachable by Tab in visual order and operable with Enter/Space; no custom keyboard shortcuts are introduced.
+- [ ] Refreshing the browser mid-wizard loses all entered data and returns to Step 1 on reload — acceptable given today's form has no persistence either.
+
+## Out of scope
+
+- The goal branch of this wizard (a milestones step instead of cadence, submitting to a goal-creation endpoint). There is currently no backend support for Goals at all: #5 ("Goals: CRUD + locked ordered milestone list", `order-14`) is still open and not started, so a goal branch here would have nothing real to submit to. Follow-up filed: #34 (`order-14a`), to be built once #5 ships and slotted in right after it. This issue ships the experiment branch only, with the wizard shell built so #34 can extend it rather than fork a second implementation.
+- Draft persistence/autosave across a page reload or closed tab mid-wizard. Not in today's spec, and the single-shot form being replaced has none either.
+- The Settings sound effect on wizard start/finish mentioned in `_docs/specs.md`'s Design system section. The Settings screen doesn't exist yet, tracked in #12 (`order-11`).
+- Full 4-theme theming behavior. Same, #12.
+- Inline editing of fields directly within the Review step's summary. Review is a read-only summary with a Back control; editing happens by going back to the relevant step.
+
+## Constraints
+
+- Files: `frontend/src/NewExperimentForm.tsx` (restructure into the wizard, or split into step components alongside it), `frontend/src/neumorphic.css` (add rail/step styling reusing the existing `--sage`, `--neu-surface`, `--neu-shadow-dark`, `--neu-shadow-light` tokens; no new hardcoded colors). `frontend/src/App.tsx` only changes if the route itself needs to change (it shouldn't; `/experiments/new` stays the single entry point).
+- Reuse the exact existing fetch pattern from `NewExperimentForm.tsx`: `BASE_URL` from `VITE_BACKEND_URL`, `credentials: 'include'`, `refetch()` from `useAuth()`, `navigate('/dashboard')` on success. No new HTTP library.
+- Wizard step state is local React state within the existing route; no new routing library (one route per step is not required) and no new global state library.
+- Sage green accent for the current/completed step markers per the Design system section (clay/terracotta is reserved for goals, not used here since this pass is experiment-only).
+- No em dashes or hyphens used as punctuation in any new copy; keep "cadence", "check in" terms as-is.
 
 ---
 
@@ -907,6 +950,38 @@ Goal CRUD with an ordered, locked milestone list; milestones run their own PACT 
 - Moving a goal/milestone to Archived requires a saved retro first.
 
 Ref: `_docs/specs.md` → Core entities, Board model.
+
+---
+
+## order-14a · #34 — Multi-step creation wizard: add Goal branch (milestones step)
+
+- **Status**: OPEN
+- **Labels**: frontend, design
+- **Link**: https://github.com/nachiketnasa/petri-v2/issues/34
+
+## Goal
+
+Once Goals exist on the backend (#5, `order-14`), extend the experiment-creation wizard shipped for #13 with a second entity branch: creating a Goal through the same wizard shell, with a milestones step in place of the cadence step.
+
+## Acceptance criteria
+
+- [ ] An entry point to "New goal" exists (dashboard and/or wizard's own entity picker) alongside the existing "New experiment" entry point.
+- [ ] Steps: details (title, why-this-goal text, start/target date) -> milestones (define the full, locked, ordered milestone list) -> review.
+- [ ] The milestones step lets the user add, reorder, and remove milestone entries before submitting; at least one milestone is required to proceed.
+- [ ] Submit wires to whatever goal-creation endpoint #5 ships (shape TBD until #5 lands), following the same refetch-then-navigate pattern used for experiments.
+- [ ] The side progress rail, back/forward behavior, per-step validation, and keyboard/browser-back handling match the conventions established for the experiment branch in #13 (ref that issue once groomed).
+
+## Out of scope
+
+- Everything already covered for the experiment branch in #13 — this issue only adds the goal branch.
+- Milestone editing after the goal is Active (locked-list change via explicit abandon-with-reason) — that's goal lifecycle behavior owned by #5, not wizard behavior.
+
+## Constraints
+
+- Depends on #5 shipping first (`order-14`); do not start before the goal-creation endpoint exists.
+- Reuse the wizard shell/progress-rail component built for #13 rather than forking a second wizard implementation.
+- Follow `_docs/specs.md` -> "Creating an experiment or a goal" and "Core entities" (milestone definition) for intended behavior.
+- Clay/terracotta accent color (not sage) per the Design system section, consistent with goals elsewhere once they exist.
 
 ---
 
