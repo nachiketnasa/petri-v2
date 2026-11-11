@@ -36,7 +36,7 @@ function fillDetailsAndAdvance() {
 }
 
 function fillCadenceAndAdvance() {
-  fireEvent.change(screen.getByPlaceholderText('Cadence type'), { target: { value: 'daily' } })
+  fireEvent.change(screen.getByLabelText('Cadence type'), { target: { value: 'daily' } })
   fireEvent.change(screen.getByPlaceholderText('Target days'), { target: { value: '30' } })
   fireEvent.click(screen.getByRole('button', { name: 'Next' }))
 }
@@ -112,7 +112,7 @@ describe('NewExperimentForm wizard', () => {
     renderWizard()
     fillDetailsAndAdvance()
 
-    fireEvent.change(screen.getByPlaceholderText('Cadence type'), { target: { value: 'custom' } })
+    fireEvent.change(screen.getByLabelText('Cadence type'), { target: { value: 'custom' } })
     fireEvent.change(screen.getByPlaceholderText('Target days'), { target: { value: '30' } })
     fireEvent.click(screen.getByRole('button', { name: 'Next' }))
 
@@ -145,7 +145,7 @@ describe('NewExperimentForm wizard', () => {
     fillCadenceAndAdvance()
 
     fireEvent.click(screen.getByRole('button', { name: 'Back' }))
-    expect(screen.getByPlaceholderText('Cadence type')).toHaveValue('daily')
+    expect(screen.getByLabelText('Cadence type')).toHaveValue('daily')
     expect(screen.getByPlaceholderText('Target days')).toHaveValue(30)
 
     fireEvent.click(screen.getByRole('button', { name: /Details/ }))

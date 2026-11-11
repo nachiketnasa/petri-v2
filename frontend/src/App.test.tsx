@@ -105,7 +105,7 @@ describe('App', () => {
 
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Cadence' })).toBeInTheDocument())
 
-    fireEvent.change(screen.getByPlaceholderText('Cadence type'), { target: { value: 'daily' } })
+    fireEvent.change(screen.getByLabelText('Cadence type'), { target: { value: 'daily' } })
     fireEvent.change(screen.getByPlaceholderText('Target days'), { target: { value: '30' } })
     fireEvent.click(screen.getByRole('button', { name: 'Next' }))
 

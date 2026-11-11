@@ -159,12 +159,16 @@ function NewExperimentForm() {
         {step === 1 && (
           <form onSubmit={handleCadenceNext}>
             <h2>Cadence</h2>
-            <input
-              type="text"
-              placeholder="Cadence type"
+            <select
+              aria-label="Cadence type"
               value={cadenceType}
               onChange={(e) => setCadenceType(e.target.value)}
-            />
+            >
+              <option value="">Cadence type</option>
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+              <option value="custom">Custom</option>
+            </select>
             <input
               type="number"
               placeholder="Target days"
@@ -179,12 +183,15 @@ function NewExperimentForm() {
                 onChange={(e) => setCadenceDays(e.target.value)}
               />
             )}
-            <input
-              type="text"
-              placeholder="Check-in kind"
+            <select
+              aria-label="Check-in kind"
               value={checkInKind}
               onChange={(e) => setCheckInKind(e.target.value)}
-            />
+            >
+              <option value="">Check-in kind</option>
+              <option value="boolean">Boolean</option>
+              <option value="rating">Rating</option>
+            </select>
             <input
               type="date"
               placeholder="Start date"

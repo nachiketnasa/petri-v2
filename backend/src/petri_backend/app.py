@@ -1,5 +1,6 @@
 import os
 from datetime import date, datetime, timedelta, timezone
+from typing import Literal
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.exceptions import RequestValidationError
@@ -66,6 +67,15 @@ def _on_validation_error(request: Request, exc: RequestValidationError) -> JSONR
     return JSONResponse(status_code=400, content={"detail": "Missing or invalid field."})
 
 
+@app.exception_handler(Exception)
+def _on_unhandled_error(request: Request, exc: Exception) -> JSONResponse:
+    # Exception handlers run inside CORSMiddleware; Starlette's own default
+    # 500 handler runs outside it, so an uncaught error (e.g. a DB CHECK
+    # constraint violation) would otherwise reach the browser with no CORS
+    # headers, surfacing as a confusing "Load failed" instead of a real error.
+    return JSONResponse(status_code=500, content={"detail": "Internal server error."})
+
+
 class SignupRequest(BaseModel):
     email: str
     password: str
@@ -90,9 +100,9 @@ class ResetPasswordRequest(BaseModel):
 class CreateExperimentRequest(BaseModel):
     title: str
     hypothesis: str
-    cadence_type: str
+    cadence_type: Literal["daily", "weekly", "custom"]
     cadence_days: int | None = None
-    check_in_kind: str | None = None
+    check_in_kind: Literal["boolean", "rating"] | None = None
     start_date: date | None = None
     target_days: int
 
