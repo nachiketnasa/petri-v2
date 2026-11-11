@@ -30,6 +30,14 @@ describe('Calendar', () => {
     cleanup()
   })
 
+  it('links back to the dashboard', async () => {
+    stubExperiments([])
+    renderCalendar()
+
+    await waitFor(() => expect(screen.getByRole('link', { name: 'Back to the dashboard' })).toBeInTheDocument())
+    expect(screen.getByRole('link', { name: 'Back to the dashboard' })).toHaveAttribute('href', '/dashboard')
+  })
+
   it('defaults to month view showing Mon..Sun headers and a 7-wide grid', async () => {
     stubExperiments([])
     renderCalendar()

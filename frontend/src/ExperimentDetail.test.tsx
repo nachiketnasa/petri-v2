@@ -218,6 +218,49 @@ describe('ExperimentDetail', () => {
     expect(screen.getByRole('alert')).toHaveTextContent(/fill in what worked/i)
   })
 
+  it('activates a backlog experiment and shows the result status', async () => {
+    const backlogExperiment = { ...experiment, status: 'backlog' }
+    const activated = { ...experiment, status: 'active' }
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => backlogExperiment })
+      .mockResolvedValueOnce({ ok: true, json: async () => activated })
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderDetail('exp-1')
+    await waitFor(() => expect(screen.getByText('Drink more water')).toBeInTheDocument())
+
+    fireEvent.click(screen.getByRole('button', { name: 'Activate' }))
+
+    await waitFor(() => expect(screen.getByText('Experiment, active')).toBeInTheDocument())
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      expect.stringContaining('/experiments/exp-1/activate'),
+      expect.objectContaining({ method: 'POST', credentials: 'include' }),
+    )
+  })
+
+  it('shows the backend error when activating fails (e.g. WIP cap already reached)', async () => {
+    const backlogExperiment = { ...experiment, status: 'backlog' }
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => backlogExperiment })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        json: async () => ({ detail: 'You already have 2 active experiments.' }),
+      })
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderDetail('exp-1')
+    await waitFor(() => expect(screen.getByText('Drink more water')).toBeInTheDocument())
+
+    fireEvent.click(screen.getByRole('button', { name: 'Activate' }))
+
+    await waitFor(() =>
+      expect(screen.getByRole('alert')).toHaveTextContent('You already have 2 active experiments.'),
+    )
+  })
+
   it('shows the backend error text on a rejected archive submission', async () => {
     const fetchMock = vi
       .fn()

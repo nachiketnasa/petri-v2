@@ -55,6 +55,26 @@ function ExperimentDetail() {
   const [archiving, setArchiving] = useState(false)
   const [archiveError, setArchiveError] = useState<string | null>(null)
 
+  const [activating, setActivating] = useState(false)
+  const [activateError, setActivateError] = useState<string | null>(null)
+
+  function handleActivate() {
+    setActivating(true)
+    setActivateError(null)
+
+    fetch(`${BASE_URL}/experiments/${experimentId}/activate`, {
+      method: 'POST',
+      credentials: 'include',
+    })
+      .then(async (res) => {
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.detail)
+        setExperiment(data)
+      })
+      .catch((err: Error) => setActivateError(err.message))
+      .finally(() => setActivating(false))
+  }
+
   useEffect(() => {
     fetch(`${BASE_URL}/experiments/${experimentId}`, { credentials: 'include' })
       .then(async (res) => {
@@ -181,6 +201,23 @@ function ExperimentDetail() {
             </div>
             {experiment.abandon_reason != null && (
               <p className="hyp">Abandon reason: {experiment.abandon_reason}</p>
+            )}
+            {experiment.status === 'backlog' && (
+              <div style={{ marginTop: 14 }}>
+                <button
+                  type="button"
+                  onClick={handleActivate}
+                  disabled={activating}
+                  className="btn btn-primary-exp"
+                >
+                  Activate
+                </button>
+                {activateError && (
+                  <p role="alert" style={{ marginTop: 8 }}>
+                    {activateError}
+                  </p>
+                )}
+              </div>
             )}
           </div>
         </div>

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import { useAuth, type Experiment } from './AuthContext'
 import {
   addDays,
@@ -96,6 +96,10 @@ function Calendar() {
 
   return (
     <div className="calendar-screen">
+      <div className="crumb">
+        <Link to="/dashboard">Back to the dashboard</Link>
+      </div>
+
       <div className="calendar-controls">
         <div className="raised-sm segmented" role="radiogroup" aria-label="Scope">
           <button
