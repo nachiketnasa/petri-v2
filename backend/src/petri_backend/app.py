@@ -182,7 +182,9 @@ def health() -> dict[str, str]:
 
 @app.post("/auth/signup", status_code=201, response_model=UserOut)
 def signup(
-    body: SignupRequest, repository: Repository = Depends(get_repository)
+    body: SignupRequest,
+    response: Response,
+    repository: Repository = Depends(get_repository),
 ) -> UserOut:
     if repository.get_user_by_email(email=body.email) is not None:
         raise HTTPException(status_code=400, detail="Email already registered.")
@@ -192,6 +194,10 @@ def signup(
         display_name=body.display_name,
         timezone=body.timezone,
     )
+
+    token = new_session_token()
+    _sessions[token] = user.id
+    response.set_cookie(SESSION_COOKIE_NAME, token, httponly=True)
     return UserOut.from_user(user)
 
 

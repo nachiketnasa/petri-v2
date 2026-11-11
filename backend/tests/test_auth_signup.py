@@ -108,3 +108,46 @@ def test_signup_missing_required_field_returns_400(client: TestClient, payload: 
     response = client.post("/auth/signup", json=payload)
 
     assert response.status_code == 400
+
+
+def test_signup_sets_session_cookie_usable_for_authenticated_request(
+    client: TestClient,
+):
+    response = client.post(
+        "/auth/signup",
+        json={
+            "email": "session@example.com",
+            "password": "pw12345",
+            "display_name": "Session User",
+        },
+    )
+
+    assert response.status_code == 201
+    assert "session_id" in response.cookies
+
+    follow_up = client.get("/experiments")
+    assert follow_up.status_code == 200
+
+
+def test_duplicate_email_signup_does_not_set_cookie(client: TestClient):
+    client.post(
+        "/auth/signup",
+        json={
+            "email": "dupcookie@example.com",
+            "password": "pw12345",
+            "display_name": "First",
+        },
+    )
+
+    response = client.post(
+        "/auth/signup",
+        json={
+            "email": "dupcookie@example.com",
+            "password": "different-pw",
+            "display_name": "Second",
+        },
+    )
+
+    assert response.status_code == 400
+    assert "session_id" not in response.cookies
+    assert "set-cookie" not in response.headers
