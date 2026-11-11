@@ -6,7 +6,7 @@ services:
       POSTGRES_PASSWORD: petri
       POSTGRES_DB: petri
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./_docs/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
@@ -23,7 +23,7 @@ services:
       RESEND_API_KEY: ${RESEND_API_KEY}
       EMAIL_FROM_ADDRESS: ${EMAIL_FROM_ADDRESS}
     ports:
-      - "8000:8000"
+      - "${BACKEND_PORT:-8000}:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -31,9 +31,9 @@ services:
   frontend:
     build: ./frontend
     environment:
-      VITE_BACKEND_URL: http://localhost:8000
+      VITE_BACKEND_URL: http://localhost:${BACKEND_PORT:-8000}
     ports:
-      - "5173:5173"
+      - "${FRONTEND_PORT:-5173}:5173"
     depends_on:
       - backend
 

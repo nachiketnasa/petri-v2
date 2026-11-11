@@ -21,6 +21,13 @@ backend, and the Vite frontend each start as their own container.
 - Frontend: http://localhost:5173
 - Backend / OpenAPI docs: http://localhost:8000/docs
 
+If any of those ports are already taken on your machine, override them before
+starting — `docker-compose.yml` reads `POSTGRES_PORT` / `BACKEND_PORT` /
+`FRONTEND_PORT` with those same defaults, e.g.:
+```bash
+BACKEND_PORT=8001 FRONTEND_PORT=5174 docker compose up --build
+```
+
 **Email, without a Resend API key.** The app sends real email (sign-up verification
 codes, password reset links) through [Resend](https://resend.com). You don't need an
 account to evaluate it: with no `RESEND_API_KEY` set, the backend logs the code/link to
@@ -52,7 +59,7 @@ yourself:
 | 3 | Agent team specification | 2 / 2 | [`_docs/process.md`](_docs/process.md) (PM → Engineer → QA lifecycle) and [`_docs/team/`](_docs/team) (one file per role). **Evidence the roles were actually used, not just documented:** [issue #30](https://github.com/nachiketnasa/petri-v2/issues/30)'s comment thread shows the full cycle on one issue — PM's `## Groomed:` comment, Engineer's `Implemented:` comment, QA's `## QA: FAIL`, Engineer's follow-up fix, and QA's final `## QA: PASS` before close. |
 | 4 | Context management | 2 / 2 | [`AGENTS.md`](AGENTS.md) indexes every doc below it; each is scoped to one concern. |
 | 5 | Application | 2 / 2 | `docker compose up --build` runs frontend + backend + Postgres together; see [Running it locally](#running-it-locally-no-resend-account-needed) above. |
-| 6 | Testing | 2 / 2 | Backend, one command runs unit *and* integration tests (against real Postgres, see `backend/tests/test_repository_postgres.py`) together: `docker compose up -d postgres && cd backend && DATABASE_URL=postgresql://petri:petri@localhost:5432/petri uv run pytest` (210 passed, 0 skipped, verified). A bare `uv run pytest` still works and stays green, but skips the Postgres-backed tests — pass `DATABASE_URL` to include them. Frontend: `cd frontend && npm test` (Vitest + React Testing Library). |
+| 6 | Testing | 2 / 2 | Backend, one command runs unit *and* integration tests (against real Postgres, see `backend/tests/test_repository_postgres.py`) together: `docker compose up -d postgres && cd backend && DATABASE_URL=postgresql://petri:petri@localhost:5432/petri uv run pytest` (210 passed, 0 skipped, verified). If port 5432 is already taken on your machine, set `POSTGRES_PORT` first, e.g. `POSTGRES_PORT=5433 docker compose up -d postgres` and point `DATABASE_URL` at that port instead — `docker-compose.yml`'s ports are all overridable this way (`POSTGRES_PORT`, `BACKEND_PORT`, `FRONTEND_PORT`), with the same defaults (5432/8000/5173) if left unset. A bare `uv run pytest` still works and stays green, but skips the Postgres-backed tests — pass `DATABASE_URL` to include them. Frontend: `cd frontend && npm test` (Vitest + React Testing Library). |
 | 7 | Containerization | 2 / 2 | Single `docker-compose.yml` for all three services. |
 | 8 | Deployment | 0 / 2 | Not deployed yet. `_docs/specs.md`'s Tech stack section names the intended target (a VPS, `petri.nachiketnasa.com`), not yet acted on. |
 | 9 | CI/CD | 0 / 3 | No `.github/workflows` yet. |
