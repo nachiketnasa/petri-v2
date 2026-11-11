@@ -6,6 +6,8 @@ export type Experiment = {
   id: string
   title: string
   cadence_type: string
+  cadence_days?: number | null
+  start_date?: string | null
   status: string
   ended_early?: boolean
 }

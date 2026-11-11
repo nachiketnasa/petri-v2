@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 
 const BASE_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8000'
 
@@ -156,6 +156,9 @@ function ExperimentDetail() {
       <p>Target days: {experiment.target_days}</p>
       <p>Status: {experiment.status}</p>
       {experiment.abandon_reason != null && <p>Abandon reason: {experiment.abandon_reason}</p>}
+      <p>
+        <Link to={`/calendar/${experiment.id}`}>View on calendar</Link>
+      </p>
 
       {experiment.status === 'active' ? (
         <form onSubmit={handleSubmit}>

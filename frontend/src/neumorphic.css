@@ -236,3 +236,114 @@
 .landing-action:hover {
   box-shadow: 4px 4px 8px var(--neu-shadow-dark), -4px -4px 8px var(--neu-shadow-light);
 }
+
+.calendar-screen {
+  padding: 8px 0;
+}
+
+.calendar-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.calendar-view-toggle,
+.calendar-scope-toggle {
+  display: flex;
+  gap: 12px;
+}
+
+.calendar-nav {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.calendar-nav button {
+  border: none;
+  border-radius: 10px;
+  padding: 6px 12px;
+  background: var(--neu-surface);
+  color: var(--text-h);
+  box-shadow: 4px 4px 8px var(--neu-shadow-dark), -4px -4px 8px var(--neu-shadow-light);
+  cursor: pointer;
+}
+
+.calendar-nav-label {
+  font-family: 'IBM Plex Mono', var(--mono);
+  color: var(--text-h);
+  min-width: 160px;
+  text-align: center;
+}
+
+.calendar-empty-state {
+  color: var(--text);
+  margin-bottom: 12px;
+}
+
+.calendar-weekday-header,
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 8px;
+}
+
+.calendar-weekday-header {
+  margin-bottom: 8px;
+}
+
+.calendar-weekday-label {
+  text-align: center;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.calendar-day {
+  position: relative;
+  min-height: 72px;
+  border-radius: 14px;
+  padding: 8px;
+  background: var(--neu-surface);
+  box-shadow: 6px 6px 12px var(--neu-shadow-dark), -6px -6px 12px var(--neu-shadow-light);
+}
+
+.calendar-grid-week .calendar-day {
+  min-height: 120px;
+}
+
+.calendar-day-number {
+  font-family: 'IBM Plex Mono', var(--mono);
+  color: var(--text-h);
+  font-size: 14px;
+}
+
+.calendar-day-faded {
+  opacity: 0.4;
+}
+
+.calendar-day-today {
+  box-shadow: inset 4px 4px 8px var(--neu-shadow-dark), inset -4px -4px 8px var(--neu-shadow-light);
+}
+
+.calendar-day-today .calendar-day-number {
+  color: var(--sage);
+  font-weight: 700;
+}
+
+.calendar-day-markers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.calendar-marker {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--sage);
+}

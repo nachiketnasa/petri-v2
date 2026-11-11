@@ -50,6 +50,8 @@ function Dashboard() {
   return (
     <div className="dashboard">
       <Link to="/experiments/new">New experiment</Link>
+      {' · '}
+      <Link to="/calendar">Calendar</Link>
 
       {error && <p role="alert">{error}</p>}
 

@@ -5,6 +5,7 @@ import AuthForm from './AuthForm'
 import Landing from './Landing'
 import Dashboard from './Dashboard'
 import ExperimentDetail from './ExperimentDetail'
+import Calendar from './Calendar'
 import Greeting, { rememberDisplayName } from './Greeting'
 import NewExperimentForm from './NewExperimentForm'
 import { AuthProvider, useAuth } from './AuthContext'
@@ -101,6 +102,22 @@ function AppRoutes() {
           element={
             <RequireAuth>
               <ExperimentDetail />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/calendar"
+          element={
+            <RequireAuth>
+              <Calendar />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/calendar/:experimentId"
+          element={
+            <RequireAuth>
+              <Calendar />
             </RequireAuth>
           }
         />
