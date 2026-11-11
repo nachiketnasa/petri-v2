@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from petri_backend.email import send_password_reset_email
+from petri_backend.email import send_password_reset_email, send_verification_email
 from petri_backend.repository import CheckIn, Experiment, Goal, Milestone, Repository, User
 from petri_backend.repository_memory import InMemoryRepository
 from petri_backend.repository_postgres import PostgresRepository
@@ -17,6 +17,7 @@ from petri_backend.security import (
     hash_password,
     new_reset_token,
     new_session_token,
+    new_verification_code,
     verify_password,
 )
 
@@ -42,9 +43,13 @@ _sessions: dict[str, tuple[str, datetime]] = {}
 # ponytail: module-level dict, no persistence; fine for in-memory MVP.
 _reset_tokens: dict[str, tuple[str, datetime]] = {}
 
+# ponytail: module-level dict, no persistence; fine for in-memory MVP.
+_email_verifications: dict[str, tuple[str, datetime]] = {}
+
 SESSION_COOKIE_NAME = "session_id"
 RESET_TOKEN_TTL = timedelta(minutes=15)
 SESSION_TTL = timedelta(days=30)
+VERIFICATION_CODE_TTL = timedelta(minutes=30)
 
 
 def _start_session(token: str, user_id: str) -> None:
@@ -117,6 +122,10 @@ class ForgotPasswordRequest(BaseModel):
 class ResetPasswordRequest(BaseModel):
     token: str
     password: str
+
+
+class VerifyEmailRequest(BaseModel):
+    code: str
 
 
 class CreateExperimentRequest(BaseModel):
@@ -338,6 +347,7 @@ class UserOut(BaseModel):
     theme: str
     sound_effects_enabled: bool
     default_landing: str
+    email_verified: bool
 
     @classmethod
     def from_user(cls, user: User) -> "UserOut":
@@ -350,6 +360,7 @@ class UserOut(BaseModel):
             theme=user.theme,
             sound_effects_enabled=user.sound_effects_enabled,
             default_landing=user.default_landing,
+            email_verified=user.email_verified_at is not None,
         )
 
 
@@ -379,6 +390,15 @@ def signup(
         timezone=body.timezone,
     )
 
+    # #23: a code is generated and emailed on every email/password sign-up.
+    # The new session below is unaffected by verification status -- #33's
+    # fix (signup must establish a session) stays intact; it's a later
+    # *login* that's gated on having verified (see login()), not the
+    # signup moment itself.
+    code = new_verification_code()
+    _email_verifications[code] = (user.id, datetime.now(timezone.utc) + VERIFICATION_CODE_TTL)
+    send_verification_email(to=user.email, code=code)
+
     token = new_session_token()
     _start_session(token, user.id)
     response.set_cookie(SESSION_COOKIE_NAME, token, httponly=True)
@@ -398,6 +418,8 @@ def login(
         or not verify_password(body.password, user.password_hash)
     ):
         raise HTTPException(status_code=401, detail="Invalid email or password.")
+    if user.email_verified_at is None:
+        raise HTTPException(status_code=403, detail="Email not verified.")
 
     token = new_session_token()
     _start_session(token, user.id)
@@ -465,6 +487,26 @@ def reset_password(
     for session_token, (session_user_id, _expires_at) in list(_sessions.items()):
         if session_user_id == user_id:
             del _sessions[session_token]
+
+    return {"status": "ok"}
+
+
+@app.post("/auth/verify-email")
+def verify_email(
+    body: VerifyEmailRequest, repository: Repository = Depends(get_repository)
+) -> dict[str, str]:
+    entry = _email_verifications.pop(body.code, None)  # one-time use: gone either way.
+    if entry is None:
+        raise HTTPException(status_code=400, detail="Invalid or expired code.")
+
+    user_id, expires_at = entry
+    if datetime.now(timezone.utc) > expires_at:
+        raise HTTPException(status_code=400, detail="Invalid or expired code.")
+
+    updated = repository.update_user(user_id=user_id, email_verified_at=datetime.now(timezone.utc))
+    if updated is None:
+        # Defensive: the user the code pointed at no longer exists.
+        raise HTTPException(status_code=400, detail="Invalid or expired code.")
 
     return {"status": "ok"}
 

@@ -27,8 +27,16 @@ def _signup(client: TestClient, email: str = "user@example.com", password: str =
     )
 
 
-def test_login_success_sets_cookie_and_returns_user(client: TestClient):
+def _verify(repo: InMemoryRepository, email: str) -> None:
+    from datetime import datetime, timezone
+
+    user = repo.get_user_by_email(email=email)
+    repo.update_user(user_id=user.id, email_verified_at=datetime.now(timezone.utc))
+
+
+def test_login_success_sets_cookie_and_returns_user(client: TestClient, repo: InMemoryRepository):
     _signup(client, email="user@example.com", password="pw12345")
+    _verify(repo, "user@example.com")
 
     response = client.post(
         "/auth/login", json={"email": "User@Example.com", "password": "pw12345"}
@@ -80,6 +88,7 @@ def test_login_with_no_password_hash_returns_401_not_500(
 
 def test_two_logins_both_stay_valid(client: TestClient, repo: InMemoryRepository):
     _signup(client, email="twice@example.com", password="pw12345")
+    _verify(repo, "twice@example.com")
 
     first = client.post(
         "/auth/login", json={"email": "twice@example.com", "password": "pw12345"}
@@ -110,6 +119,7 @@ def test_get_current_user_resolves_valid_session(
         password_hash=hash_password("pw"),
         display_name="Dep User",
     )
+    _verify(repo, "dep@example.com")
     response = client.post(
         "/auth/login", json={"email": "dep@example.com", "password": "pw"}
     )

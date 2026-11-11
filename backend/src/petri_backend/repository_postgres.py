@@ -35,18 +35,20 @@ _EXPERIMENT_UPDATABLE_FIELDS = {
     "archived_at",
 }
 
-# Columns `update_user` is allowed to set -- Settings preferences only (#37);
-# email/password/display_name/timezone go through their own dedicated flows.
+# Columns `update_user` is allowed to set -- Settings preferences (#37) plus
+# email_verified_at (#23); email/password/display_name/timezone go through
+# their own dedicated flows.
 _USER_UPDATABLE_FIELDS = {
     "theme",
     "sound_effects_enabled",
     "default_landing",
+    "email_verified_at",
 }
 
 
 _USER_COLUMNS = (
     "id, email, password_hash, display_name, timezone, created_at, "
-    "theme, sound_effects_enabled, default_landing"
+    "theme, sound_effects_enabled, default_landing, email_verified_at"
 )
 
 _EXPERIMENT_COLUMNS = (
@@ -114,6 +116,7 @@ def _row_to_user(row: tuple) -> User:
         theme=row[6],
         sound_effects_enabled=row[7],
         default_landing=row[8],
+        email_verified_at=row[9],
     )
 
 

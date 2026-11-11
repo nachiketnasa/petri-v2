@@ -1,7 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from petri_backend.app import app, get_repository
+from petri_backend.app import _email_verifications, app, get_repository
 from petri_backend.repository_memory import InMemoryRepository
 
 
@@ -20,10 +20,13 @@ def client(repo: InMemoryRepository):
 
 
 def _signup_and_login(client: TestClient, email: str, password: str = "pw12345"):
-    client.post(
+    signup_response = client.post(
         "/auth/signup",
         json={"email": email, "password": password, "display_name": "User"},
     )
+    user_id = signup_response.json()["id"]
+    code = next(c for c, (uid, _exp) in _email_verifications.items() if uid == user_id)
+    client.post("/auth/verify-email", json={"code": code})
     response = client.post("/auth/login", json={"email": email, "password": password})
     return response.cookies["session_id"]
 

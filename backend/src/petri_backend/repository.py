@@ -24,6 +24,7 @@ class User:
     theme: str = "petri-light"
     sound_effects_enabled: bool = True
     default_landing: str = "greeting"
+    email_verified_at: datetime | None = None
 
 
 @dataclass

@@ -85,6 +85,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "403":
+          description: Correct credentials, but the account's email isn't verified yet (#23).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 
   /auth/logout:
     post:
@@ -206,6 +212,36 @@ paths:
                     example: ok
         "400":
           description: Missing or invalid field, or invalid/expired token.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /auth/verify-email:
+    post:
+      summary: Confirm a sign-up email verification code
+      operationId: verifyEmail
+      security: []
+      tags: [auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VerifyEmailRequest"
+      responses:
+        "200":
+          description: Email verified.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+        "400":
+          description: Missing field, or invalid/expired/already-used code.
           content:
             application/json:
               schema:
@@ -756,6 +792,7 @@ components:
           theme,
           sound_effects_enabled,
           default_landing,
+          email_verified,
         ]
       properties:
         id:
@@ -778,6 +815,9 @@ components:
         default_landing:
           type: string
           enum: [greeting, dashboard]
+        email_verified:
+          type: boolean
+          description: True once POST /auth/verify-email has confirmed the sign-up code (#23).
 
     UpdateUserPreferencesRequest:
       type: object
@@ -836,6 +876,14 @@ components:
         password:
           type: string
           format: password
+
+    VerifyEmailRequest:
+      type: object
+      required: [code]
+      properties:
+        code:
+          type: string
+          description: The 6-digit code emailed at sign-up.
 
     Goal:
       type: object

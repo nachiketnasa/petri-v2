@@ -34,6 +34,11 @@ def _signup(client: TestClient, email: str = "user@example.com", password: str =
     )
 
 
+def _verify(repo: InMemoryRepository, email: str) -> None:
+    user = repo.get_user_by_email(email=email)
+    repo.update_user(user_id=user.id, email_verified_at=datetime.now(timezone.utc))
+
+
 def test_forgot_password_registered_email_returns_ok_and_stores_token(
     client: TestClient, capsys
 ):
@@ -72,9 +77,10 @@ def test_forgot_password_logs_token_only_for_registered_email(client: TestClient
 
 
 def test_reset_password_with_valid_token_updates_password_and_invalidates_sessions(
-    client: TestClient,
+    client: TestClient, repo: InMemoryRepository,
 ):
     _signup(client, email="user@example.com", password="oldpassword")
+    _verify(repo, "user@example.com")
     login_response = client.post(
         "/auth/login", json={"email": "user@example.com", "password": "oldpassword"}
     )
@@ -116,9 +122,10 @@ def test_reset_password_with_unknown_token_returns_generic_400(client: TestClien
 
 
 def test_reset_password_with_expired_token_returns_generic_400_and_no_change(
-    client: TestClient,
+    client: TestClient, repo: InMemoryRepository,
 ):
     _signup(client, email="user@example.com", password="oldpassword")
+    _verify(repo, "user@example.com")
     client.post("/auth/forgot-password", json={"email": "user@example.com"})
     reset_token = list(_reset_tokens.keys())[0]
 

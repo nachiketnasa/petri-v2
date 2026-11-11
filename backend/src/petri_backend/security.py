@@ -36,3 +36,9 @@ def new_session_token() -> str:
 
 def new_reset_token() -> str:
     return secrets.token_urlsafe(32)
+
+
+def new_verification_code() -> str:
+    # Six digits: short enough to type in by hand from an email, unlike the
+    # URL-safe tokens above which are only ever clicked, never typed.
+    return f"{secrets.randbelow(1_000_000):06d}"
