@@ -16,7 +16,17 @@ docker compose up --build
 ```
 
 That's the whole setup — one command, no `.env` file required. Postgres, the FastAPI
-backend, and the Vite frontend each start as their own container.
+backend, and the Vite frontend each start as their own container. You'll see:
+
+```
+WARN[0000] The "RESEND_API_KEY" variable is not set. Defaulting to a blank string.
+WARN[0000] The "EMAIL_FROM_ADDRESS" variable is not set. Defaulting to a blank string.
+```
+
+That's expected, not an error — it's Compose noting those two are unset, exactly the
+no-Resend-account case this section covers. The stack still starts and all three
+containers come up fine; the backend just falls back to logging email codes/links
+instead of sending them (see "Email, without a Resend API key" below).
 
 - Frontend: http://localhost:5173
 - Backend / OpenAPI docs: http://localhost:8000/docs
