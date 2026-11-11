@@ -80,7 +80,7 @@ yourself:
 | 10 | Observability | 0 / 2 | No metrics/traces/structured logs with request correlation yet. |
 | 11 | Alerting | 0 / 1 | None yet. |
 | 12 | On-call agent | 0 / 2 | None yet. |
-| | **Total** | **14 / 24** | Pass threshold is 10. |
+| | **Total** | **13 / 24** | Pass threshold is 10. |
 
 The honest gap is entirely in the ops layer (deployment, CI/CD, observability,
 alerting, on-call) — nothing in the product, spec, testing, or containerization rows
