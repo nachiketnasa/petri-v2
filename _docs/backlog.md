@@ -875,13 +875,138 @@ Add the public landing page that does not exist yet: an unauthenticated visitor 
 - **Labels**: frontend
 - **Link**: https://github.com/nachiketnasa/petri-v2/issues/11
 
-## What
-Calendar: week and month views.
+## Goal
+
+A Calendar screen with week and month views, navigable forward/back, where
+each day shows which active experiments have a cadence occurrence scheduled
+that day — computed client-side from data the app already fetches
+(`cadence_type` / `cadence_days` / `start_date` on each `Experiment`), no
+backend change needed for this part.
 
 ## Acceptance criteria
-- Week view: Monday–Sunday, its own layout, never a slice of the month grid. Prev/next navigation by week.
-- Month view: starts the Monday of the week containing the 1st, shows every day of the month, continues through the Sunday closing the last week (faded adjacent-month days included). Prev/next by month.
-- Scope toggle: "this cadence only" vs "all active" (and Other tasks, if enabled).
+
+- [ ] Week view shows exactly Monday through Sunday in its own layout (not a
+      7-day slice cropped out of the month grid). Prev/next controls move
+      the view back/forward exactly one week at a time.
+- [ ] Month view starts on the Monday of the week containing the 1st of the
+      month and ends on the Sunday closing the week containing the month's
+      last day, so every day of the month appears, plus the leading/trailing
+      adjacent-month days needed to complete the first/last week — those
+      adjacent-month days are visually faded/de-emphasized relative to
+      in-month days. Prev/next controls move the view back/forward exactly
+      one month at a time.
+- [ ] Today's date is visually highlighted, distinct from all other days, in
+      both week and month view.
+- [ ] Each day cell shows a marker per active experiment whose cadence lands
+      on that date: `daily` → every day from `start_date` onward; `weekly` →
+      every 7th day from `start_date`; `custom` → every `cadence_days` days
+      from `start_date`. This is schedule math only (is this date a cadence
+      occurrence), not a check-in-completion check — see Out of scope.
+- [ ] Scope toggle has two options for this pass: "this cadence only" (the
+      single experiment the calendar was opened from, if opened from an
+      experiment's context) and "all active" (every experiment with
+      `status == "active"`, merged onto the same grid). Switching the toggle
+      changes which markers are drawn without a page reload.
+- [ ] No "Other tasks" option appears in the scope toggle — that feature
+      doesn't exist yet (#8, `order-17`, still open).
+- [ ] Empty state: a user with zero active experiments sees the grid and
+      navigation render normally, with no day markers and no error.
+- [ ] A `custom`-cadence experiment with `cadence_days` other than 7 (e.g.
+      3) shows its markers on the correct non-weekly-aligned days, verifiable
+      by counting marked days across at least two consecutive weeks.
+- [ ] Navigating many weeks/months forward and back (e.g. 12+ months either
+      direction, crossing a year boundary) keeps date math and markers
+      correct — no drift, no crash, no duplicate/missing day cells.
+- [ ] Days are computed and compared using the browser's local date only
+      (no server round-trip per day, no cross-timezone "due as of a
+      specific instant" precision) — see Constraints.
+
+## Out of scope
+
+- Marking a past scheduled day as "completed" (a check-in was actually
+  logged) versus "missed" (scheduled, nothing logged) — this needs the real,
+  cross-session list of an experiment's logged check-ins, which does not
+  exist yet (#28, `order-05c`, still open: the frontend currently only holds
+  same-session check-ins). Filed as a follow-up: #35 (`order-10b`), to be
+  picked up once #28 ships. This pass only shows "scheduled" vs. "not
+  scheduled," not "done."
+- The "Other tasks" scope-toggle option — not implemented yet (#8,
+  `order-17`, still open). Revisit this calendar's toggle once #8 ships.
+- Server-side, timezone-precise "is this due as of this exact instant"
+  computation (the kind #27, `order-05b`, needs for its live due-now badge).
+  The calendar's per-day markers are a different, simpler computation —
+  "does this calendar date fall on the cadence schedule" — and are
+  deliberately scoped to the browser's local calendar date, not a
+  per-user-timezone instant comparison. Not blocked by #27; the two
+  concepts just aren't the same thing and shouldn't be conflated.
+
+## Constraints
+
+- Frontend-only for everything in scope here: `cadence_type`, `cadence_days`,
+  `start_date`, and `status` are already present on every `Experiment` the
+  app fetches (see `frontend/src/AuthContext.tsx`'s `experiments` list and
+  `GET /experiments`'s response in `backend/src/petri_backend/app.py`) — no
+  new endpoint or field is needed to compute scheduled days.
+- Do not read or depend on any per-check-in history data in this pass; that
+  path is #35/#28's, not this issue's.
+- Follow the existing neumorphic design direction already used elsewhere in
+  the app (see `_docs/specs.md` → Design system) rather than introducing a
+  new visual style for the calendar grid.
+
+Ref: `_docs/specs.md` → Calendar.
+
+---
+
+## order-10b · #35 — Calendar: mark completed vs. missed days from real check-in history
+
+- **Status**: OPEN
+- **Labels**: frontend
+- **Link**: https://github.com/nachiketnasa/petri-v2/issues/35
+
+## What
+
+Split out of #11 (Calendar: week and month views, `order-10`) while grooming it.
+
+#11 ships the week/month grid, navigation, today-highlighting, and per-day
+scheduled/due markers computed client-side from each active experiment's
+`cadence_type` / `cadence_days` / `start_date` (pure date math, no backend
+dependency). What #11 does not ship is distinguishing, for a day in the
+past, whether a check-in actually happened that day ("completed") versus
+was scheduled but never logged ("missed").
+
+That distinction needs the real list of an experiment's logged check-ins,
+across sessions/devices — which does not exist yet. #28 (order-05c, still
+open) notes the frontend currently only has same-session check-ins (from
+each `POST`'s own response body), not persisted history. Without #28, the
+calendar can show *scheduled* days but cannot honestly show *completed*
+days past the current browser session, so this was deliberately left out
+of #11 rather than faked from partial data.
+
+## Acceptance criteria
+
+- [ ] A day in the current or past that was scheduled (per cadence) and has
+      a matching logged check-in is visually marked "completed," distinct
+      from a scheduled day with no check-in ("missed") and from a scheduled
+      day still in the future ("due" / upcoming).
+- [ ] Completed/missed status is correct across page reloads and on a
+      different device/browser session than the one the check-in was
+      logged from (i.e., backed by #28's GET endpoint, not same-session
+      state).
+- [ ] Works the same in week and month view, and under both scope-toggle
+      modes ("this cadence only" / "all active") shipped by #11.
+
+## Out of scope
+
+- The calendar grid, navigation, and scope toggle themselves — already
+  shipped by #11 (`order-10`).
+- The "Other tasks" scope option — deferred to #8 (`order-17`), not shipped
+  yet.
+
+## Constraints
+
+- Depends on #28 (`order-05c`) shipping first — this issue should not start
+  before that GET endpoint exists.
+- Frontend-only once #28 lands: no new backend endpoint of its own.
 
 Ref: `_docs/specs.md` → Calendar.
 
