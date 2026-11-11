@@ -1048,6 +1048,105 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /experiments/{id}/share:
+    post:
+      summary: Share an experiment (idempotent; returns the existing token if already shared)
+      operationId: shareExperiment
+      tags: [sharing]
+      parameters: [{ $ref: "#/components/parameters/ExperimentId" }]
+      responses:
+        "200": { description: Share token., content: { application/json: { schema: { $ref: "#/components/schemas/ShareOut" } } } }
+        "401": { description: Not authenticated., content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+        "404": { description: Experiment not found., content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+    delete:
+      summary: Unshare an experiment (deletes its likes/comments, invalidates the token)
+      operationId: unshareExperiment
+      tags: [sharing]
+      parameters: [{ $ref: "#/components/parameters/ExperimentId" }]
+      responses:
+        "204": { description: Unshared. }
+        "401": { description: Not authenticated., content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+        "404": { description: Experiment not found., content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+
+  /goals/{id}/share:
+    post:
+      summary: Share a goal (idempotent; returns the existing token if already shared)
+      operationId: shareGoal
+      tags: [sharing]
+      parameters: [{ $ref: "#/components/parameters/GoalId" }]
+      responses:
+        "200": { description: Share token., content: { application/json: { schema: { $ref: "#/components/schemas/ShareOut" } } } }
+        "401": { description: Not authenticated., content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+        "404": { description: Goal not found., content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+    delete:
+      summary: Unshare a goal (deletes its likes/comments, invalidates the token)
+      operationId: unshareGoal
+      tags: [sharing]
+      parameters: [{ $ref: "#/components/parameters/GoalId" }]
+      responses:
+        "204": { description: Unshared. }
+        "401": { description: Not authenticated., content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+        "404": { description: Goal not found., content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+
+  /shared/{token}:
+    get:
+      summary: View a shared page -- no login required
+      operationId: getSharedPage
+      tags: [sharing]
+      security: []
+      parameters: [{ $ref: "#/components/parameters/ShareToken" }]
+      responses:
+        "200": { description: Shared page., content: { application/json: { schema: { $ref: "#/components/schemas/SharedPage" } } } }
+        "404": { description: Shared page not found (never shared, or unshared since)., content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+
+  /shared/{token}/comments:
+    post:
+      summary: Comment on a shared page (requires sign-in)
+      operationId: addSharedComment
+      tags: [sharing]
+      parameters: [{ $ref: "#/components/parameters/ShareToken" }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/CreateCommentRequest" } } }
+      responses:
+        "201": { description: Comment posted., content: { application/json: { schema: { $ref: "#/components/schemas/Comment" } } } }
+        "401": { description: Not authenticated., content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+        "404": { description: Shared page not found., content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+
+  /shared/{token}/comments/{comment_id}:
+    delete:
+      summary: Delete a comment (its author, or the shared item's owner, only)
+      operationId: deleteSharedComment
+      tags: [sharing]
+      parameters:
+        - { $ref: "#/components/parameters/ShareToken" }
+        - { name: comment_id, in: path, required: true, schema: { type: string } }
+      responses:
+        "204": { description: Comment deleted. }
+        "401": { description: Not authenticated., content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+        "403": { description: Not the comment's author or the page's owner., content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+        "404": { description: Shared page or comment not found., content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+
+  /shared/{token}/like:
+    post:
+      summary: Like a shared page (requires sign-in)
+      operationId: likeSharedPage
+      tags: [sharing]
+      parameters: [{ $ref: "#/components/parameters/ShareToken" }]
+      responses:
+        "204": { description: Liked. }
+        "401": { description: Not authenticated., content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+        "404": { description: Shared page not found., content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+    delete:
+      summary: Unlike a shared page
+      operationId: unlikeSharedPage
+      tags: [sharing]
+      parameters: [{ $ref: "#/components/parameters/ShareToken" }]
+      responses:
+        "204": { description: Unliked. }
+        "401": { description: Not authenticated., content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+        "404": { description: Shared page not found., content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+
 components:
   securitySchemes:
     sessionCookie:
@@ -1079,6 +1178,13 @@ components:
 
     OtherTaskId:
       name: id
+      in: path
+      required: true
+      schema:
+        type: string
+
+    ShareToken:
+      name: token
       in: path
       required: true
       schema:
@@ -1558,6 +1664,50 @@ components:
       properties:
         endpoint:
           type: string
+
+    ShareOut:
+      type: object
+      required: [token]
+      properties:
+        token: { type: string }
+
+    Comment:
+      type: object
+      required: [id, user_id, display_name, body, created_at]
+      properties:
+        id: { type: string }
+        user_id: { type: string }
+        display_name: { type: string }
+        body: { type: string }
+        created_at: { type: string, format: date-time }
+
+    CreateCommentRequest:
+      type: object
+      required: [body]
+      properties:
+        body: { type: string }
+
+    SharedPage:
+      type: object
+      description: >-
+        Never notes or retro content (specs.md's Sharing model) -- only
+        title/hypothesis/cadence/status/streak (experiment) or
+        title/milestone-progress (goal).
+      required: [kind, title, status, like_count, viewer_has_liked, comments]
+      properties:
+        kind: { type: string, enum: [experiment, goal] }
+        title: { type: string }
+        hypothesis: { type: string, nullable: true }
+        cadence_type: { type: string, nullable: true }
+        status: { type: string }
+        streak: { type: integer, nullable: true }
+        milestone_index: { type: integer, nullable: true, description: 1-based, current active milestone. }
+        milestone_count: { type: integer, nullable: true }
+        like_count: { type: integer }
+        viewer_has_liked: { type: boolean }
+        comments:
+          type: array
+          items: { $ref: "#/components/schemas/Comment" }
 
     Experiment:
       type: object

@@ -64,6 +64,32 @@ class PushSubscription:
 
 
 @dataclass
+class Share:
+    id: str
+    experiment_id: str | None
+    goal_id: str | None
+    token: str
+    created_at: datetime
+
+
+@dataclass
+class Comment:
+    id: str
+    share_id: str
+    user_id: str
+    body: str
+    created_at: datetime
+
+
+@dataclass
+class Like:
+    id: str
+    share_id: str
+    user_id: str
+    created_at: datetime
+
+
+@dataclass
 class Experiment:
     id: str
     user_id: str
@@ -335,3 +361,54 @@ class Repository(ABC):
 
     @abstractmethod
     def delete_push_subscription(self, *, user_id: str, endpoint: str) -> None: ...
+
+    @abstractmethod
+    def create_share(self, *, experiment_id: str | None, goal_id: str | None) -> Share: ...
+
+    @abstractmethod
+    def get_share_by_token(self, *, token: str) -> Share | None: ...
+
+    @abstractmethod
+    def get_share_for_item(
+        self, *, experiment_id: str | None = None, goal_id: str | None = None
+    ) -> Share | None: ...
+
+    @abstractmethod
+    def delete_share(self, *, share_id: str) -> None:
+        """Also deletes every comment/like on it (schema.sql's on delete cascade)."""
+        ...
+
+    @abstractmethod
+    def add_comment(self, *, share_id: str, user_id: str, body: str) -> Comment: ...
+
+    @abstractmethod
+    def list_comments(self, *, share_id: str) -> list[Comment]: ...
+
+    @abstractmethod
+    def get_comment(self, *, comment_id: str) -> Comment | None: ...
+
+    @abstractmethod
+    def delete_comment(self, *, comment_id: str) -> None: ...
+
+    @abstractmethod
+    def add_like(self, *, share_id: str, user_id: str) -> Like:
+        """Idempotent: liking twice returns the existing Like, no duplicate row."""
+        ...
+
+    @abstractmethod
+    def remove_like(self, *, share_id: str, user_id: str) -> None: ...
+
+    @abstractmethod
+    def count_likes(self, *, share_id: str) -> int: ...
+
+    @abstractmethod
+    def user_has_liked(self, *, share_id: str, user_id: str) -> bool: ...
+
+    @abstractmethod
+    def get_experiment_owner_id(self, *, experiment_id: str) -> str | None:
+        """Owner-agnostic lookup for the public shared-page route, which has
+        no signed-in owner to scope a normal get_experiment call by."""
+        ...
+
+    @abstractmethod
+    def get_goal_owner_id(self, *, goal_id: str) -> str | None: ...

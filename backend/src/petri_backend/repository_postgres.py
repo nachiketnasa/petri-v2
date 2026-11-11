@@ -15,16 +15,21 @@ from __future__ import annotations
 
 import psycopg
 
+import secrets
+
 from petri_backend.repository import (
     CheckIn,
+    Comment,
     Experiment,
     Goal,
+    Like,
     Milestone,
     OtherTask,
     PushSubscription,
     RecoveryCode,
     Repository,
     Retro,
+    Share,
     User,
 )
 
@@ -168,6 +173,24 @@ def _row_to_other_task(row: tuple) -> OtherTask:
         created_at=row[9],
         updated_at=row[10],
     )
+
+
+def _row_to_share(row: tuple) -> Share:
+    return Share(
+        id=str(row[0]),
+        experiment_id=str(row[1]) if row[1] else None,
+        goal_id=str(row[2]) if row[2] else None,
+        token=row[3],
+        created_at=row[4],
+    )
+
+
+def _row_to_comment(row: tuple) -> Comment:
+    return Comment(id=str(row[0]), share_id=str(row[1]), user_id=str(row[2]), body=row[3], created_at=row[4])
+
+
+def _row_to_like(row: tuple) -> Like:
+    return Like(id=str(row[0]), share_id=str(row[1]), user_id=str(row[2]), created_at=row[3])
 
 
 def _row_to_push_subscription(row: tuple) -> PushSubscription:
@@ -825,3 +848,124 @@ class PostgresRepository(Repository):
                 "delete from push_subscriptions where user_id = %s and endpoint = %s",
                 (user_id, endpoint),
             )
+
+    def create_share(self, *, experiment_id: str | None, goal_id: str | None) -> Share:
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                insert into shares (experiment_id, goal_id, token)
+                values (%s, %s, %s)
+                returning id, experiment_id, goal_id, token, created_at
+                """,
+                (experiment_id, goal_id, secrets.token_urlsafe(16)),
+            )
+            return _row_to_share(cur.fetchone())
+
+    def get_share_by_token(self, *, token: str) -> Share | None:
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute(
+                "select id, experiment_id, goal_id, token, created_at from shares where token = %s",
+                (token,),
+            )
+            row = cur.fetchone()
+            return _row_to_share(row) if row else None
+
+    def get_share_for_item(
+        self, *, experiment_id: str | None = None, goal_id: str | None = None
+    ) -> Share | None:
+        with self._connect() as conn, conn.cursor() as cur:
+            if experiment_id is not None:
+                cur.execute(
+                    "select id, experiment_id, goal_id, token, created_at from shares "
+                    "where experiment_id = %s",
+                    (experiment_id,),
+                )
+            else:
+                cur.execute(
+                    "select id, experiment_id, goal_id, token, created_at from shares "
+                    "where goal_id = %s",
+                    (goal_id,),
+                )
+            row = cur.fetchone()
+            return _row_to_share(row) if row else None
+
+    def delete_share(self, *, share_id: str) -> None:
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute("delete from shares where id = %s", (share_id,))  # cascades in schema.sql
+
+    def add_comment(self, *, share_id: str, user_id: str, body: str) -> Comment:
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                insert into comments (share_id, user_id, body)
+                values (%s, %s, %s)
+                returning id, share_id, user_id, body, created_at
+                """,
+                (share_id, user_id, body),
+            )
+            return _row_to_comment(cur.fetchone())
+
+    def list_comments(self, *, share_id: str) -> list[Comment]:
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute(
+                "select id, share_id, user_id, body, created_at from comments "
+                "where share_id = %s order by created_at",
+                (share_id,),
+            )
+            return [_row_to_comment(row) for row in cur.fetchall()]
+
+    def get_comment(self, *, comment_id: str) -> Comment | None:
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute(
+                "select id, share_id, user_id, body, created_at from comments where id = %s",
+                (comment_id,),
+            )
+            row = cur.fetchone()
+            return _row_to_comment(row) if row else None
+
+    def delete_comment(self, *, comment_id: str) -> None:
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute("delete from comments where id = %s", (comment_id,))
+
+    def add_like(self, *, share_id: str, user_id: str) -> Like:
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                insert into likes (share_id, user_id)
+                values (%s, %s)
+                on conflict (share_id, user_id) do update set share_id = excluded.share_id
+                returning id, share_id, user_id, created_at
+                """,
+                (share_id, user_id),
+            )
+            return _row_to_like(cur.fetchone())
+
+    def remove_like(self, *, share_id: str, user_id: str) -> None:
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute(
+                "delete from likes where share_id = %s and user_id = %s", (share_id, user_id)
+            )
+
+    def count_likes(self, *, share_id: str) -> int:
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute("select count(*) from likes where share_id = %s", (share_id,))
+            return cur.fetchone()[0]
+
+    def user_has_liked(self, *, share_id: str, user_id: str) -> bool:
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute(
+                "select 1 from likes where share_id = %s and user_id = %s", (share_id, user_id)
+            )
+            return cur.fetchone() is not None
+
+    def get_experiment_owner_id(self, *, experiment_id: str) -> str | None:
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute("select user_id from experiments where id = %s", (experiment_id,))
+            row = cur.fetchone()
+            return str(row[0]) if row else None
+
+    def get_goal_owner_id(self, *, goal_id: str) -> str | None:
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute("select user_id from goals where id = %s", (goal_id,))
+            row = cur.fetchone()
+            return str(row[0]) if row else None

@@ -7,20 +7,24 @@ service/route code built on top of this interface (see #4, #7).
 
 from __future__ import annotations
 
+import secrets
 import uuid
 from datetime import date, datetime
 from datetime import timezone as _tz
 
 from petri_backend.repository import (
     CheckIn,
+    Comment,
     Experiment,
     Goal,
+    Like,
     Milestone,
     OtherTask,
     PushSubscription,
     RecoveryCode,
     Repository,
     Retro,
+    Share,
     User,
 )
 
@@ -36,6 +40,9 @@ class InMemoryRepository(Repository):
         self._recovery_codes: dict[str, RecoveryCode] = {}
         self._other_tasks: dict[str, OtherTask] = {}
         self._push_subscriptions: dict[str, PushSubscription] = {}
+        self._shares: dict[str, Share] = {}
+        self._comments: dict[str, Comment] = {}
+        self._likes: dict[str, Like] = {}
 
     def create_user(
         self,
@@ -446,6 +453,88 @@ class InMemoryRepository(Repository):
             if s.user_id == user_id and s.endpoint == endpoint
         ]:
             del self._push_subscriptions[sub_id]
+
+
+    def create_share(self, *, experiment_id: str | None, goal_id: str | None) -> Share:
+        share = Share(
+            id=str(uuid.uuid4()),
+            experiment_id=experiment_id,
+            goal_id=goal_id,
+            token=secrets.token_urlsafe(16),
+            created_at=_utcnow(),
+        )
+        self._shares[share.id] = share
+        return share
+
+    def get_share_by_token(self, *, token: str) -> Share | None:
+        for s in self._shares.values():
+            if s.token == token:
+                return s
+        return None
+
+    def get_share_for_item(
+        self, *, experiment_id: str | None = None, goal_id: str | None = None
+    ) -> Share | None:
+        for s in self._shares.values():
+            if experiment_id is not None and s.experiment_id == experiment_id:
+                return s
+            if goal_id is not None and s.goal_id == goal_id:
+                return s
+        return None
+
+    def delete_share(self, *, share_id: str) -> None:
+        self._shares.pop(share_id, None)
+        for c_id in [c.id for c in self._comments.values() if c.share_id == share_id]:
+            del self._comments[c_id]
+        for l_id in [l.id for l in self._likes.values() if l.share_id == share_id]:
+            del self._likes[l_id]
+
+    def add_comment(self, *, share_id: str, user_id: str, body: str) -> Comment:
+        comment = Comment(
+            id=str(uuid.uuid4()), share_id=share_id, user_id=user_id, body=body, created_at=_utcnow()
+        )
+        self._comments[comment.id] = comment
+        return comment
+
+    def list_comments(self, *, share_id: str) -> list[Comment]:
+        return sorted(
+            (c for c in self._comments.values() if c.share_id == share_id),
+            key=lambda c: c.created_at,
+        )
+
+    def get_comment(self, *, comment_id: str) -> Comment | None:
+        return self._comments.get(comment_id)
+
+    def delete_comment(self, *, comment_id: str) -> None:
+        self._comments.pop(comment_id, None)
+
+    def add_like(self, *, share_id: str, user_id: str) -> Like:
+        for like in self._likes.values():
+            if like.share_id == share_id and like.user_id == user_id:
+                return like
+        like = Like(id=str(uuid.uuid4()), share_id=share_id, user_id=user_id, created_at=_utcnow())
+        self._likes[like.id] = like
+        return like
+
+    def remove_like(self, *, share_id: str, user_id: str) -> None:
+        for l_id in [
+            l.id for l in self._likes.values() if l.share_id == share_id and l.user_id == user_id
+        ]:
+            del self._likes[l_id]
+
+    def count_likes(self, *, share_id: str) -> int:
+        return sum(1 for l in self._likes.values() if l.share_id == share_id)
+
+    def user_has_liked(self, *, share_id: str, user_id: str) -> bool:
+        return any(l.share_id == share_id and l.user_id == user_id for l in self._likes.values())
+
+    def get_experiment_owner_id(self, *, experiment_id: str) -> str | None:
+        e = self._experiments.get(experiment_id)
+        return e.user_id if e else None
+
+    def get_goal_owner_id(self, *, goal_id: str) -> str | None:
+        g = self._goals.get(goal_id)
+        return g.user_id if g else None
 
 
 def _utcnow() -> datetime:

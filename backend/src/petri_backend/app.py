@@ -13,11 +13,13 @@ from pydantic import BaseModel
 from petri_backend.email import send_password_reset_email, send_verification_email
 from petri_backend.repository import (
     CheckIn,
+    Comment,
     Experiment,
     Goal,
     Milestone,
     OtherTask,
     Repository,
+    Share,
     User,
 )
 from petri_backend.repository_memory import InMemoryRepository
@@ -89,6 +91,16 @@ def get_current_user(
     if user is None:
         raise HTTPException(status_code=401, detail="Not authenticated.")
     return user
+
+
+def get_current_user_optional(
+    request: Request, repository: Repository = Depends(get_repository)
+) -> User | None:
+    # Viewing a shared page never requires sign-in; liking/commenting do.
+    try:
+        return get_current_user(request, repository=repository)
+    except HTTPException:
+        return None
 
 
 @app.exception_handler(RequestValidationError)
@@ -1435,3 +1447,217 @@ def unsubscribe_from_push(
     repository: Repository = Depends(get_repository),
 ) -> None:
     repository.delete_push_subscription(user_id=current_user.id, endpoint=body.endpoint)
+
+
+# ─── Sharing, likes, comments (#9) ─────────────────────────────────────────
+# Shared page shows only title/hypothesis/cadence/status/streak (experiment)
+# or title/milestone-progress (goal) -- never notes or retro content, per
+# specs.md's Sharing model.
+
+
+class ShareOut(BaseModel):
+    token: str
+
+
+class CommentOut(BaseModel):
+    id: str
+    user_id: str
+    display_name: str
+    body: str
+    created_at: datetime
+
+
+class CreateCommentRequest(BaseModel):
+    body: str
+
+
+class SharedPageOut(BaseModel):
+    kind: Literal["experiment", "goal"]
+    title: str
+    hypothesis: str | None = None
+    cadence_type: str | None = None
+    status: str
+    streak: int | None = None
+    milestone_index: int | None = None  # 1-based, current active milestone
+    milestone_count: int | None = None
+    like_count: int
+    viewer_has_liked: bool
+    comments: list[CommentOut]
+
+
+def _owner_id_of_share(repository: Repository, share: Share) -> str | None:
+    if share.experiment_id:
+        return repository.get_experiment_owner_id(experiment_id=share.experiment_id)
+    return repository.get_goal_owner_id(goal_id=share.goal_id)
+
+
+def _comment_out(repository: Repository, comment: Comment) -> CommentOut:
+    user = repository.get_user_by_id(user_id=comment.user_id)
+    return CommentOut(
+        id=comment.id,
+        user_id=comment.user_id,
+        display_name=user.display_name if user else "Unknown",
+        body=comment.body,
+        created_at=comment.created_at,
+    )
+
+
+@app.post("/experiments/{id}/share", response_model=ShareOut)
+def share_experiment(
+    id: str,
+    current_user: User = Depends(get_current_user),
+    repository: Repository = Depends(get_repository),
+) -> ShareOut:
+    if repository.get_experiment(experiment_id=id, user_id=current_user.id) is None:
+        raise HTTPException(status_code=404, detail="Experiment not found.")
+    existing = repository.get_share_for_item(experiment_id=id)
+    share = existing or repository.create_share(experiment_id=id, goal_id=None)
+    return ShareOut(token=share.token)
+
+
+@app.delete("/experiments/{id}/share", status_code=204)
+def unshare_experiment(
+    id: str,
+    current_user: User = Depends(get_current_user),
+    repository: Repository = Depends(get_repository),
+) -> None:
+    if repository.get_experiment(experiment_id=id, user_id=current_user.id) is None:
+        raise HTTPException(status_code=404, detail="Experiment not found.")
+    share = repository.get_share_for_item(experiment_id=id)
+    if share is not None:
+        repository.delete_share(share_id=share.id)  # also deletes its comments/likes
+
+
+@app.post("/goals/{id}/share", response_model=ShareOut)
+def share_goal(
+    id: str,
+    current_user: User = Depends(get_current_user),
+    repository: Repository = Depends(get_repository),
+) -> ShareOut:
+    if repository.get_goal(goal_id=id, user_id=current_user.id) is None:
+        raise HTTPException(status_code=404, detail="Goal not found.")
+    existing = repository.get_share_for_item(goal_id=id)
+    share = existing or repository.create_share(experiment_id=None, goal_id=id)
+    return ShareOut(token=share.token)
+
+
+@app.delete("/goals/{id}/share", status_code=204)
+def unshare_goal(
+    id: str,
+    current_user: User = Depends(get_current_user),
+    repository: Repository = Depends(get_repository),
+) -> None:
+    if repository.get_goal(goal_id=id, user_id=current_user.id) is None:
+        raise HTTPException(status_code=404, detail="Goal not found.")
+    share = repository.get_share_for_item(goal_id=id)
+    if share is not None:
+        repository.delete_share(share_id=share.id)
+
+
+@app.get("/shared/{token}", response_model=SharedPageOut)
+def get_shared_page(
+    token: str,
+    viewer: User | None = Depends(get_current_user_optional),
+    repository: Repository = Depends(get_repository),
+) -> SharedPageOut:
+    share = repository.get_share_by_token(token=token)
+    if share is None:
+        raise HTTPException(status_code=404, detail="Shared page not found.")
+    comments = [_comment_out(repository, c) for c in repository.list_comments(share_id=share.id)]
+    like_count = repository.count_likes(share_id=share.id)
+    viewer_has_liked = (
+        repository.user_has_liked(share_id=share.id, user_id=viewer.id) if viewer else False
+    )
+
+    owner_id = _owner_id_of_share(repository, share)
+    owner = repository.get_user_by_id(user_id=owner_id) if owner_id else None
+
+    if share.experiment_id:
+        experiment = repository.get_experiment(experiment_id=share.experiment_id, user_id=owner.id)
+        check_ins = repository.list_check_ins(experiment_id=experiment.id, user_id=owner.id)
+        streak = _compute_streak(experiment, check_ins, owner.timezone)
+        return SharedPageOut(
+            kind="experiment",
+            title=experiment.title,
+            hypothesis=experiment.hypothesis,
+            cadence_type=experiment.cadence_type,
+            status=experiment.status,
+            streak=streak,
+            like_count=like_count,
+            viewer_has_liked=viewer_has_liked,
+            comments=comments,
+        )
+    else:
+        goal = repository.get_goal(goal_id=share.goal_id, user_id=owner.id)
+        milestones = repository.list_milestones(goal_id=goal.id, user_id=owner.id)
+        active_index = next(
+            (i for i, m in enumerate(milestones) if m.status == "active"),
+            next((i for i, m in enumerate(milestones) if m.status != "backlog"), 0),
+        )
+        return SharedPageOut(
+            kind="goal",
+            title=goal.title,
+            status=goal.status,
+            milestone_index=active_index + 1 if milestones else None,
+            milestone_count=len(milestones),
+            like_count=like_count,
+            viewer_has_liked=viewer_has_liked,
+            comments=comments,
+        )
+
+
+@app.post("/shared/{token}/comments", status_code=201, response_model=CommentOut)
+def add_comment_to_shared_page(
+    token: str,
+    body: CreateCommentRequest,
+    current_user: User = Depends(get_current_user),
+    repository: Repository = Depends(get_repository),
+) -> CommentOut:
+    share = repository.get_share_by_token(token=token)
+    if share is None:
+        raise HTTPException(status_code=404, detail="Shared page not found.")
+    comment = repository.add_comment(share_id=share.id, user_id=current_user.id, body=body.body)
+    return _comment_out(repository, comment)
+
+
+@app.delete("/shared/{token}/comments/{comment_id}", status_code=204)
+def delete_shared_comment(
+    token: str,
+    comment_id: str,
+    current_user: User = Depends(get_current_user),
+    repository: Repository = Depends(get_repository),
+) -> None:
+    share = repository.get_share_by_token(token=token)
+    if share is None:
+        raise HTTPException(status_code=404, detail="Shared page not found.")
+    comment = repository.get_comment(comment_id=comment_id)
+    if comment is None or comment.share_id != share.id:
+        raise HTTPException(status_code=404, detail="Comment not found.")
+    owner_id = _owner_id_of_share(repository, share)
+    if comment.user_id != current_user.id and current_user.id != owner_id:
+        raise HTTPException(status_code=403, detail="Only the comment's author or the page's owner can delete it.")
+    repository.delete_comment(comment_id=comment_id)
+
+
+@app.post("/shared/{token}/like", status_code=204)
+def like_shared_page(
+    token: str,
+    current_user: User = Depends(get_current_user),
+    repository: Repository = Depends(get_repository),
+) -> None:
+    share = repository.get_share_by_token(token=token)
+    if share is None:
+        raise HTTPException(status_code=404, detail="Shared page not found.")
+    repository.add_like(share_id=share.id, user_id=current_user.id)
+
+
+@app.delete("/shared/{token}/like", status_code=204)
+def unlike_shared_page(
+    token: str,
+    current_user: User = Depends(get_current_user),
+    repository: Repository = Depends(get_repository),
+) -> None:
+    share = repository.get_share_by_token(token=token)
+    if share is None:
+        raise HTTPException(status_code=404, detail="Shared page not found.")
+    repository.remove_like(share_id=share.id, user_id=current_user.id)

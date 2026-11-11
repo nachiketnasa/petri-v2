@@ -51,6 +51,20 @@ def test_implements_exactly_the_interface_methods():
         "add_push_subscription",
         "list_push_subscriptions",
         "delete_push_subscription",
+        "create_share",
+        "get_share_by_token",
+        "get_share_for_item",
+        "delete_share",
+        "add_comment",
+        "list_comments",
+        "get_comment",
+        "delete_comment",
+        "add_like",
+        "remove_like",
+        "count_likes",
+        "user_has_liked",
+        "get_experiment_owner_id",
+        "get_goal_owner_id",
     }
 
 
