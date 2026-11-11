@@ -4,7 +4,7 @@ from typing import Literal
 from zoneinfo import ZoneInfo
 
 import pyotp
-from fastapi import Depends, FastAPI, HTTPException, Request, Response
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -16,12 +16,14 @@ from petri_backend.repository import (
     Experiment,
     Goal,
     Milestone,
+    OtherTask,
     Repository,
     User,
 )
 from petri_backend.repository_memory import InMemoryRepository
 from petri_backend.repository_postgres import PostgresRepository
 from petri_backend.totp_crypto import decrypt_totp_secret, encrypt_totp_secret
+from petri_backend.vapid import vapid_public_key_b64url
 from petri_backend.security import (
     hash_password,
     new_reset_token,
@@ -356,6 +358,7 @@ class UserOut(BaseModel):
     created_at: datetime
     theme: str
     sound_effects_enabled: bool
+    other_tasks_enabled: bool
     default_landing: str
     email_verified: bool
     totp_enabled: bool
@@ -370,6 +373,7 @@ class UserOut(BaseModel):
             created_at=user.created_at,
             theme=user.theme,
             sound_effects_enabled=user.sound_effects_enabled,
+            other_tasks_enabled=user.other_tasks_enabled,
             default_landing=user.default_landing,
             email_verified=user.email_verified_at is not None,
             totp_enabled=user.totp_enabled,
@@ -392,6 +396,7 @@ class Confirm2FAResponse(BaseModel):
 class UpdateUserPreferencesRequest(BaseModel):
     theme: Literal["petri-light", "petri-dark", "solarized-light", "solarized-dark"] | None = None
     sound_effects_enabled: bool | None = None
+    other_tasks_enabled: bool | None = None
     default_landing: Literal["greeting", "dashboard"] | None = None
 
 
@@ -1137,3 +1142,296 @@ def archive_milestone(
             repository.update_goal(goal_id=goal.id, user_id=current_user.id, status="reflect")
 
     return MilestoneOut.from_milestone(updated)
+
+
+# ─── Other tasks (#8) ──────────────────────────────────────────────────────
+# Off by default (users.other_tasks_enabled); frontend's call to gate the
+# feature behind that preference, not enforced server-side -- a user who
+# flips it off still owns their existing rows, same as any other setting.
+
+DAILY_LOAD_THRESHOLD = 8
+
+
+class CreateOtherTaskRequest(BaseModel):
+    title: str
+    schedule_type: Literal["one_time", "repeating"]
+    one_time_date: date | None = None
+    repeat_days_of_week: list[int] | None = None  # 0=Mon .. 6=Sun
+    repeat_interval_days: int | None = None
+    repeat_end_date: date | None = None
+    push_reminder_enabled: bool = True
+
+
+class UpdateOtherTaskRequest(BaseModel):
+    title: str | None = None
+    schedule_type: Literal["one_time", "repeating"] | None = None
+    one_time_date: date | None = None
+    repeat_days_of_week: list[int] | None = None
+    repeat_interval_days: int | None = None
+    repeat_end_date: date | None = None
+    push_reminder_enabled: bool | None = None
+
+
+class OtherTaskOut(BaseModel):
+    id: str
+    user_id: str
+    title: str
+    schedule_type: str
+    one_time_date: date | None
+    repeat_days_of_week: list[int] | None
+    repeat_interval_days: int | None
+    repeat_end_date: date | None
+    push_reminder_enabled: bool
+    created_at: datetime
+    updated_at: datetime
+
+    @classmethod
+    def from_other_task(cls, t: OtherTask) -> "OtherTaskOut":
+        return cls(
+            id=t.id,
+            user_id=t.user_id,
+            title=t.title,
+            schedule_type=t.schedule_type,
+            one_time_date=t.one_time_date,
+            repeat_days_of_week=t.repeat_days_of_week,
+            repeat_interval_days=t.repeat_interval_days,
+            repeat_end_date=t.repeat_end_date,
+            push_reminder_enabled=t.push_reminder_enabled,
+            created_at=t.created_at,
+            updated_at=t.updated_at,
+        )
+
+
+def _validate_other_task_schedule(
+    schedule_type: str,
+    one_time_date: date | None,
+    repeat_days_of_week: list[int] | None,
+    repeat_interval_days: int | None,
+    repeat_end_date: date | None,
+) -> None:
+    if schedule_type == "one_time":
+        if one_time_date is None:
+            raise HTTPException(
+                status_code=400, detail="one_time_date is required when schedule_type is 'one_time'."
+            )
+    else:
+        if repeat_end_date is None:
+            raise HTTPException(
+                status_code=400,
+                detail="repeat_end_date is required when schedule_type is 'repeating'.",
+            )
+        if not repeat_days_of_week and not repeat_interval_days:
+            raise HTTPException(
+                status_code=400,
+                detail="Provide repeat_days_of_week or repeat_interval_days for a repeating task.",
+            )
+        if repeat_days_of_week and any(d < 0 or d > 6 for d in repeat_days_of_week):
+            raise HTTPException(status_code=400, detail="repeat_days_of_week entries must be 0-6.")
+
+
+@app.post("/other-tasks", status_code=201, response_model=OtherTaskOut)
+def create_other_task(
+    body: CreateOtherTaskRequest,
+    current_user: User = Depends(get_current_user),
+    repository: Repository = Depends(get_repository),
+) -> OtherTaskOut:
+    _validate_other_task_schedule(
+        body.schedule_type,
+        body.one_time_date,
+        body.repeat_days_of_week,
+        body.repeat_interval_days,
+        body.repeat_end_date,
+    )
+    task = repository.create_other_task(
+        user_id=current_user.id,
+        title=body.title,
+        schedule_type=body.schedule_type,
+        one_time_date=body.one_time_date,
+        repeat_days_of_week=body.repeat_days_of_week,
+        repeat_interval_days=body.repeat_interval_days,
+        repeat_end_date=body.repeat_end_date,
+        push_reminder_enabled=body.push_reminder_enabled,
+    )
+    return OtherTaskOut.from_other_task(task)
+
+
+@app.get("/other-tasks", response_model=list[OtherTaskOut])
+def list_other_tasks(
+    current_user: User = Depends(get_current_user),
+    repository: Repository = Depends(get_repository),
+) -> list[OtherTaskOut]:
+    return [OtherTaskOut.from_other_task(t) for t in repository.list_other_tasks(user_id=current_user.id)]
+
+
+@app.get("/other-tasks/{id}", response_model=OtherTaskOut)
+def get_other_task(
+    id: str,
+    current_user: User = Depends(get_current_user),
+    repository: Repository = Depends(get_repository),
+) -> OtherTaskOut:
+    task = repository.get_other_task(other_task_id=id, user_id=current_user.id)
+    if task is None:
+        raise HTTPException(status_code=404, detail="Other task not found.")
+    return OtherTaskOut.from_other_task(task)
+
+
+@app.patch("/other-tasks/{id}", response_model=OtherTaskOut)
+def update_other_task(
+    id: str,
+    body: UpdateOtherTaskRequest,
+    current_user: User = Depends(get_current_user),
+    repository: Repository = Depends(get_repository),
+) -> OtherTaskOut:
+    existing = repository.get_other_task(other_task_id=id, user_id=current_user.id)
+    if existing is None:
+        raise HTTPException(status_code=404, detail="Other task not found.")
+    fields = body.model_dump(exclude_unset=True)
+    merged = {
+        "schedule_type": existing.schedule_type,
+        "one_time_date": existing.one_time_date,
+        "repeat_days_of_week": existing.repeat_days_of_week,
+        "repeat_interval_days": existing.repeat_interval_days,
+        "repeat_end_date": existing.repeat_end_date,
+        **fields,
+    }
+    _validate_other_task_schedule(
+        merged["schedule_type"],
+        merged["one_time_date"],
+        merged["repeat_days_of_week"],
+        merged["repeat_interval_days"],
+        merged["repeat_end_date"],
+    )
+    updated = repository.update_other_task(other_task_id=id, user_id=current_user.id, **fields)
+    return OtherTaskOut.from_other_task(updated)
+
+
+@app.delete("/other-tasks/{id}", status_code=204)
+def delete_other_task(
+    id: str,
+    current_user: User = Depends(get_current_user),
+    repository: Repository = Depends(get_repository),
+) -> None:
+    existing = repository.get_other_task(other_task_id=id, user_id=current_user.id)
+    if existing is None:
+        raise HTTPException(status_code=404, detail="Other task not found.")
+    repository.delete_other_task(other_task_id=id, user_id=current_user.id)
+
+
+def _other_task_due_on(task: OtherTask, target: date) -> bool:
+    if task.schedule_type == "one_time":
+        return task.one_time_date == target
+    if task.repeat_end_date is not None and target > task.repeat_end_date:
+        return False
+    if task.repeat_days_of_week:
+        return target.weekday() in task.repeat_days_of_week
+    if task.repeat_interval_days:
+        start = task.created_at.date()
+        diff = (target - start).days
+        return diff >= 0 and diff % task.repeat_interval_days == 0
+    return False
+
+
+class DailyLoadOut(BaseModel):
+    date: date
+    count: int
+    over_threshold: bool
+    breakdown: dict[str, int]
+
+
+@app.get("/daily-load", response_model=DailyLoadOut)
+def get_daily_load(
+    date: date | None = Query(None),
+    current_user: User = Depends(get_current_user),
+    repository: Repository = Depends(get_repository),
+) -> DailyLoadOut:
+    # specs.md -> "Other tasks": other tasks + experiment check-ins + the
+    # active goal's current milestone cadence, combined, over 8 -> flagged.
+    # Informational only -- never blocks (enforced by not blocking anything
+    # here; this is a pure read).
+    target = date or datetime.now(timezone.utc).date()
+
+    other_tasks_count = sum(
+        1 for t in repository.list_other_tasks(user_id=current_user.id) if _other_task_due_on(t, target)
+    )
+
+    experiments = repository.list_experiments(user_id=current_user.id, status="active")
+    experiments_count = sum(
+        1
+        for e in experiments
+        if e.start_date <= target and _cadence_interval_days(e)
+        and (target - e.start_date).days % _cadence_interval_days(e) == 0
+    )
+
+    milestones_count = 0
+    for goal in repository.list_goals(user_id=current_user.id, status="active"):
+        for milestone in repository.list_milestones(goal_id=goal.id, user_id=current_user.id):
+            if milestone.status != "active":
+                continue
+            interval = (
+                milestone.cadence_days
+                if milestone.cadence_type == "custom"
+                else {"daily": 1, "weekly": 7}.get(milestone.cadence_type)
+            )
+            # Milestones have no start_date of their own (schema.sql) -- use
+            # when it became active (updated_at) as the reference point,
+            # same reasoning as check_in_due/streak being skipped for them,
+            # just applied here since a daily-load count needs *some* answer.
+            reference = milestone.updated_at.date()
+            if interval and target >= reference and (target - reference).days % interval == 0:
+                milestones_count += 1
+
+    total = other_tasks_count + experiments_count + milestones_count
+    return DailyLoadOut(
+        date=target,
+        count=total,
+        over_threshold=total > DAILY_LOAD_THRESHOLD,
+        breakdown={
+            "other_tasks": other_tasks_count,
+            "experiment_check_ins": experiments_count,
+            "milestone_check_ins": milestones_count,
+        },
+    )
+
+
+# ─── Web Push subscriptions (#8) ───────────────────────────────────────────
+# Subscription management only -- see vapid.py's module docstring for why
+# actually *sending* a push is a separate, not-yet-built piece of work.
+
+
+class PushSubscribeRequest(BaseModel):
+    endpoint: str
+    p256dh_key: str
+    auth_key: str
+
+
+class PushUnsubscribeRequest(BaseModel):
+    endpoint: str
+
+
+@app.get("/push/vapid-public-key")
+def get_vapid_public_key() -> dict[str, str]:
+    return {"public_key": vapid_public_key_b64url()}
+
+
+@app.post("/push/subscribe", status_code=201)
+def subscribe_to_push(
+    body: PushSubscribeRequest,
+    current_user: User = Depends(get_current_user),
+    repository: Repository = Depends(get_repository),
+) -> dict[str, str]:
+    repository.add_push_subscription(
+        user_id=current_user.id,
+        endpoint=body.endpoint,
+        p256dh_key=body.p256dh_key,
+        auth_key=body.auth_key,
+    )
+    return {"status": "ok"}
+
+
+@app.post("/push/unsubscribe", status_code=204)
+def unsubscribe_from_push(
+    body: PushUnsubscribeRequest,
+    current_user: User = Depends(get_current_user),
+    repository: Repository = Depends(get_repository),
+) -> None:
+    repository.delete_push_subscription(user_id=current_user.id, endpoint=body.endpoint)

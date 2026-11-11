@@ -20,6 +20,8 @@ from petri_backend.repository import (
     Experiment,
     Goal,
     Milestone,
+    OtherTask,
+    PushSubscription,
     RecoveryCode,
     Repository,
     Retro,
@@ -50,6 +52,7 @@ _EXPERIMENT_UPDATABLE_FIELDS = {
 _USER_UPDATABLE_FIELDS = {
     "theme",
     "sound_effects_enabled",
+    "other_tasks_enabled",
     "default_landing",
     "email_verified_at",
     "totp_secret",
@@ -59,9 +62,25 @@ _USER_UPDATABLE_FIELDS = {
 
 _USER_COLUMNS = (
     "id, email, password_hash, display_name, timezone, created_at, "
-    "theme, sound_effects_enabled, default_landing, email_verified_at, "
-    "totp_secret, totp_enabled"
+    "theme, sound_effects_enabled, other_tasks_enabled, default_landing, "
+    "email_verified_at, totp_secret, totp_enabled"
 )
+
+_OTHER_TASK_COLUMNS = (
+    "id, user_id, title, schedule_type, one_time_date, repeat_days_of_week, "
+    "repeat_interval_days, repeat_end_date, push_reminder_enabled, created_at, updated_at"
+)
+
+_OTHER_TASK_UPDATABLE_FIELDS = {
+    "title",
+    "schedule_type",
+    "one_time_date",
+    "repeat_days_of_week",
+    "repeat_interval_days",
+    "repeat_end_date",
+    "push_reminder_enabled",
+    "updated_at",
+}
 
 _EXPERIMENT_COLUMNS = (
     "id, user_id, title, hypothesis, cadence_type, cadence_days, "
@@ -127,10 +146,34 @@ def _row_to_user(row: tuple) -> User:
         created_at=row[5],
         theme=row[6],
         sound_effects_enabled=row[7],
-        default_landing=row[8],
-        email_verified_at=row[9],
-        totp_secret=row[10],
-        totp_enabled=row[11],
+        other_tasks_enabled=row[8],
+        default_landing=row[9],
+        email_verified_at=row[10],
+        totp_secret=row[11],
+        totp_enabled=row[12],
+    )
+
+
+def _row_to_other_task(row: tuple) -> OtherTask:
+    return OtherTask(
+        id=str(row[0]),
+        user_id=str(row[1]),
+        title=row[2],
+        schedule_type=row[3],
+        one_time_date=row[4],
+        repeat_days_of_week=list(row[5]) if row[5] is not None else None,
+        repeat_interval_days=row[6],
+        repeat_end_date=row[7],
+        push_reminder_enabled=row[8],
+        created_at=row[9],
+        updated_at=row[10],
+    )
+
+
+def _row_to_push_subscription(row: tuple) -> PushSubscription:
+    return PushSubscription(
+        id=str(row[0]), user_id=str(row[1]), endpoint=row[2], p256dh_key=row[3],
+        auth_key=row[4], created_at=row[5],
     )
 
 
@@ -672,3 +715,113 @@ class PostgresRepository(Repository):
                 (milestone_id, what_worked, what_didnt, decision),
             )
             return _row_to_retro(cur.fetchone())
+
+    def create_other_task(
+        self,
+        *,
+        user_id: str,
+        title: str,
+        schedule_type: str,
+        one_time_date,
+        repeat_days_of_week: list[int] | None,
+        repeat_interval_days: int | None,
+        repeat_end_date,
+        push_reminder_enabled: bool,
+    ) -> OtherTask:
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute(
+                f"""
+                insert into other_tasks
+                    (user_id, title, schedule_type, one_time_date, repeat_days_of_week,
+                     repeat_interval_days, repeat_end_date, push_reminder_enabled)
+                values (%s, %s, %s, %s, %s, %s, %s, %s)
+                returning {_OTHER_TASK_COLUMNS}
+                """,
+                (
+                    user_id,
+                    title,
+                    schedule_type,
+                    one_time_date,
+                    repeat_days_of_week,
+                    repeat_interval_days,
+                    repeat_end_date,
+                    push_reminder_enabled,
+                ),
+            )
+            return _row_to_other_task(cur.fetchone())
+
+    def list_other_tasks(self, *, user_id: str) -> list[OtherTask]:
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute(
+                f"select {_OTHER_TASK_COLUMNS} from other_tasks where user_id = %s", (user_id,)
+            )
+            return [_row_to_other_task(row) for row in cur.fetchall()]
+
+    def get_other_task(self, *, other_task_id: str, user_id: str) -> OtherTask | None:
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute(
+                f"select {_OTHER_TASK_COLUMNS} from other_tasks where id = %s and user_id = %s",
+                (other_task_id, user_id),
+            )
+            row = cur.fetchone()
+            return _row_to_other_task(row) if row else None
+
+    def update_other_task(self, *, other_task_id: str, user_id: str, **fields) -> OtherTask | None:
+        if self.get_other_task(other_task_id=other_task_id, user_id=user_id) is None:
+            return None
+        if not fields:
+            return self.get_other_task(other_task_id=other_task_id, user_id=user_id)
+        unknown = set(fields) - _OTHER_TASK_UPDATABLE_FIELDS
+        if unknown:
+            raise ValueError(f"unknown other_task field(s): {sorted(unknown)}")
+        set_clause = ", ".join(f"{key} = %s" for key in fields)
+        values = list(fields.values()) + [other_task_id, user_id]
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute(
+                f"""
+                update other_tasks set {set_clause}
+                where id = %s and user_id = %s
+                returning {_OTHER_TASK_COLUMNS}
+                """,
+                values,
+            )
+            row = cur.fetchone()
+            return _row_to_other_task(row) if row else None
+
+    def delete_other_task(self, *, other_task_id: str, user_id: str) -> None:
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute(
+                "delete from other_tasks where id = %s and user_id = %s", (other_task_id, user_id)
+            )
+
+    def add_push_subscription(
+        self, *, user_id: str, endpoint: str, p256dh_key: str, auth_key: str
+    ) -> PushSubscription:
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                insert into push_subscriptions (user_id, endpoint, p256dh_key, auth_key)
+                values (%s, %s, %s, %s)
+                on conflict (endpoint) do update set p256dh_key = excluded.p256dh_key,
+                    auth_key = excluded.auth_key
+                returning id, user_id, endpoint, p256dh_key, auth_key, created_at
+                """,
+                (user_id, endpoint, p256dh_key, auth_key),
+            )
+            return _row_to_push_subscription(cur.fetchone())
+
+    def list_push_subscriptions(self, *, user_id: str) -> list[PushSubscription]:
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute(
+                "select id, user_id, endpoint, p256dh_key, auth_key, created_at "
+                "from push_subscriptions where user_id = %s",
+                (user_id,),
+            )
+            return [_row_to_push_subscription(row) for row in cur.fetchall()]
+
+    def delete_push_subscription(self, *, user_id: str, endpoint: str) -> None:
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute(
+                "delete from push_subscriptions where user_id = %s and endpoint = %s",
+                (user_id, endpoint),
+            )

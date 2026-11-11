@@ -23,6 +23,7 @@ class User:
     created_at: datetime
     theme: str = "petri-light"
     sound_effects_enabled: bool = True
+    other_tasks_enabled: bool = False
     default_landing: str = "greeting"
     email_verified_at: datetime | None = None
     totp_secret: str | None = None  # ciphertext (totp_crypto.py), never plaintext
@@ -34,6 +35,31 @@ class RecoveryCode:
     id: str
     user_id: str
     code_hash: str
+    created_at: datetime
+
+
+@dataclass
+class OtherTask:
+    id: str
+    user_id: str
+    title: str
+    schedule_type: str  # 'one_time' | 'repeating'
+    one_time_date: date | None
+    repeat_days_of_week: list[int] | None  # 0=Mon .. 6=Sun
+    repeat_interval_days: int | None
+    repeat_end_date: date | None
+    push_reminder_enabled: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+@dataclass
+class PushSubscription:
+    id: str
+    user_id: str
+    endpoint: str
+    p256dh_key: str
+    auth_key: str
     created_at: datetime
 
 
@@ -272,3 +298,40 @@ class Repository(ABC):
     def add_milestone_retro(
         self, *, milestone_id: str, user_id: str, what_worked: str, what_didnt: str, decision: str
     ) -> Retro: ...
+
+    @abstractmethod
+    def create_other_task(
+        self,
+        *,
+        user_id: str,
+        title: str,
+        schedule_type: str,
+        one_time_date: date | None,
+        repeat_days_of_week: list[int] | None,
+        repeat_interval_days: int | None,
+        repeat_end_date: date | None,
+        push_reminder_enabled: bool,
+    ) -> OtherTask: ...
+
+    @abstractmethod
+    def list_other_tasks(self, *, user_id: str) -> list[OtherTask]: ...
+
+    @abstractmethod
+    def get_other_task(self, *, other_task_id: str, user_id: str) -> OtherTask | None: ...
+
+    @abstractmethod
+    def update_other_task(self, *, other_task_id: str, user_id: str, **fields) -> OtherTask | None: ...
+
+    @abstractmethod
+    def delete_other_task(self, *, other_task_id: str, user_id: str) -> None: ...
+
+    @abstractmethod
+    def add_push_subscription(
+        self, *, user_id: str, endpoint: str, p256dh_key: str, auth_key: str
+    ) -> PushSubscription: ...
+
+    @abstractmethod
+    def list_push_subscriptions(self, *, user_id: str) -> list[PushSubscription]: ...
+
+    @abstractmethod
+    def delete_push_subscription(self, *, user_id: str, endpoint: str) -> None: ...

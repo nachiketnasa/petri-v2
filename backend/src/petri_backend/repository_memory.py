@@ -16,6 +16,8 @@ from petri_backend.repository import (
     Experiment,
     Goal,
     Milestone,
+    OtherTask,
+    PushSubscription,
     RecoveryCode,
     Repository,
     Retro,
@@ -32,6 +34,8 @@ class InMemoryRepository(Repository):
         self._goals: dict[str, Goal] = {}
         self._milestones: dict[str, Milestone] = {}
         self._recovery_codes: dict[str, RecoveryCode] = {}
+        self._other_tasks: dict[str, OtherTask] = {}
+        self._push_subscriptions: dict[str, PushSubscription] = {}
 
     def create_user(
         self,
@@ -365,6 +369,83 @@ class InMemoryRepository(Repository):
         )
         self._retros[retro.id] = retro
         return retro
+
+    def create_other_task(
+        self,
+        *,
+        user_id: str,
+        title: str,
+        schedule_type: str,
+        one_time_date: date | None,
+        repeat_days_of_week: list[int] | None,
+        repeat_interval_days: int | None,
+        repeat_end_date: date | None,
+        push_reminder_enabled: bool,
+    ) -> OtherTask:
+        now = _utcnow()
+        task = OtherTask(
+            id=str(uuid.uuid4()),
+            user_id=user_id,
+            title=title,
+            schedule_type=schedule_type,
+            one_time_date=one_time_date,
+            repeat_days_of_week=repeat_days_of_week,
+            repeat_interval_days=repeat_interval_days,
+            repeat_end_date=repeat_end_date,
+            push_reminder_enabled=push_reminder_enabled,
+            created_at=now,
+            updated_at=now,
+        )
+        self._other_tasks[task.id] = task
+        return task
+
+    def list_other_tasks(self, *, user_id: str) -> list[OtherTask]:
+        return [t for t in self._other_tasks.values() if t.user_id == user_id]
+
+    def get_other_task(self, *, other_task_id: str, user_id: str) -> OtherTask | None:
+        task = self._other_tasks.get(other_task_id)
+        if task is None or task.user_id != user_id:
+            return None
+        return task
+
+    def update_other_task(self, *, other_task_id: str, user_id: str, **fields) -> OtherTask | None:
+        task = self.get_other_task(other_task_id=other_task_id, user_id=user_id)
+        if task is None:
+            return None
+        for key, value in fields.items():
+            setattr(task, key, value)
+        task.updated_at = _utcnow()
+        return task
+
+    def delete_other_task(self, *, other_task_id: str, user_id: str) -> None:
+        task = self.get_other_task(other_task_id=other_task_id, user_id=user_id)
+        if task is not None:
+            del self._other_tasks[task.id]
+
+    def add_push_subscription(
+        self, *, user_id: str, endpoint: str, p256dh_key: str, auth_key: str
+    ) -> PushSubscription:
+        sub = PushSubscription(
+            id=str(uuid.uuid4()),
+            user_id=user_id,
+            endpoint=endpoint,
+            p256dh_key=p256dh_key,
+            auth_key=auth_key,
+            created_at=_utcnow(),
+        )
+        self._push_subscriptions[sub.id] = sub
+        return sub
+
+    def list_push_subscriptions(self, *, user_id: str) -> list[PushSubscription]:
+        return [s for s in self._push_subscriptions.values() if s.user_id == user_id]
+
+    def delete_push_subscription(self, *, user_id: str, endpoint: str) -> None:
+        for sub_id in [
+            s.id
+            for s in self._push_subscriptions.values()
+            if s.user_id == user_id and s.endpoint == endpoint
+        ]:
+            del self._push_subscriptions[sub_id]
 
 
 def _utcnow() -> datetime:

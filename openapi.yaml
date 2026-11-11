@@ -816,6 +816,238 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /other-tasks:
+    post:
+      summary: Create an Other task (#8, off by default via users.other_tasks_enabled)
+      operationId: createOtherTask
+      tags: [other-tasks]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOtherTaskRequest"
+      responses:
+        "201":
+          description: Task created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OtherTask"
+        "400":
+          description: Missing/invalid field for the chosen schedule_type.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    get:
+      summary: List Other tasks for the current user
+      operationId: listOtherTasks
+      tags: [other-tasks]
+      responses:
+        "200":
+          description: List of tasks.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OtherTask"
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /other-tasks/{id}:
+    get:
+      summary: Get a single Other task
+      operationId: getOtherTask
+      tags: [other-tasks]
+      parameters:
+        - $ref: "#/components/parameters/OtherTaskId"
+      responses:
+        "200":
+          description: Task found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OtherTask"
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Task not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    patch:
+      summary: Edit an Other task (editable at any time, per #8)
+      operationId: updateOtherTask
+      tags: [other-tasks]
+      parameters:
+        - $ref: "#/components/parameters/OtherTaskId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateOtherTaskRequest"
+      responses:
+        "200":
+          description: Task updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OtherTask"
+        "400":
+          description: The merged (existing + patched) schedule is invalid.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Task not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      summary: Remove an Other task (removable at any time, per #8)
+      operationId: deleteOtherTask
+      tags: [other-tasks]
+      parameters:
+        - $ref: "#/components/parameters/OtherTaskId"
+      responses:
+        "204":
+          description: Task deleted.
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Task not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /daily-load:
+    get:
+      summary: >-
+        The combined count of what's due on a given day (Other tasks +
+        experiment check-ins + active milestone cadences) and whether it
+        flags the day (#8, informational only, never blocks anything).
+      operationId: getDailyLoad
+      tags: [other-tasks]
+      parameters:
+        - name: date
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+          description: Defaults to today.
+      responses:
+        "200":
+          description: Daily load.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DailyLoad"
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /push/vapid-public-key:
+    get:
+      summary: The server's VAPID public key, for PushManager.subscribe
+      operationId: getVapidPublicKey
+      tags: [other-tasks]
+      security: []
+      responses:
+        "200":
+          description: VAPID public key.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  public_key:
+                    type: string
+
+  /push/subscribe:
+    post:
+      summary: Register a Web Push subscription for the current user
+      operationId: subscribeToPush
+      tags: [other-tasks]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PushSubscribeRequest"
+      responses:
+        "201":
+          description: Subscribed.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /push/unsubscribe:
+    post:
+      summary: Remove a Web Push subscription
+      operationId: unsubscribeFromPush
+      tags: [other-tasks]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PushUnsubscribeRequest"
+      responses:
+        "204":
+          description: Unsubscribed.
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
 components:
   securitySchemes:
     sessionCookie:
@@ -845,6 +1077,13 @@ components:
       schema:
         type: string
 
+    OtherTaskId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+
   schemas:
     Error:
       type: object
@@ -867,6 +1106,7 @@ components:
           created_at,
           theme,
           sound_effects_enabled,
+          other_tasks_enabled,
           default_landing,
           email_verified,
           totp_enabled,
@@ -889,6 +1129,9 @@ components:
           enum: [petri-light, petri-dark, solarized-light, solarized-dark]
         sound_effects_enabled:
           type: boolean
+        other_tasks_enabled:
+          type: boolean
+          description: Off by default (#8); turned on from Settings.
         default_landing:
           type: string
           enum: [greeting, dashboard]
@@ -935,6 +1178,8 @@ components:
           type: string
           enum: [petri-light, petri-dark, solarized-light, solarized-dark]
         sound_effects_enabled:
+          type: boolean
+        other_tasks_enabled:
           type: boolean
         default_landing:
           type: string
@@ -1168,6 +1413,151 @@ components:
           minItems: 1
           items:
             $ref: "#/components/schemas/MilestoneSpec"
+
+    OtherTask:
+      type: object
+      description: Mirrors repository.py's OtherTask dataclass.
+      required:
+        [
+          id,
+          user_id,
+          title,
+          schedule_type,
+          one_time_date,
+          repeat_days_of_week,
+          repeat_interval_days,
+          repeat_end_date,
+          push_reminder_enabled,
+          created_at,
+          updated_at,
+        ]
+      properties:
+        id:
+          type: string
+        user_id:
+          type: string
+        title:
+          type: string
+        schedule_type:
+          type: string
+          enum: [one_time, repeating]
+        one_time_date:
+          type: string
+          format: date
+          nullable: true
+        repeat_days_of_week:
+          type: array
+          items:
+            type: integer
+          nullable: true
+          description: 0=Mon .. 6=Sun.
+        repeat_interval_days:
+          type: integer
+          nullable: true
+        repeat_end_date:
+          type: string
+          format: date
+          nullable: true
+        push_reminder_enabled:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreateOtherTaskRequest:
+      type: object
+      required: [title, schedule_type]
+      properties:
+        title:
+          type: string
+        schedule_type:
+          type: string
+          enum: [one_time, repeating]
+        one_time_date:
+          type: string
+          format: date
+          description: Required when schedule_type is 'one_time'.
+        repeat_days_of_week:
+          type: array
+          items:
+            type: integer
+          description: 0=Mon .. 6=Sun. Provide this or repeat_interval_days when repeating.
+        repeat_interval_days:
+          type: integer
+        repeat_end_date:
+          type: string
+          format: date
+          description: Required when schedule_type is 'repeating'.
+        push_reminder_enabled:
+          type: boolean
+          default: true
+
+    UpdateOtherTaskRequest:
+      type: object
+      description: All fields optional; only the ones provided are updated.
+      properties:
+        title:
+          type: string
+        schedule_type:
+          type: string
+          enum: [one_time, repeating]
+        one_time_date:
+          type: string
+          format: date
+        repeat_days_of_week:
+          type: array
+          items:
+            type: integer
+        repeat_interval_days:
+          type: integer
+        repeat_end_date:
+          type: string
+          format: date
+        push_reminder_enabled:
+          type: boolean
+
+    DailyLoad:
+      type: object
+      required: [date, count, over_threshold, breakdown]
+      properties:
+        date:
+          type: string
+          format: date
+        count:
+          type: integer
+        over_threshold:
+          type: boolean
+          description: True once count exceeds 8 (specs.md -> "Other tasks"). Informational only.
+        breakdown:
+          type: object
+          properties:
+            other_tasks:
+              type: integer
+            experiment_check_ins:
+              type: integer
+            milestone_check_ins:
+              type: integer
+
+    PushSubscribeRequest:
+      type: object
+      required: [endpoint, p256dh_key, auth_key]
+      properties:
+        endpoint:
+          type: string
+        p256dh_key:
+          type: string
+        auth_key:
+          type: string
+
+    PushUnsubscribeRequest:
+      type: object
+      required: [endpoint]
+      properties:
+        endpoint:
+          type: string
 
     Experiment:
       type: object

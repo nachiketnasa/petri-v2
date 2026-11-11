@@ -43,6 +43,14 @@ def test_implements_exactly_the_interface_methods():
         "replace_recovery_codes",
         "list_recovery_codes",
         "delete_recovery_code",
+        "create_other_task",
+        "list_other_tasks",
+        "get_other_task",
+        "update_other_task",
+        "delete_other_task",
+        "add_push_subscription",
+        "list_push_subscriptions",
+        "delete_push_subscription",
     }
 
 
