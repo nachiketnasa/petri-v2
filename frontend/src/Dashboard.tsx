@@ -9,10 +9,6 @@ const FILTERS: Filter[] = ['Both', 'Experiments', 'Goals']
 const EXPERIMENT_WIP_CAP = 2
 const GOAL_WIP_CAP = 1
 
-// The issue's acceptance criteria compare against capitalized status strings
-// ('Active' / 'Archived' / 'Backlog'). The backend actually returns lowercase
-// statuses ('active' / 'archived' / 'backlog') -- flagged on #10 rather than
-// silently "fixed" here, since the AC is implemented exactly as written.
 function ExperimentCard({
   experiment,
   showStatus = true,
@@ -35,13 +31,18 @@ function Dashboard() {
   const { experiments, experimentsError: error } = useAuth()
   const [filter, setFilter] = useState<Filter>('Both')
 
-  const wip = experiments ? experiments.filter((e) => e.status === 'Active').length : 0
+  // Real backend status values are lowercase ('active', 'archived', 'backlog',
+  // and 'reflect') -- the groomed AC used capitalized strings, a casing typo
+  // confirmed against _docs/schema.sql and backend/src/petri_backend/app.py.
+  // 'reflect' experiments aren't called out by any tile, but they still show
+  // up in the main grid below rather than silently disappearing.
+  const wip = experiments ? experiments.filter((e) => e.status === 'active').length : 0
   const completed = experiments
-    ? experiments.filter((e) => e.status === 'Archived' && !e.ended_early).length
+    ? experiments.filter((e) => e.status === 'archived' && !e.ended_early).length
     : 0
   const abandoned = experiments ? experiments.filter((e) => e.ended_early === true).length : 0
-  const backlog = experiments ? experiments.filter((e) => e.status === 'Backlog') : []
-  const gridExperiments = experiments ? experiments.filter((e) => e.status !== 'Backlog') : []
+  const backlog = experiments ? experiments.filter((e) => e.status === 'backlog') : []
+  const gridExperiments = experiments ? experiments.filter((e) => e.status !== 'backlog') : []
 
   const showExperiments = filter === 'Both' || filter === 'Experiments'
   const showGoals = filter === 'Both' || filter === 'Goals'

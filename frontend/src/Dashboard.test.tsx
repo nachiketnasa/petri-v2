@@ -30,8 +30,8 @@ describe('Dashboard', () => {
 
   it('fetches and renders multiple experiments as cards, defaulting the filter to Both', async () => {
     const fetchMock = stubExperiments([
-      { id: '1', title: 'Cold showers', cadence_type: 'daily', status: 'Active', ended_early: false },
-      { id: '2', title: 'No sugar', cadence_type: 'weekly', status: 'Archived', ended_early: false },
+      { id: '1', title: 'Cold showers', cadence_type: 'daily', status: 'active', ended_early: false },
+      { id: '2', title: 'No sugar', cadence_type: 'weekly', status: 'archived', ended_early: false },
     ])
 
     renderDashboard()
@@ -101,8 +101,8 @@ describe('Dashboard', () => {
 
   it('computes the WIP tile from Active experiments and the static Goals placeholder', async () => {
     stubExperiments([
-      { id: '1', title: 'A', cadence_type: 'daily', status: 'Active', ended_early: false },
-      { id: '2', title: 'B', cadence_type: 'daily', status: 'Backlog', ended_early: false },
+      { id: '1', title: 'A', cadence_type: 'daily', status: 'active', ended_early: false },
+      { id: '2', title: 'B', cadence_type: 'daily', status: 'backlog', ended_early: false },
     ])
 
     renderDashboard()
@@ -113,9 +113,9 @@ describe('Dashboard', () => {
 
   it('computes the completed vs abandoned ratio tile and a muted streak placeholder', async () => {
     stubExperiments([
-      { id: '1', title: 'A', cadence_type: 'daily', status: 'Archived', ended_early: false },
-      { id: '2', title: 'B', cadence_type: 'daily', status: 'Archived', ended_early: false },
-      { id: '3', title: 'C', cadence_type: 'daily', status: 'Archived', ended_early: true },
+      { id: '1', title: 'A', cadence_type: 'daily', status: 'archived', ended_early: false },
+      { id: '2', title: 'B', cadence_type: 'daily', status: 'archived', ended_early: false },
+      { id: '3', title: 'C', cadence_type: 'daily', status: 'archived', ended_early: true },
     ])
 
     renderDashboard()
@@ -126,8 +126,8 @@ describe('Dashboard', () => {
 
   it('lists Backlog experiments separately from the active grid', async () => {
     stubExperiments([
-      { id: '1', title: 'Active one', cadence_type: 'daily', status: 'Active', ended_early: false },
-      { id: '2', title: 'Shelved idea', cadence_type: 'weekly', status: 'Backlog', ended_early: false },
+      { id: '1', title: 'Active one', cadence_type: 'daily', status: 'active', ended_early: false },
+      { id: '2', title: 'Shelved idea', cadence_type: 'weekly', status: 'backlog', ended_early: false },
     ])
 
     renderDashboard()
@@ -140,7 +140,7 @@ describe('Dashboard', () => {
 
   it('filters to Experiments only, hiding the Goals empty state', async () => {
     stubExperiments([
-      { id: '1', title: 'A', cadence_type: 'daily', status: 'Active', ended_early: false },
+      { id: '1', title: 'A', cadence_type: 'daily', status: 'active', ended_early: false },
     ])
 
     renderDashboard()
@@ -154,7 +154,7 @@ describe('Dashboard', () => {
 
   it('filters to Goals only, hiding the experiment grid and showing the zero state', async () => {
     stubExperiments([
-      { id: '1', title: 'A', cadence_type: 'daily', status: 'Active', ended_early: false },
+      { id: '1', title: 'A', cadence_type: 'daily', status: 'active', ended_early: false },
     ])
 
     renderDashboard()
@@ -171,7 +171,7 @@ describe('Dashboard', () => {
       id: String(i),
       title: `Experiment ${i}`,
       cadence_type: 'daily',
-      status: 'Active',
+      status: 'active',
       ended_early: false,
     }))
     stubExperiments(many)
@@ -186,12 +186,24 @@ describe('Dashboard', () => {
     const longTitle =
       'A very long experiment title that should truncate instead of breaking the card layout or pushing the tiles out of place'
     stubExperiments([
-      { id: '1', title: longTitle, cadence_type: 'daily', status: 'Active', ended_early: false },
+      { id: '1', title: longTitle, cadence_type: 'daily', status: 'active', ended_early: false },
     ])
 
     renderDashboard()
 
     await waitFor(() => expect(screen.getByTitle(longTitle)).toBeInTheDocument())
     expect(screen.getByTitle(longTitle)).toHaveClass('card-title')
+  })
+
+  it('keeps a reflect-status experiment visible in the main grid, uncounted by WIP/ratio tiles', async () => {
+    stubExperiments([
+      { id: '1', title: 'In reflection', cadence_type: 'daily', status: 'reflect', ended_early: false },
+    ])
+
+    renderDashboard()
+
+    await waitFor(() => expect(screen.getByText('In reflection')).toBeInTheDocument())
+    expect(screen.getByText('Experiments 0/2')).toBeInTheDocument()
+    expect(screen.getByText('0 completed · 0 abandoned')).toBeInTheDocument()
   })
 })
