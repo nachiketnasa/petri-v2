@@ -834,20 +834,38 @@ task anywhere -- this is that concrete task.
 
 ## order-09 · #19 — Public landing page
 
-- **Status**: OPEN
+- **Status**: CLOSED
 - **Labels**: frontend, design
 - **Link**: https://github.com/nachiketnasa/petri-v2/issues/19
 
-## What
-A single public landing page for unauthenticated visitors, separate from the signed-in greeting screen.
+## Goal
+
+Add the public landing page that does not exist yet: an unauthenticated visitor at `/` sees a page that explains Petri in plain language and offers exactly one action, which takes them to a new `/sign-in` route carrying the existing `AuthForm`. A signed-in visitor hitting `/` or `/sign-in` is still sent straight to `/greeting`, unchanged from today.
 
 ## Acceptance criteria
-- An unauthenticated visitor at the root URL sees this page, never the dashboard or a bare login form.
-- Explains the product (tiny experiments that can grow into goals, PACT, the work-in-progress limit, transparent endings) in plain language.
-- One clear action: sign in or create an account. No pricing tiers, feature-comparison grid, or testimonials.
-- Same restrained, neumorphic design direction as the rest of the product — not a typical SaaS gradient-hero page.
 
-Ref: `_docs/specs.md` → Public landing page.
+- Visiting `/` while unauthenticated renders a new landing page component, not `AuthForm` directly and not a redirect to `/dashboard` or `/greeting`.
+- The landing page's copy covers all four concepts from `_docs/specs.md`'s "Public landing page" section, each identifiable by name or clear paraphrase: experiments start tiny and can grow into goals, the PACT shape (naming "PACT" is enough, it doesn't need to spell out Purposeful/Actionable/Continuous/Trackable inline), the work-in-progress limit, and that endings are tracked transparently (an abandoned or failed experiment is shown honestly, not hidden). Wording does not need to match specs.md verbatim.
+- The page renders exactly one actionable control, a single button or link (e.g. "Sign in") that navigates to a new `/sign-in` route. Nothing else on the page is clickable toward auth, and there are no pricing tiers, feature-comparison grid, or testimonials anywhere on it.
+- `/sign-in` is a new route rendering the existing `AuthForm` component unchanged, including its own sign-up/sign-in toggle. Successful auth there follows the same flow `Home` uses today: `rememberDisplayName`, `signIn()`, then navigate to `/greeting`.
+- A signed-in user who reaches `/` (typed URL, stale bookmark, browser back) is redirected to `/greeting`, exactly as today's `Home` already does. This existing behavior must not regress.
+- A signed-in user who navigates directly to `/sign-in` is also redirected to `/greeting` rather than seeing the sign-in form.
+- The landing page uses only the existing neumorphic tokens already defined in `frontend/src/neumorphic.css` (`--sage`, `--neu-surface`, `--neu-shadow-dark`, `--neu-shadow-light`) for any surfaces or the action button — no new hardcoded colors and no gradient hero.
+- At a 375px-wide viewport, the copy and the single action button are fully readable and reachable with no horizontal scroll; content stacks vertically rather than clipping or overlapping.
+- No sign-up/sign-in form fields (email, password, display name) appear on the landing page itself — those inputs exist only on `/sign-in`.
+
+## Out of scope
+
+- Original line-art illustrations mentioned generally in specs.md's Design system section — not required for this page; restrained text plus the existing neumorphic surfaces satisfy the acceptance criteria above.
+- Four-theme theming (Petri Light/Dark, Solarized Light/Dark) — the Settings screen doesn't exist yet, tracked in #12 (`order-11`).
+
+## Constraints
+
+- Files: a new `frontend/src/Landing.tsx` (or similar name) plus its test, `frontend/src/App.tsx` (add the `/sign-in` route, replace the `/` route's element), `frontend/src/neumorphic.css` (new landing-specific classes reusing the existing tokens only — no new tokens added). `AuthForm.tsx` itself does not need to change.
+- Reuse `AuthContext`'s existing `signedIn`/`signIn`, and the exact `rememberDisplayName` + `navigate('/greeting')` pattern already used in today's `Home` — don't invent a second post-auth flow.
+- No new routing library beyond the already-installed `react-router-dom`; no new state library.
+- Sage green is the only accent color available before goals exist; don't introduce clay/terracotta here (reserved for goals).
+- No em dashes or hyphens used as punctuation in any new copy (per specs.md's Design system section).
 
 ---
 
