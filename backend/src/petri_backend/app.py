@@ -186,6 +186,23 @@ def _cadence_interval_days(experiment: Experiment) -> int:
     )
 
 
+def _maybe_transition_to_reflect(
+    repository: Repository, experiment: Experiment, *, user_id: str
+) -> Experiment:
+    # Board model (_docs/specs.md): Active -> Reflect once target_days has
+    # elapsed since start_date. No scheduler in this backend, so this is
+    # computed lazily on read (like check_in_due/streak) and persisted the
+    # first time it's observed, rather than left to recompute every time.
+    if experiment.status != "active":
+        return experiment
+    if date.today() < experiment.start_date + timedelta(days=experiment.target_days):
+        return experiment
+    updated = repository.update_experiment(
+        experiment_id=experiment.id, user_id=user_id, status="reflect"
+    )
+    return updated or experiment
+
+
 def _is_check_in_due(experiment: Experiment, last_check_in_at: datetime | None) -> bool:
     # "Check-in Due" (_docs/specs.md -> Board model, item 3): a derived badge
     # on Active experiments, cadence elapsed since the last check-in (or
@@ -432,7 +449,15 @@ def list_experiments(
     current_user: User = Depends(get_current_user),
     repository: Repository = Depends(get_repository),
 ) -> list[ExperimentOut]:
-    experiments = repository.list_experiments(user_id=current_user.id, status=status)
+    # Transition before filtering: an experiment whose target_days just
+    # elapsed must count under its new status, not the one a status= filter
+    # was written against before this request ever ran.
+    experiments = [
+        _maybe_transition_to_reflect(repository, experiment, user_id=current_user.id)
+        for experiment in repository.list_experiments(user_id=current_user.id, status=None)
+    ]
+    if status is not None:
+        experiments = [e for e in experiments if e.status == status]
     return [
         ExperimentOut.from_experiment(
             experiment,
@@ -455,6 +480,7 @@ def get_experiment(
         # belongs to another user" - don't distinguish, so a 404 can't leak
         # whether the id exists for someone else.
         raise HTTPException(status_code=404, detail="Experiment not found.")
+    experiment = _maybe_transition_to_reflect(repository, experiment, user_id=current_user.id)
     check_ins = repository.list_check_ins(experiment_id=id, user_id=current_user.id)
     return ExperimentOut.from_experiment(
         experiment, check_ins=check_ins, user_timezone=current_user.timezone
