@@ -149,7 +149,7 @@ MVP note: OAuth and sign-up email verification are deferred past this slice; shi
 
 ## order-04b · #20 — Auth: session expiration / TTL
 
-- **Status**: OPEN
+- **Status**: CLOSED
 - **Labels**: backend, auth
 - **Link**: https://github.com/nachiketnasa/petri-v2/issues/20
 
@@ -219,7 +219,7 @@ the dev-log version deliberately avoided) and shouldn't block that task.
 
 ## order-04d · #22 — Frontend: forgot/reset password form
 
-- **Status**: OPEN
+- **Status**: CLOSED
 - **Labels**: frontend, auth
 - **Link**: https://github.com/nachiketnasa/petri-v2/issues/22
 
@@ -338,7 +338,7 @@ Split out while auditing #2's full scope against its MVP checklist.
 
 ## order-04g · #31 — Auth: expose current signed-in user (display_name) for greeting
 
-- **Status**: OPEN
+- **Status**: CLOSED
 - **Labels**: backend, auth
 - **Link**: https://github.com/nachiketnasa/petri-v2/issues/31
 
@@ -425,7 +425,7 @@ Discovered while implementing/verifying #11 (Calendar) — the Engineer had to r
 
 ## order-04j · #37 — Auth/Account: persist Settings preferences (theme, sound effects, default landing) to the account
 
-- **Status**: OPEN
+- **Status**: CLOSED
 - **Labels**: backend
 - **Link**: https://github.com/nachiketnasa/petri-v2/issues/37
 
@@ -489,7 +489,7 @@ Ref: `_docs/specs.md` → Board model, Core entities, Abandoning something early
 
 ## order-05 · #26 — Check-ins: validate value_bool/value_rating against the experiment's check_in_kind
 
-- **Status**: OPEN
+- **Status**: CLOSED
 - **Labels**: backend
 - **Link**: https://github.com/nachiketnasa/petri-v2/issues/26
 
@@ -517,7 +517,7 @@ Noticed while grooming #4's "log a check-in" checklist line. That task is scoped
 
 ## order-05b · #27 — Check-in Due derived badge: not computed/exposed anywhere
 
-- **Status**: OPEN
+- **Status**: CLOSED
 - **Labels**: backend, frontend
 - **Link**: https://github.com/nachiketnasa/petri-v2/issues/27
 
@@ -544,7 +544,7 @@ Ref: `_docs/specs.md` → Board model (item 3).
 
 ## order-05c · #28 — Check-ins: no GET endpoint to list an experiment's check-in history
 
-- **Status**: OPEN
+- **Status**: CLOSED
 - **Labels**: backend
 - **Link**: https://github.com/nachiketnasa/petri-v2/issues/28
 
@@ -592,7 +592,7 @@ Ref: `_docs/specs.md` → Core entities (check-ins).
 
 ## order-05d · #32 — Check-ins: compute and expose per-experiment streak count
 
-- **Status**: OPEN
+- **Status**: CLOSED
 - **Labels**: backend
 - **Link**: https://github.com/nachiketnasa/petri-v2/issues/32
 
@@ -618,6 +618,39 @@ A computed "streak" (consecutive cadence periods logged without a gap) available
 
 - Backend only. Depends on #28 (order-05c) landing first for check-in history data to compute from.
 - Follows the existing repository-interface pattern; no new persisted "streak" column needed if it can stay a derived read, consistent with how Check-in Due (#27) is handled.
+
+---
+
+## order-05e · #38 — Experiments: no automatic Active -> Reflect transition once target_days elapses
+
+- **Status**: CLOSED
+- **Labels**: backend
+- **Link**: https://github.com/nachiketnasa/petri-v2/issues/38
+
+## What
+
+`_docs/specs.md`'s Board model names a real lifecycle column: **Backlog → Active → Reflect → Archived**, where Reflect is entered once "cadence or duration complete." `_docs/schema.sql`'s `experiments.status` check constraint already includes `'reflect'` as a real value, and `ExperimentDetail.tsx`/the archive endpoint already branch on `status == 'reflect'` wherever they handle `'active'`. But no endpoint anywhere ever writes `status = 'reflect'` — nothing transitions an experiment out of `active` once its `target_days` have elapsed. An experiment just stays `active` forever unless a user manually archives it (which the archive endpoint allows directly from `active`, retro-gated the same as from `reflect`).
+
+Discovered by the standalone UX Validator role (`_docs/team/ux-validator.md`) while tracing every real status value through the running app — `#4`'s own acceptance criteria named the full lifecycle, but its checklist never had a line for this specific transition, so neither PM grooming nor Engineer implementation ever caught the gap.
+
+## Acceptance criteria
+
+- [ ] Once `target_days` days have elapsed since `start_date` (i.e. `today >= start_date + target_days`), an `active` experiment's status becomes `reflect` automatically, computed lazily the next time it's read (`GET /experiments`, `GET /experiments/{id}`) rather than via a background job/cron -- no new infrastructure, consistent with how this backend already has no scheduler anywhere.
+- [ ] The transition is idempotent and persisted: once observed as `reflect`, it stays `reflect` (not recomputed back to `active`) until archived.
+- [ ] `check_in_due` (#27) and `streak` (#32) are unaffected by this issue -- both already stop counting once status leaves `active`, which is correct (a completed-duration experiment shouldn't still show as check-in-due).
+- [ ] Archiving directly from `active` (today's behavior, past `target_days` or not) keeps working unchanged -- this issue adds the missing automatic transition, it does not remove the existing direct `active` -> `archived` path.
+- [ ] Covered by a backend test: an active experiment whose target_days has elapsed reads back as `reflect` on the next GET; one that hasn't elapsed stays `active`.
+
+## Out of scope
+
+- A UI change announcing "time to reflect" (e.g. a dashboard badge) -- that would be its own follow-up once this lands, same pattern as #27/#32.
+- Ending early (`ended_early=true` via the abandon path) -- that already goes straight `active` -> `archived` with a required one-line reason, which already satisfies "retro required before archiving" for that path. Not a reflect-transition gap.
+- Goals' own `Backlog -> Active -> Reflect -> Archived` lifecycle -- goals don't exist yet (#5, order-14).
+
+## Constraints
+
+- Backend only: `backend/src/petri_backend/app.py`, both repository implementations if the transition needs a dedicated repository method (or reuse `update_experiment`).
+- No new infrastructure (no cron/scheduler/background worker) -- lazy, read-time computation only, matching every other derived-on-read value in this codebase (`check_in_due`, `streak`).
 
 ---
 
@@ -1021,7 +1054,7 @@ Ref: `_docs/specs.md` → Calendar.
 
 ## order-10b · #35 — Calendar: mark completed vs. missed days from real check-in history
 
-- **Status**: OPEN
+- **Status**: CLOSED
 - **Labels**: frontend
 - **Link**: https://github.com/nachiketnasa/petri-v2/issues/35
 
