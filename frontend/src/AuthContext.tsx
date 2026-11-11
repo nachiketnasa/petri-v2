@@ -7,6 +7,7 @@ export type Experiment = {
   title: string
   cadence_type: string
   status: string
+  ended_early?: boolean
 }
 
 type AuthState = {

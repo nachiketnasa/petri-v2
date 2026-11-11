@@ -1,0 +1,150 @@
+/* Neumorphic "natural makeup" styling for the greeting and dashboard screens.
+   Sage green marks experiments (clay/terracotta is reserved for goals once
+   they exist). Reuses index.css's light/dark color-scheme switch pattern so
+   dark mode stays correct without hardcoding new colors there. */
+
+:root {
+  --sage: #7c9473;
+  --sage-soft: rgba(124, 148, 115, 0.16);
+  --neu-surface: #eef1ea;
+  --neu-shadow-dark: rgba(60, 66, 55, 0.18);
+  --neu-shadow-light: rgba(255, 255, 255, 0.9);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --sage: #9bb591;
+    --sage-soft: rgba(155, 181, 145, 0.18);
+    --neu-surface: #1c1f1a;
+    --neu-shadow-dark: rgba(0, 0, 0, 0.5);
+    --neu-shadow-light: rgba(255, 255, 255, 0.04);
+  }
+}
+
+.greeting-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  min-height: 60vh;
+  text-align: center;
+  padding: 24px;
+}
+
+.greeting-text {
+  font-size: 32px;
+  color: var(--text-h);
+}
+
+.greeting-due {
+  color: var(--text);
+}
+
+.greeting-action {
+  margin-top: 8px;
+  border: none;
+  border-radius: 14px;
+  padding: 12px 28px;
+  font-size: 16px;
+  background: var(--neu-surface);
+  color: var(--text-h);
+  box-shadow: 6px 6px 12px var(--neu-shadow-dark), -6px -6px 12px var(--neu-shadow-light);
+  cursor: pointer;
+}
+
+.greeting-action:hover {
+  box-shadow: 4px 4px 8px var(--neu-shadow-dark), -4px -4px 8px var(--neu-shadow-light);
+}
+
+.dashboard-filter {
+  display: flex;
+  gap: 16px;
+  margin: 16px 0;
+}
+
+.dashboard-tiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.neu-tile {
+  flex: 1 1 160px;
+  border-radius: 16px;
+  padding: 16px;
+  background: var(--neu-surface);
+  box-shadow: 6px 6px 12px var(--neu-shadow-dark), -6px -6px 12px var(--neu-shadow-light);
+}
+
+.neu-tile h4 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.neu-tile .tile-value {
+  font-size: 20px;
+  color: var(--text-h);
+}
+
+.streak-tile .tile-value {
+  font-family: 'IBM Plex Mono', var(--mono);
+  font-size: 40px;
+  color: var(--sage);
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.neu-card {
+  position: relative;
+  border: none;
+  border-radius: 16px;
+  padding: 16px 16px 16px 20px;
+  background: var(--neu-surface);
+  box-shadow: 6px 6px 12px var(--neu-shadow-dark), -6px -6px 12px var(--neu-shadow-light);
+  min-width: 0;
+}
+
+.neu-card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 16px;
+  bottom: 16px;
+  width: 4px;
+  border-radius: 2px;
+  background: var(--sage);
+}
+
+.neu-card .card-title {
+  display: block;
+  font-weight: 600;
+  color: var(--text-h);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.neu-card .card-meta {
+  margin-top: 6px;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.backlog-section,
+.goals-section {
+  margin-top: 8px;
+}
+
+.backlog-section h3,
+.goals-section h3 {
+  font-size: 16px;
+  color: var(--text-h);
+}

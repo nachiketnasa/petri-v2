@@ -4,6 +4,7 @@ import HealthStatus from './HealthStatus'
 import AuthForm from './AuthForm'
 import Dashboard from './Dashboard'
 import ExperimentDetail from './ExperimentDetail'
+import Greeting, { rememberDisplayName } from './Greeting'
 import NewExperimentForm from './NewExperimentForm'
 import { AuthProvider, useAuth } from './AuthContext'
 import './App.css'
@@ -41,13 +42,14 @@ function Home() {
   const navigate = useNavigate()
 
   if (signedIn === null) return <p>Loading…</p>
-  if (signedIn) return <Navigate to="/dashboard" replace />
+  if (signedIn) return <Navigate to="/greeting" replace />
 
   return (
     <AuthForm
-      onAuthenticated={() => {
+      onAuthenticated={(user) => {
+        rememberDisplayName(user.display_name)
         signIn()
-        navigate('/dashboard')
+        navigate('/greeting')
       }}
     />
   )
@@ -59,6 +61,14 @@ function AppRoutes() {
       <Header />
       <Routes>
         <Route path="/" element={<Home />} />
+        <Route
+          path="/greeting"
+          element={
+            <RequireAuth>
+              <Greeting />
+            </RequireAuth>
+          }
+        />
         <Route
           path="/dashboard"
           element={

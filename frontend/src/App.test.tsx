@@ -30,6 +30,7 @@ const experiment = {
 describe('App', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
+    localStorage.clear()
     cleanup()
   })
 
@@ -60,6 +61,11 @@ describe('App', () => {
     fireEvent.change(screen.getByPlaceholderText('Password'), { target: { value: 'secret123' } })
     fireEvent.change(screen.getByPlaceholderText('Display name'), { target: { value: 'New' } })
     fireEvent.click(screen.getByRole('button', { name: 'Sign up' }))
+
+    // Sign-in now lands on the greeting screen, not the dashboard directly.
+    await waitFor(() => expect(screen.getByText(/New\.$/)).toBeInTheDocument())
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open dashboard' }))
 
     await waitFor(() => expect(screen.getByText('No experiments yet.')).toBeInTheDocument())
   })
