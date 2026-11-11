@@ -207,6 +207,29 @@ class Repository(ABC):
         ...
 
     @abstractmethod
+    def create_email_verification(
+        self, *, user_id: str, code_hash: str, expires_at: datetime
+    ) -> None: ...
+
+    @abstractmethod
+    def consume_email_verification(self, *, code_hash: str) -> str | None:
+        """Marks the matching, unconsumed, unexpired row consumed and
+        returns its user_id -- or None if no such row exists (one-time
+        use: gone either way)."""
+        ...
+
+    @abstractmethod
+    def create_password_reset(
+        self, *, user_id: str, token_hash: str, expires_at: datetime
+    ) -> None: ...
+
+    @abstractmethod
+    def consume_password_reset(self, *, token_hash: str) -> str | None:
+        """Same contract as consume_email_verification, for the
+        password_resets table."""
+        ...
+
+    @abstractmethod
     def create_experiment(
         self,
         *,

@@ -34,15 +34,20 @@ describe('App', () => {
     cleanup()
   })
 
-  it('signs up and lands on the dashboard', async () => {
+  it('signs up, verifies the emailed code, and lands on the dashboard', async () => {
     let signedUp = false
+    let verified = false
     const fetchMock = vi.fn((url: string) => {
       if (url.includes('/auth/signup')) {
         signedUp = true
         return Promise.resolve({ ok: true, json: async () => user })
       }
+      if (url.includes('/auth/verify-email')) {
+        verified = true
+        return Promise.resolve({ ok: true, json: async () => ({ status: 'ok' }) })
+      }
       if (url.includes('/experiments')) {
-        if (!signedUp) {
+        if (!signedUp || !verified) {
           return Promise.resolve({ ok: false, status: 401, json: async () => ({ detail: 'Not authenticated' }) })
         }
         return Promise.resolve({ ok: true, json: async () => [] })
@@ -61,6 +66,12 @@ describe('App', () => {
     fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'secret123' } })
     fireEvent.change(screen.getByLabelText('Display name'), { target: { value: 'New' } })
     fireEvent.click(screen.getByRole('button', { name: 'Sign up' }))
+
+    // Signup alone doesn't let you in -- verification is required first.
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Verify your email' })).toBeInTheDocument())
+
+    fireEvent.change(screen.getByLabelText('Verification code'), { target: { value: '123456' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Verify' }))
 
     // Sign-in now lands on the greeting screen, not the dashboard directly.
     await waitFor(() => expect(screen.getByText(/New\.$/)).toBeInTheDocument())
@@ -105,7 +116,7 @@ describe('App', () => {
 
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Cadence' })).toBeInTheDocument())
 
-    fireEvent.change(screen.getByLabelText('Cadence type'), { target: { value: 'daily' } })
+    fireEvent.click(screen.getByRole('radio', { name: 'Daily' }))
     fireEvent.change(screen.getByPlaceholderText('Target days'), { target: { value: '30' } })
     fireEvent.click(screen.getByRole('button', { name: 'Next' }))
 
@@ -122,7 +133,10 @@ describe('App', () => {
   })
 
   it('makes exactly one GET /experiments call on a signed-in dashboard visit', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => [experiment] })
+    const fetchMock = vi.fn((url: string) => {
+      if (url.includes('/goals')) return Promise.resolve({ ok: true, json: async () => [] })
+      return Promise.resolve({ ok: true, json: async () => [experiment] })
+    })
     vi.stubGlobal('fetch', fetchMock)
     window.history.pushState({}, '', '/dashboard')
 
@@ -231,13 +245,18 @@ describe('App', () => {
   it('with the landing preference on, signing in goes straight to /dashboard instead of /greeting', async () => {
     localStorage.setItem('petri:landingPreference', 'dashboard')
     let signedUp = false
+    let verified = false
     const fetchMock = vi.fn((url: string) => {
       if (url.includes('/auth/signup')) {
         signedUp = true
         return Promise.resolve({ ok: true, json: async () => user })
       }
+      if (url.includes('/auth/verify-email')) {
+        verified = true
+        return Promise.resolve({ ok: true, json: async () => ({ status: 'ok' }) })
+      }
       if (url.includes('/experiments')) {
-        if (!signedUp) {
+        if (!signedUp || !verified) {
           return Promise.resolve({ ok: false, status: 401, json: async () => ({ detail: 'Not authenticated' }) })
         }
         return Promise.resolve({ ok: true, json: async () => [] })
@@ -255,6 +274,10 @@ describe('App', () => {
     fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'secret123' } })
     fireEvent.change(screen.getByLabelText('Display name'), { target: { value: 'New' } })
     fireEvent.click(screen.getByRole('button', { name: 'Sign up' }))
+
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Verify your email' })).toBeInTheDocument())
+    fireEvent.change(screen.getByLabelText('Verification code'), { target: { value: '123456' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Verify' }))
 
     await waitFor(() => expect(screen.getByText('No experiments yet.')).toBeInTheDocument())
     expect(screen.queryByText(/New\.$/)).not.toBeInTheDocument()

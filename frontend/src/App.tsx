@@ -9,6 +9,7 @@ import ExperimentDetail from './ExperimentDetail'
 import Calendar from './Calendar'
 import Greeting, { rememberDisplayName } from './Greeting'
 import NewExperimentForm from './NewExperimentForm'
+import NewGoalForm from './NewGoalForm'
 import Settings, { CookieNotice, applyStoredTheme, getLandingPreference } from './Settings'
 import ForgotPassword from './ForgotPassword'
 import ResetPassword from './ResetPassword'
@@ -103,6 +104,14 @@ function AppRoutes() {
           element={
             <RequireAuth>
               <NewExperimentForm />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/goals/new"
+          element={
+            <RequireAuth>
+              <NewGoalForm />
             </RequireAuth>
           }
         />

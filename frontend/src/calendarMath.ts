@@ -68,6 +68,7 @@ export type CadenceExperiment = {
   cadence_type: string
   cadence_days?: number | null
   start_date?: string | null
+  target_days?: number | null
 }
 
 /** Whole-day difference between two local dates (b - a), ignoring time-of-day. */
@@ -106,6 +107,7 @@ export function isCadenceDay(experiment: CadenceExperiment, date: Date): boolean
   const start = parseLocalDate(experiment.start_date)
   const diff = dayDiff(start, date)
   if (diff < 0) return false
+  if (experiment.target_days != null && diff >= experiment.target_days) return false
 
   switch (experiment.cadence_type) {
     case 'daily':

@@ -3,14 +3,16 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from fastapi.testclient import TestClient
 
-from petri_backend.app import _reset_tokens, _sessions, app, get_repository
+from petri_backend.app import _sessions, app, get_repository
 from petri_backend.repository_memory import InMemoryRepository
+from petri_backend.security import hash_lookup_code
+
+from _email_capture import sent_reset_tokens
 
 
 @pytest.fixture(autouse=True)
 def _clear_module_state():
     _sessions.clear()
-    _reset_tokens.clear()
 
 
 @pytest.fixture
@@ -40,7 +42,7 @@ def _verify(repo: InMemoryRepository, email: str) -> None:
 
 
 def test_forgot_password_registered_email_returns_ok_and_stores_token(
-    client: TestClient, capsys
+    client: TestClient, repo: InMemoryRepository, capsys
 ):
     _signup(client, email="user@example.com")
 
@@ -48,17 +50,19 @@ def test_forgot_password_registered_email_returns_ok_and_stores_token(
 
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
-    assert len(_reset_tokens) == 1
+    assert len(repo._password_resets) == 1
 
 
-def test_forgot_password_unregistered_email_returns_identical_ok_body(client: TestClient):
+def test_forgot_password_unregistered_email_returns_identical_ok_body(
+    client: TestClient, repo: InMemoryRepository
+):
     registered = client.post(
         "/auth/forgot-password", json={"email": "doesnotexist@example.com"}
     )
 
     assert registered.status_code == 200
     assert registered.json() == {"status": "ok"}
-    assert len(_reset_tokens) == 0
+    assert len(repo._password_resets) == 0
 
 
 def test_forgot_password_logs_token_only_for_registered_email(client: TestClient, capsys):
@@ -67,7 +71,7 @@ def test_forgot_password_logs_token_only_for_registered_email(client: TestClient
     client.post("/auth/forgot-password", json={"email": "user@example.com"})
     out = capsys.readouterr().out
     assert "to=user@example.com" in out
-    token = list(_reset_tokens.keys())[0]
+    token = sent_reset_tokens["user@example.com"]
     assert token in out
 
     capsys.readouterr()  # clear
@@ -88,7 +92,7 @@ def test_reset_password_with_valid_token_updates_password_and_invalidates_sessio
     assert session_token in _sessions
 
     client.post("/auth/forgot-password", json={"email": "user@example.com"})
-    reset_token = list(_reset_tokens.keys())[0]
+    reset_token = sent_reset_tokens["user@example.com"]
 
     response = client.post(
         "/auth/reset-password",
@@ -127,11 +131,12 @@ def test_reset_password_with_expired_token_returns_generic_400_and_no_change(
     _signup(client, email="user@example.com", password="oldpassword")
     _verify(repo, "user@example.com")
     client.post("/auth/forgot-password", json={"email": "user@example.com"})
-    reset_token = list(_reset_tokens.keys())[0]
+    reset_token = sent_reset_tokens["user@example.com"]
 
     # Force expiry.
-    user_id, _ = _reset_tokens[reset_token]
-    _reset_tokens[reset_token] = (
+    token_hash = hash_lookup_code(reset_token)
+    user_id, _ = repo._password_resets[token_hash]
+    repo._password_resets[token_hash] = (
         user_id,
         datetime.now(timezone.utc) - timedelta(minutes=1),
     )
@@ -151,7 +156,7 @@ def test_reset_password_with_expired_token_returns_generic_400_and_no_change(
 def test_reusing_a_consumed_token_returns_generic_400(client: TestClient):
     _signup(client, email="user@example.com", password="oldpassword")
     client.post("/auth/forgot-password", json={"email": "user@example.com"})
-    reset_token = list(_reset_tokens.keys())[0]
+    reset_token = sent_reset_tokens["user@example.com"]
 
     first = client.post(
         "/auth/reset-password",

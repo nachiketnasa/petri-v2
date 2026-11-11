@@ -13,6 +13,8 @@ Apply the schema by hand before using this (no migration framework):
 
 from __future__ import annotations
 
+from datetime import datetime
+
 import psycopg
 
 import secrets
@@ -62,6 +64,7 @@ _USER_UPDATABLE_FIELDS = {
     "email_verified_at",
     "totp_secret",
     "totp_enabled",
+    "password_hash",
 }
 
 
@@ -383,6 +386,48 @@ class PostgresRepository(Repository):
     def delete_recovery_code(self, *, recovery_code_id: str) -> None:
         with self._connect() as conn, conn.cursor() as cur:
             cur.execute("delete from totp_recovery_codes where id = %s", (recovery_code_id,))
+
+    def create_email_verification(
+        self, *, user_id: str, code_hash: str, expires_at: datetime
+    ) -> None:
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute(
+                "insert into email_verifications (user_id, code_hash, expires_at) "
+                "values (%s, %s, %s)",
+                (user_id, code_hash, expires_at),
+            )
+
+    def consume_email_verification(self, *, code_hash: str) -> str | None:
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute(
+                "update email_verifications set consumed_at = now() "
+                "where code_hash = %s and consumed_at is null and expires_at > now() "
+                "returning user_id",
+                (code_hash,),
+            )
+            row = cur.fetchone()
+            return str(row[0]) if row else None
+
+    def create_password_reset(
+        self, *, user_id: str, token_hash: str, expires_at: datetime
+    ) -> None:
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute(
+                "insert into password_resets (user_id, token_hash, expires_at) "
+                "values (%s, %s, %s)",
+                (user_id, token_hash, expires_at),
+            )
+
+    def consume_password_reset(self, *, token_hash: str) -> str | None:
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute(
+                "update password_resets set consumed_at = now() "
+                "where token_hash = %s and consumed_at is null and expires_at > now() "
+                "returning user_id",
+                (token_hash,),
+            )
+            row = cur.fetchone()
+            return str(row[0]) if row else None
 
     def create_experiment(
         self,

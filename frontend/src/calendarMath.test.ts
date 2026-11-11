@@ -146,6 +146,13 @@ describe('isCadenceDay', () => {
   it('returns false when start_date is missing', () => {
     expect(isCadenceDay({ cadence_type: 'daily' }, localDate(2026, 10, 5))).toBe(false)
   })
+
+  it('stops matching once target_days have elapsed from start_date', () => {
+    const experiment = { cadence_type: 'daily', start_date: '2026-11-01', target_days: 5 }
+    expect(isCadenceDay(experiment, localDate(2026, 10, 1))).toBe(true) // day 0
+    expect(isCadenceDay(experiment, localDate(2026, 10, 5))).toBe(true) // day 4, last day
+    expect(isCadenceDay(experiment, localDate(2026, 10, 6))).toBe(false) // day 5, past the run
+  })
 })
 
 describe('dayStatus', () => {

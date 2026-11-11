@@ -19,6 +19,7 @@ services:
     environment:
       DATABASE_URL: postgresql://petri:petri@postgres:5432/petri
       RESEND_API_KEY: ${RESEND_API_KEY}
+      EMAIL_FROM_ADDRESS: ${EMAIL_FROM_ADDRESS}
     ports:
       - "8000:8000"
     depends_on:

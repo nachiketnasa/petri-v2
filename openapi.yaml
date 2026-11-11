@@ -253,6 +253,38 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /auth/resend-verification:
+    post:
+      summary: Send a fresh sign-up email verification code
+      operationId: resendVerification
+      security: []
+      tags: [auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ForgotPasswordRequest"
+      responses:
+        "200":
+          description: >-
+            Always returned, regardless of whether the email exists or is
+            already verified (same no-enumeration rule as forgot-password).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+        "400":
+          description: Missing or invalid field.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /auth/2fa/enroll:
     post:
       summary: Start TOTP 2FA enrollment (does not enable it yet)

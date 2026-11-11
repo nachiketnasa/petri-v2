@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { useAuth, type Experiment } from './AuthContext'
+import { useAuth, type Experiment, type Goal } from './AuthContext'
 import { getStoredDisplayName } from './Greeting'
 import './neumorphic.css'
 
@@ -52,8 +52,27 @@ function ExperimentCard({
   )
 }
 
+function GoalCard({ goal, variant = 'active' }: { goal: Goal; variant?: 'active' | 'backlog' }) {
+  return (
+    <div className="raised card">
+      <div>
+        <span className={variant === 'backlog' ? 'badge badge-muted' : 'badge badge-goal'}>
+          {variant === 'backlog' ? 'Backlog' : `Goal, ${goal.status}`}
+        </span>
+        <div className="card-title" title={goal.title}>
+          {goal.title}
+        </div>
+      </div>
+      {goal.why_text && <div className="card-sub">{goal.why_text}</div>}
+      <div className="card-foot">
+        <div className="streak mono">{goal.milestones.length} milestone{goal.milestones.length === 1 ? '' : 's'}</div>
+      </div>
+    </div>
+  )
+}
+
 function Dashboard() {
-  const { experiments, experimentsError: error, signOut } = useAuth()
+  const { experiments, experimentsError: error, goals, signOut } = useAuth()
   const [filter, setFilter] = useState<Filter>('Both')
   const navigate = useNavigate()
   const displayName = getStoredDisplayName()
@@ -75,6 +94,10 @@ function Dashboard() {
   const abandoned = experiments ? experiments.filter((e) => e.ended_early === true).length : 0
   const backlog = experiments ? experiments.filter((e) => e.status === 'backlog') : []
   const gridExperiments = experiments ? experiments.filter((e) => e.status !== 'backlog') : []
+
+  const goalWip = goals ? goals.filter((g) => g.status === 'active').length : 0
+  const goalBacklog = goals ? goals.filter((g) => g.status === 'backlog') : []
+  const gridGoals = goals ? goals.filter((g) => g.status !== 'backlog') : []
 
   const showExperiments = filter === 'Both' || filter === 'Experiments'
   const showGoals = filter === 'Both' || filter === 'Goals'
@@ -136,9 +159,14 @@ function Dashboard() {
         {!error && experiments && experiments.length === 0 && (
           <>
             <p>No experiments yet.</p>
-            <Link to="/experiments/new" className="btn btn-exp">
-              New experiment
-            </Link>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <Link to="/experiments/new" className="btn btn-exp">
+                New experiment
+              </Link>
+              <Link to="/goals/new" className="btn btn-goal">
+                New goal
+              </Link>
+            </div>
           </>
         )}
 
@@ -152,7 +180,9 @@ function Dashboard() {
                 <div className="stat-label">Experiments running right now</div>
               </div>
               <div className="raised stat-tile">
-                <div className="stat-num">0 / {GOAL_WIP_CAP}</div>
+                <div className="stat-num">
+                  {goalWip} / {GOAL_WIP_CAP}
+                </div>
                 <div className="stat-label">Goals running right now</div>
               </div>
               <div className="raised stat-tile">
@@ -178,9 +208,14 @@ function Dashboard() {
 
                 <div className="section-head">
                   <h3 className="section-title">Backlog</h3>
-                  <Link to="/experiments/new" className="btn btn-exp">
-                    New experiment
-                  </Link>
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    <Link to="/experiments/new" className="btn btn-exp">
+                      New experiment
+                    </Link>
+                    <Link to="/goals/new" className="btn btn-goal">
+                      New goal
+                    </Link>
+                  </div>
                 </div>
                 {backlog.length === 0 ? (
                   <div className="card-grid">
@@ -202,8 +237,38 @@ function Dashboard() {
               <section className="goals-section">
                 <div className="section-head">
                   <h3 className="section-title">Goals</h3>
+                  {gridGoals.length === 0 && goalBacklog.length === 0 && (
+                    <Link to="/goals/new" className="btn btn-goal">
+                      New goal
+                    </Link>
+                  )}
                 </div>
-                <p>No goals yet.</p>
+                {gridGoals.length === 0 && goalBacklog.length === 0 ? (
+                  <p>No goals yet.</p>
+                ) : (
+                  <>
+                    <div className="card-grid">
+                      {gridGoals.map((goal) => (
+                        <GoalCard key={goal.id} goal={goal} />
+                      ))}
+                    </div>
+                    {goalBacklog.length > 0 && (
+                      <>
+                        <div className="section-head">
+                          <h3 className="section-title">Goals backlog</h3>
+                          <Link to="/goals/new" className="btn btn-goal">
+                            New goal
+                          </Link>
+                        </div>
+                        <div className="card-grid">
+                          {goalBacklog.map((goal) => (
+                            <GoalCard key={goal.id} goal={goal} variant="backlog" />
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </>
+                )}
               </section>
             )}
           </>

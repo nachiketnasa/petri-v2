@@ -38,6 +38,10 @@ class InMemoryRepository(Repository):
         self._goals: dict[str, Goal] = {}
         self._milestones: dict[str, Milestone] = {}
         self._recovery_codes: dict[str, RecoveryCode] = {}
+        # code_hash/token_hash -> (user_id, expires_at); popped on consume,
+        # one-time use: gone either way, same as the recovery codes above.
+        self._email_verifications: dict[str, tuple[str, datetime]] = {}
+        self._password_resets: dict[str, tuple[str, datetime]] = {}
         self._other_tasks: dict[str, OtherTask] = {}
         self._push_subscriptions: dict[str, PushSubscription] = {}
         self._shares: dict[str, Share] = {}
@@ -98,6 +102,30 @@ class InMemoryRepository(Repository):
 
     def delete_recovery_code(self, *, recovery_code_id: str) -> None:
         self._recovery_codes.pop(recovery_code_id, None)
+
+    def create_email_verification(
+        self, *, user_id: str, code_hash: str, expires_at: datetime
+    ) -> None:
+        self._email_verifications[code_hash] = (user_id, expires_at)
+
+    def consume_email_verification(self, *, code_hash: str) -> str | None:
+        entry = self._email_verifications.pop(code_hash, None)
+        if entry is None:
+            return None
+        user_id, expires_at = entry
+        return user_id if _utcnow() <= expires_at else None
+
+    def create_password_reset(
+        self, *, user_id: str, token_hash: str, expires_at: datetime
+    ) -> None:
+        self._password_resets[token_hash] = (user_id, expires_at)
+
+    def consume_password_reset(self, *, token_hash: str) -> str | None:
+        entry = self._password_resets.pop(token_hash, None)
+        if entry is None:
+            return None
+        user_id, expires_at = entry
+        return user_id if _utcnow() <= expires_at else None
 
     def create_experiment(
         self,

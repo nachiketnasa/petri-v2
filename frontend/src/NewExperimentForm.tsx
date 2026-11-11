@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from './AuthContext'
 import { playTone } from './sound'
 import './neumorphic.css'
@@ -9,6 +9,17 @@ const BASE_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8000'
 type Step = 0 | 1 | 2
 
 const STEP_NAMES = ['Details', 'Cadence', 'Review'] as const
+
+const CADENCE_TYPE_OPTIONS = [
+  { value: 'daily', label: 'Daily' },
+  { value: 'weekly', label: 'Weekly' },
+  { value: 'custom', label: 'Custom' },
+] as const
+
+const CHECK_IN_KIND_OPTIONS = [
+  { value: 'boolean', label: 'Boolean' },
+  { value: 'rating', label: 'Rating' },
+] as const
 
 function NewExperimentForm() {
   const navigate = useNavigate()
@@ -108,7 +119,13 @@ function NewExperimentForm() {
   }
 
   return (
-    <div className="wizard">
+    <>
+      <div className="wizard-crumb-wrap">
+        <div className="crumb">
+          <Link to="/dashboard">Back to the dashboard</Link>
+        </div>
+      </div>
+      <div className="wizard">
       <nav className="wizard-rail" aria-label="Wizard steps">
         <ol>
           {STEP_NAMES.map((name, index) => {
@@ -163,17 +180,23 @@ function NewExperimentForm() {
         {step === 1 && (
           <form onSubmit={handleCadenceNext} className="raised" style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 12 }}>
             <h2>Cadence</h2>
-            <select
-              aria-label="Cadence type"
-              value={cadenceType}
-              onChange={(e) => setCadenceType(e.target.value)}
-              className="input"
-            >
-              <option value="">Cadence type</option>
-              <option value="daily">Daily</option>
-              <option value="weekly">Weekly</option>
-              <option value="custom">Custom</option>
-            </select>
+            <div className="auth-field">
+              <label className="label">Cadence type</label>
+              <div className="raised-sm segmented" role="radiogroup" aria-label="Cadence type">
+                {CADENCE_TYPE_OPTIONS.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    role="radio"
+                    aria-checked={cadenceType === option.value}
+                    className={`seg-btn${cadenceType === option.value ? ' active' : ''}`}
+                    onClick={() => setCadenceType(option.value)}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
             <input
               type="number"
               placeholder="Target days"
@@ -190,16 +213,23 @@ function NewExperimentForm() {
                 className="input"
               />
             )}
-            <select
-              aria-label="Check-in kind"
-              value={checkInKind}
-              onChange={(e) => setCheckInKind(e.target.value)}
-              className="input"
-            >
-              <option value="">Check-in kind</option>
-              <option value="boolean">Boolean</option>
-              <option value="rating">Rating</option>
-            </select>
+            <div className="auth-field">
+              <label className="label">Check-in kind</label>
+              <div className="raised-sm segmented" role="radiogroup" aria-label="Check-in kind">
+                {CHECK_IN_KIND_OPTIONS.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    role="radio"
+                    aria-checked={checkInKind === option.value}
+                    className={`seg-btn${checkInKind === option.value ? ' active' : ''}`}
+                    onClick={() => setCheckInKind(option.value)}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
             <input
               type="date"
               placeholder="Start date"
@@ -225,11 +255,13 @@ function NewExperimentForm() {
             <p>Title: {title}</p>
             <p>Hypothesis: {hypothesis}</p>
             <p>
-              Cadence: {cadenceType}
+              Cadence: {CADENCE_TYPE_OPTIONS.find((o) => o.value === cadenceType)?.label ?? cadenceType}
               {cadenceDays !== '' ? ` every ${cadenceDays} days` : ''}
             </p>
             <p>Target days: {targetDays}</p>
-            {checkInKind !== '' && <p>Check-in kind: {checkInKind}</p>}
+            {checkInKind !== '' && (
+              <p>Check-in kind: {CHECK_IN_KIND_OPTIONS.find((o) => o.value === checkInKind)?.label ?? checkInKind}</p>
+            )}
             {startDate !== '' && <p>Start date: {startDate}</p>}
             {submitError && <p role="alert">{submitError}</p>}
             <div style={{ display: 'flex', gap: 10 }}>
@@ -243,7 +275,8 @@ function NewExperimentForm() {
           </div>
         )}
       </div>
-    </div>
+      </div>
+    </>
   )
 }
 

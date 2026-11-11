@@ -1,13 +1,11 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from petri_backend.app import _email_verifications, app, get_repository
+from petri_backend.app import app, get_repository
 from petri_backend.repository_memory import InMemoryRepository
+from petri_backend.security import hash_lookup_code
 
-
-@pytest.fixture(autouse=True)
-def _clear_module_state():
-    _email_verifications.clear()
+from _email_capture import sent_verification_codes
 
 
 @pytest.fixture
@@ -31,12 +29,14 @@ def _signup(client: TestClient, email: str = "user@example.com", password: str =
     )
 
 
-def test_signup_generates_and_emails_a_verification_code(client: TestClient, capsys):
+def test_signup_generates_and_emails_a_verification_code(
+    client: TestClient, repo: InMemoryRepository, capsys
+):
     _signup(client)
 
     out = capsys.readouterr().out
     assert "Verify your Petri account" in out
-    assert len(_email_verifications) == 1
+    assert len(repo._email_verifications) == 1
 
 
 def test_login_is_rejected_until_the_code_is_confirmed(client: TestClient):
@@ -52,7 +52,7 @@ def test_login_is_rejected_until_the_code_is_confirmed(client: TestClient):
 
 def test_verifying_the_code_allows_login_afterward(client: TestClient):
     _signup(client, email="user@example.com", password="pw12345")
-    code = next(iter(_email_verifications))
+    code = sent_verification_codes["user@example.com"]
 
     verify_response = client.post("/auth/verify-email", json={"code": code})
     assert verify_response.status_code == 200
@@ -66,7 +66,7 @@ def test_verifying_the_code_allows_login_afterward(client: TestClient):
 
 def test_verifying_does_not_sign_the_user_in(client: TestClient):
     _signup(client, email="user@example.com", password="pw12345")
-    code = next(iter(_email_verifications))
+    code = sent_verification_codes["user@example.com"]
 
     response = client.post("/auth/verify-email", json={"code": code})
 
@@ -82,7 +82,7 @@ def test_an_unknown_code_returns_generic_400(client: TestClient):
 
 def test_reusing_a_consumed_code_returns_the_same_generic_400(client: TestClient):
     _signup(client, email="user@example.com", password="pw12345")
-    code = next(iter(_email_verifications))
+    code = sent_verification_codes["user@example.com"]
     first = client.post("/auth/verify-email", json={"code": code})
     assert first.status_code == 200
 
@@ -92,13 +92,14 @@ def test_reusing_a_consumed_code_returns_the_same_generic_400(client: TestClient
     assert second.json() == {"detail": "Invalid or expired code."}
 
 
-def test_an_expired_code_returns_generic_400(client: TestClient):
+def test_an_expired_code_returns_generic_400(client: TestClient, repo: InMemoryRepository):
     import datetime as dt
 
     _signup(client, email="user@example.com", password="pw12345")
-    code = next(iter(_email_verifications))
-    user_id, _expires_at = _email_verifications[code]
-    _email_verifications[code] = (
+    code = sent_verification_codes["user@example.com"]
+    code_hash = hash_lookup_code(code)
+    user_id, _expires_at = repo._email_verifications[code_hash]
+    repo._email_verifications[code_hash] = (
         user_id,
         dt.datetime.now(dt.timezone.utc) - dt.timedelta(seconds=1),
     )

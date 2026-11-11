@@ -36,7 +36,7 @@ function fillDetailsAndAdvance() {
 }
 
 function fillCadenceAndAdvance() {
-  fireEvent.change(screen.getByLabelText('Cadence type'), { target: { value: 'daily' } })
+  fireEvent.click(screen.getByRole('radio', { name: 'Daily' }))
   fireEvent.change(screen.getByPlaceholderText('Target days'), { target: { value: '30' } })
   fireEvent.click(screen.getByRole('button', { name: 'Next' }))
 }
@@ -76,6 +76,15 @@ describe('NewExperimentForm wizard', () => {
     expect(playTone).not.toHaveBeenCalledWith('wizard-submit')
   })
 
+  it('links back to the dashboard', () => {
+    stubFetch({ ok: true, status: 201, json: async () => created })
+    renderWizard()
+
+    const link = screen.getByRole('link', { name: 'Back to the dashboard' })
+    expect(link).toBeInTheDocument()
+    expect(link).toHaveAttribute('href', '/dashboard')
+  })
+
   it('renders Step 1 Details first, with the rail showing it current', () => {
     stubFetch({ ok: true, status: 201, json: async () => created })
     renderWizard()
@@ -112,7 +121,7 @@ describe('NewExperimentForm wizard', () => {
     renderWizard()
     fillDetailsAndAdvance()
 
-    fireEvent.change(screen.getByLabelText('Cadence type'), { target: { value: 'custom' } })
+    fireEvent.click(screen.getByRole('radio', { name: 'Custom' }))
     fireEvent.change(screen.getByPlaceholderText('Target days'), { target: { value: '30' } })
     fireEvent.click(screen.getByRole('button', { name: 'Next' }))
 
@@ -129,7 +138,7 @@ describe('NewExperimentForm wizard', () => {
     expect(screen.getByRole('heading', { name: 'Review' })).toBeInTheDocument()
     expect(screen.getByText('Title: Drink more water')).toBeInTheDocument()
     expect(screen.getByText('Hypothesis: I will feel better')).toBeInTheDocument()
-    expect(screen.getByText('Cadence: daily')).toBeInTheDocument()
+    expect(screen.getByText('Cadence: Daily')).toBeInTheDocument()
     expect(screen.getByText('Target days: 30')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Details/ })).toHaveClass('completed')
     expect(screen.getByRole('button', { name: /Cadence/ })).toHaveClass('completed')
@@ -145,7 +154,7 @@ describe('NewExperimentForm wizard', () => {
     fillCadenceAndAdvance()
 
     fireEvent.click(screen.getByRole('button', { name: 'Back' }))
-    expect(screen.getByLabelText('Cadence type')).toHaveValue('daily')
+    expect(screen.getByRole('radio', { name: 'Daily' })).toHaveAttribute('aria-checked', 'true')
     expect(screen.getByPlaceholderText('Target days')).toHaveValue(30)
 
     fireEvent.click(screen.getByRole('button', { name: /Details/ }))

@@ -16,8 +16,11 @@ function renderDashboard() {
   )
 }
 
-function stubExperiments(experiments: unknown[]) {
-  const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => experiments })
+function stubExperiments(experiments: unknown[], goals: unknown[] = []) {
+  const fetchMock = vi.fn((url: string) => {
+    if (url.includes('/goals')) return Promise.resolve({ ok: true, json: async () => goals })
+    return Promise.resolve({ ok: true, json: async () => experiments })
+  })
   vi.stubGlobal('fetch', fetchMock)
   return fetchMock
 }
@@ -45,9 +48,14 @@ describe('Dashboard', () => {
       expect.stringContaining('/experiments'),
       expect.objectContaining({ credentials: 'include' }),
     )
-    // Exactly one GET /experiments call backs both the auth check and
-    // Dashboard's data -- this is the double-fetch QA flagged.
-    expect(fetchMock).toHaveBeenCalledTimes(1)
+    // One GET /experiments call backs both the auth check and Dashboard's
+    // experiment data (the double-fetch QA flagged), plus one GET /goals
+    // call for goal data -- two distinct endpoints, not a repeat.
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/goals'),
+      expect.objectContaining({ credentials: 'include' }),
+    )
   })
 
   it('renders an empty state when there are no experiments, with no section headers', async () => {
@@ -98,16 +106,19 @@ describe('Dashboard', () => {
     await waitFor(() => expect(screen.getByText('No experiments yet.')).toBeInTheDocument())
   })
 
-  it('computes the WIP tile from Active experiments and the static Goals placeholder', async () => {
-    stubExperiments([
-      { id: '1', title: 'A', cadence_type: 'daily', status: 'active', ended_early: false },
-      { id: '2', title: 'B', cadence_type: 'daily', status: 'backlog', ended_early: false },
-    ])
+  it('computes the WIP tile from Active experiments and Active goals', async () => {
+    stubExperiments(
+      [
+        { id: '1', title: 'A', cadence_type: 'daily', status: 'active', ended_early: false },
+        { id: '2', title: 'B', cadence_type: 'daily', status: 'backlog', ended_early: false },
+      ],
+      [{ id: 'g1', title: 'Goal A', start_date: '2026-01-01', target_date: '2026-06-01', status: 'active', milestones: [] }],
+    )
 
     renderDashboard()
 
     await waitFor(() => expect(screen.getByText('1 / 2')).toBeInTheDocument())
-    expect(screen.getByText('0 / 1')).toBeInTheDocument()
+    expect(screen.getByText('1 / 1')).toBeInTheDocument()
   })
 
   it('computes the completed vs abandoned ratio tile and a muted per-card streak placeholder', async () => {
@@ -150,6 +161,42 @@ describe('Dashboard', () => {
     expect(backlogHeading).toBeInTheDocument()
     expect(screen.getByText('Shelved idea')).toBeInTheDocument()
     expect(screen.getByText('Backlog', { selector: '.badge' })).toBeInTheDocument()
+  })
+
+  it('renders real goal cards, split into Goals and Goals backlog', async () => {
+    stubExperiments(
+      [{ id: '1', title: 'A', cadence_type: 'daily', status: 'active', ended_early: false }],
+      [
+        {
+          id: 'g1',
+          title: 'Run a 10k',
+          why_text: 'Build a running habit',
+          start_date: '2026-01-01',
+          target_date: '2026-06-01',
+          status: 'active',
+          milestones: [{ id: 'm1', title: 'Run 5k', cadence_type: 'weekly', status: 'active' }],
+        },
+        {
+          id: 'g2',
+          title: 'Learn piano',
+          start_date: '2026-01-01',
+          target_date: '2026-12-01',
+          status: 'backlog',
+          milestones: [],
+        },
+      ],
+    )
+
+    renderDashboard()
+
+    await waitFor(() => expect(screen.getByText('Run a 10k')).toBeInTheDocument())
+    expect(screen.getByText('Build a running habit')).toBeInTheDocument()
+    expect(screen.getByText('Goal, active')).toBeInTheDocument()
+    expect(screen.getByText('1 milestone')).toBeInTheDocument()
+    expect(screen.queryByText('No goals yet.')).not.toBeInTheDocument()
+
+    expect(screen.getByRole('heading', { name: 'Goals backlog' })).toBeInTheDocument()
+    expect(screen.getByText('Learn piano')).toBeInTheDocument()
   })
 
   it('filters to Experiments only, hiding the Goals empty state', async () => {

@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { useAuth, type Experiment } from './AuthContext'
+import { useAuth } from './AuthContext'
 import {
   addDays,
   addMonths,
+  dayDiff,
   dayStatus,
   getMonthGridDays,
   getWeekDays,
@@ -16,7 +17,7 @@ import './neumorphic.css'
 
 const BASE_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8000'
 
-type Marker = { experiment: Experiment; status: DayStatus }
+type Marker = { key: string; label: string; status: DayStatus; kind: 'experiment' | 'goal' }
 
 type ViewMode = 'week' | 'month'
 type Scope = 'cadence' | 'all'
@@ -58,12 +59,12 @@ function DayCell({
       <span className="calendar-day-number">{date.getDate()}</span>
       {markers.length > 0 && (
         <div className="calendar-day-markers">
-          {markers.map(({ experiment, status }) => (
+          {markers.map(({ key, label, status, kind }) => (
             <span
-              key={experiment.id}
-              className={`calendar-marker calendar-marker-${status}`}
-              title={experiment.title}
-              aria-label={`${experiment.title} ${STATUS_LABEL[status]}`}
+              key={key}
+              className={`calendar-marker calendar-marker-${status}${kind === 'goal' ? ' calendar-marker-goal' : ''}`}
+              title={label}
+              aria-label={`${label} ${STATUS_LABEL[status]}`}
             />
           ))}
         </div>
@@ -73,7 +74,7 @@ function DayCell({
 }
 
 function Calendar() {
-  const { experiments } = useAuth()
+  const { experiments, goals } = useAuth()
   const { experimentId } = useParams<{ experimentId?: string }>()
   const [view, setView] = useState<ViewMode>('month')
   const [anchor, setAnchor] = useState(() => new Date())
@@ -89,6 +90,13 @@ function Calendar() {
     if (scope === 'cadence') return contextExperiment ? [contextExperiment] : []
     return experiments.filter((e) => e.status === 'active')
   }, [experiments, scope, contextExperiment])
+
+  // Goals don't have a "this cadence only" view of their own (that scope is
+  // an experiment concept) -- they only ever show up under "all active".
+  const scopedGoals = useMemo(() => {
+    if (scope !== 'all' || !goals) return []
+    return goals.filter((g) => g.status === 'active')
+  }, [goals, scope])
 
   // Real completed-vs-missed marking (#35) needs each scoped experiment's
   // persisted check-in history (#28), not just same-session state -- keyed
@@ -118,12 +126,31 @@ function Calendar() {
   const monthDays = useMemo(() => getMonthGridDays(anchor), [anchor])
 
   function markersFor(date: Date): Marker[] {
-    return scopedExperiments
+    const dateKey = toLocalDateKey(date)
+
+    const experimentMarkers: Marker[] = scopedExperiments
       .filter((e) => isCadenceDay(e, date))
       .map((experiment) => ({
-        experiment,
+        key: `exp-${experiment.id}`,
+        label: experiment.title,
         status: dayStatus(date, today, checkInDatesByExperiment[experiment.id] ?? new Set()),
+        kind: 'experiment' as const,
       }))
+
+    // Goals/milestones have no recurring cadence of their own in the data
+    // (no stored "milestone started on" date) -- what's real is the goal's
+    // own target_date and each milestone's optional target_date, so those
+    // are what get marked: a due-date marker, not a cadence occurrence.
+    const goalMarkers: Marker[] = scopedGoals
+      .filter((goal) => goal.target_date === dateKey || goal.milestones.some((m) => m.target_date === dateKey))
+      .map((goal) => ({
+        key: `goal-${goal.id}`,
+        label: goal.title,
+        status: dayDiff(today, date) >= 0 ? 'upcoming' : 'missed',
+        kind: 'goal' as const,
+      }))
+
+    return [...experimentMarkers, ...goalMarkers]
   }
 
   function goPrev() {

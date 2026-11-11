@@ -35,7 +35,13 @@ def _send(*, to: str, subject: str, html: str) -> None:
     request = urllib.request.Request(
         _RESEND_API_URL,
         data=payload,
-        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            # Cloudflare (fronting Resend's API) blocks urllib's default
+            # "Python-urllib/x.y" User-Agent as a bot signature.
+            "User-Agent": "petri-backend",
+        },
         method="POST",
     )
     try:

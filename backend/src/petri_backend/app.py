@@ -27,6 +27,7 @@ from petri_backend.repository_postgres import PostgresRepository
 from petri_backend.totp_crypto import decrypt_totp_secret, encrypt_totp_secret
 from petri_backend.vapid import vapid_public_key_b64url
 from petri_backend.security import (
+    hash_lookup_code,
     hash_password,
     new_reset_token,
     new_session_token,
@@ -53,11 +54,9 @@ _repository: Repository = InMemoryRepository()
 # Maps token -> (user_id, expires_at).
 _sessions: dict[str, tuple[str, datetime]] = {}
 
-# ponytail: module-level dict, no persistence; fine for in-memory MVP.
-_reset_tokens: dict[str, tuple[str, datetime]] = {}
-
-# ponytail: module-level dict, no persistence; fine for in-memory MVP.
-_email_verifications: dict[str, tuple[str, datetime]] = {}
+# Reset tokens and verification codes live in the password_resets /
+# email_verifications tables (_docs/schema.sql), not a module-level dict --
+# they must survive a backend restart, unlike _sessions above.
 
 SESSION_COOKIE_NAME = "session_id"
 RESET_TOKEN_TTL = timedelta(minutes=15)
@@ -438,7 +437,11 @@ def signup(
     # *login* that's gated on having verified (see login()), not the
     # signup moment itself.
     code = new_verification_code()
-    _email_verifications[code] = (user.id, datetime.now(timezone.utc) + VERIFICATION_CODE_TTL)
+    repository.create_email_verification(
+        user_id=user.id,
+        code_hash=hash_lookup_code(code),
+        expires_at=datetime.now(timezone.utc) + VERIFICATION_CODE_TTL,
+    )
     send_verification_email(to=user.email, code=code)
 
     token = new_session_token()
@@ -581,7 +584,11 @@ def forgot_password(
     user = repository.get_user_by_email(email=body.email)
     if user is not None:
         token = new_reset_token()
-        _reset_tokens[token] = (user.id, datetime.now(timezone.utc) + RESET_TOKEN_TTL)
+        repository.create_password_reset(
+            user_id=user.id,
+            token_hash=hash_lookup_code(token),
+            expires_at=datetime.now(timezone.utc) + RESET_TOKEN_TTL,
+        )
         # send_password_reset_email fails safely on its own (#21): a missing
         # key or provider error never raises here, so it can't turn into an
         # observable difference in this response either way.
@@ -594,16 +601,15 @@ def forgot_password(
 def reset_password(
     body: ResetPasswordRequest, repository: Repository = Depends(get_repository)
 ) -> dict[str, str]:
-    entry = _reset_tokens.pop(body.token, None)  # one-time use: gone either way.
-    if entry is None:
+    user_id = repository.consume_password_reset(token_hash=hash_lookup_code(body.token))
+    if user_id is None:
         raise HTTPException(status_code=400, detail="Invalid or expired token.")
 
-    user_id, expires_at = entry
-    user = repository.get_user_by_id(user_id=user_id)
-    if datetime.now(timezone.utc) > expires_at or user is None:
+    updated = repository.update_user(user_id=user_id, password_hash=hash_password(body.password))
+    if updated is None:
+        # Defensive: the user the token pointed at no longer exists.
         raise HTTPException(status_code=400, detail="Invalid or expired token.")
 
-    user.password_hash = hash_password(body.password)
     for session_token, (session_user_id, _expires_at) in list(_sessions.items()):
         if session_user_id == user_id:
             del _sessions[session_token]
@@ -615,12 +621,8 @@ def reset_password(
 def verify_email(
     body: VerifyEmailRequest, repository: Repository = Depends(get_repository)
 ) -> dict[str, str]:
-    entry = _email_verifications.pop(body.code, None)  # one-time use: gone either way.
-    if entry is None:
-        raise HTTPException(status_code=400, detail="Invalid or expired code.")
-
-    user_id, expires_at = entry
-    if datetime.now(timezone.utc) > expires_at:
+    user_id = repository.consume_email_verification(code_hash=hash_lookup_code(body.code))
+    if user_id is None:
         raise HTTPException(status_code=400, detail="Invalid or expired code.")
 
     updated = repository.update_user(user_id=user_id, email_verified_at=datetime.now(timezone.utc))
@@ -628,6 +630,24 @@ def verify_email(
         # Defensive: the user the code pointed at no longer exists.
         raise HTTPException(status_code=400, detail="Invalid or expired code.")
 
+    return {"status": "ok"}
+
+
+@app.post("/auth/resend-verification")
+def resend_verification(
+    body: ForgotPasswordRequest, repository: Repository = Depends(get_repository)
+) -> dict[str, str]:
+    user = repository.get_user_by_email(email=body.email)
+    if user is not None and user.email_verified_at is None:
+        code = new_verification_code()
+        repository.create_email_verification(
+            user_id=user.id,
+            code_hash=hash_lookup_code(code),
+            expires_at=datetime.now(timezone.utc) + VERIFICATION_CODE_TTL,
+        )
+        send_verification_email(to=user.email, code=code)
+    # Always the same response, registered/verified or not -- no email
+    # enumeration, same as forgot_password above.
     return {"status": "ok"}
 
 

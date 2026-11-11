@@ -42,3 +42,10 @@ def new_verification_code() -> str:
     # Six digits: short enough to type in by hand from an email, unlike the
     # URL-safe tokens above which are only ever clicked, never typed.
     return f"{secrets.randbelow(1_000_000):06d}"
+
+
+def hash_lookup_code(value: str) -> str:
+    # Plain sha256, not pbkdf2: these are random, short-lived, one-time-use
+    # tokens/codes (not user-chosen passwords), so a fast hash is fine --
+    # this is just to avoid storing them in the DB as plaintext.
+    return hashlib.sha256(value.encode()).hexdigest()

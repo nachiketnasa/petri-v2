@@ -4,8 +4,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import Calendar from './Calendar'
 import { AuthProvider } from './AuthContext'
 
-function stubExperiments(experiments: unknown[]) {
-  const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => experiments })
+function stubExperiments(experiments: unknown[], goals: unknown[] = []) {
+  const fetchMock = vi.fn((url: string) => {
+    if (url.includes('/goals')) return Promise.resolve({ ok: true, json: async () => goals })
+    return Promise.resolve({ ok: true, json: async () => experiments })
+  })
   vi.stubGlobal('fetch', fetchMock)
   return fetchMock
 }
@@ -21,6 +24,7 @@ function stubExperimentsWithCheckIns(
     if (checkInsMatch) {
       return Promise.resolve({ ok: true, json: async () => checkInsById[checkInsMatch[1]] ?? [] })
     }
+    if (url.includes('/goals')) return Promise.resolve({ ok: true, json: async () => [] })
     return Promise.resolve({ ok: true, json: async () => experiments })
   })
   vi.stubGlobal('fetch', fetchMock)
@@ -178,6 +182,49 @@ describe('Calendar', () => {
       .sort((a, b) => a - b)
 
     expect(markedDayNumbers).toEqual([1, 4, 7, 10, 13])
+  })
+
+  it('shows a goal marker on its target_date under "all active" scope', async () => {
+    vi.setSystemTime(new Date(2026, 10, 11))
+    stubExperiments(
+      [],
+      [
+        {
+          id: 'g1',
+          title: 'Run a 10k',
+          start_date: '2026-01-01',
+          target_date: '2026-11-20',
+          status: 'active',
+          milestones: [],
+        },
+      ],
+    )
+    renderCalendar()
+
+    await waitFor(() => expect(document.querySelector('.calendar-grid-month')).toBeInTheDocument())
+    const day20 = screen.getByText('20').closest('.calendar-day')
+    expect(day20?.querySelector('.calendar-marker-goal')).toBeTruthy()
+  })
+
+  it('does not show a goal marker in "this cadence only" scope', async () => {
+    vi.setSystemTime(new Date(2026, 10, 11))
+    stubExperiments(
+      [{ id: 'e1', title: 'Cold showers', cadence_type: 'daily', start_date: '2026-11-01', status: 'active' }],
+      [
+        {
+          id: 'g1',
+          title: 'Run a 10k',
+          start_date: '2026-01-01',
+          target_date: '2026-11-20',
+          status: 'active',
+          milestones: [],
+        },
+      ],
+    )
+    renderCalendar('/calendar/e1')
+
+    await waitFor(() => expect(document.querySelector('.calendar-grid-month')).toBeInTheDocument())
+    expect(document.querySelectorAll('.calendar-marker-goal')).toHaveLength(0)
   })
 
   it('scope toggle switches markers between "this cadence only" and "all active" without reload', async () => {
