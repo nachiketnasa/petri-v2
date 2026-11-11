@@ -1,7 +1,13 @@
 """Postgres-backed repository tests. Same cases as `test_repository_memory.py`,
 run against a real `postgres:16` with `_docs/schema.sql` applied.
 
-Run locally:
+Run locally, with the project's own docker-compose postgres service (already
+exposes 5432 and applies _docs/schema.sql on first init) -- one command runs
+this file's integration tests alongside every unit test in the suite:
+    docker compose up -d postgres
+    cd backend && DATABASE_URL=postgresql://petri:petri@localhost:5432/petri uv run pytest
+
+Or standalone, without docker-compose:
     docker run --rm -e POSTGRES_PASSWORD=postgres -p 5432:5432 -d postgres:16
     psql postgresql://postgres:postgres@localhost:5432/postgres -f _docs/schema.sql
     DATABASE_URL=postgresql://postgres:postgres@localhost:5432/postgres uv run pytest backend/tests/test_repository_postgres.py
