@@ -33,14 +33,20 @@ app.add_middleware(
 
 _repository: Repository = InMemoryRepository()
 
-# ponytail: module-level dict, no TTL/expiry (that's #20); fine for in-memory MVP.
-_sessions: dict[str, str] = {}
+# ponytail: module-level dict, no persistence; fine for in-memory MVP.
+# Maps token -> (user_id, expires_at).
+_sessions: dict[str, tuple[str, datetime]] = {}
 
 # ponytail: module-level dict, no persistence; fine for in-memory MVP.
 _reset_tokens: dict[str, tuple[str, datetime]] = {}
 
 SESSION_COOKIE_NAME = "session_id"
 RESET_TOKEN_TTL = timedelta(minutes=15)
+SESSION_TTL = timedelta(days=30)
+
+
+def _start_session(token: str, user_id: str) -> None:
+    _sessions[token] = (user_id, datetime.now(timezone.utc) + SESSION_TTL)
 
 
 def get_repository() -> Repository:
@@ -54,7 +60,13 @@ def get_current_user(
     request: Request, repository: Repository = Depends(get_repository)
 ) -> User:
     session_id = request.cookies.get(SESSION_COOKIE_NAME)
-    user_id = _sessions.get(session_id) if session_id else None
+    entry = _sessions.get(session_id) if session_id else None
+    user_id = None
+    if entry is not None:
+        user_id, expires_at = entry
+        if datetime.now(timezone.utc) > expires_at:
+            _sessions.pop(session_id, None)
+            user_id = None
     user = repository.get_user_by_id(user_id=user_id) if user_id else None
     if user is None:
         raise HTTPException(status_code=401, detail="Not authenticated.")
@@ -226,7 +238,7 @@ def signup(
     )
 
     token = new_session_token()
-    _sessions[token] = user.id
+    _start_session(token, user.id)
     response.set_cookie(SESSION_COOKIE_NAME, token, httponly=True)
     return UserOut.from_user(user)
 
@@ -246,7 +258,7 @@ def login(
         raise HTTPException(status_code=401, detail="Invalid email or password.")
 
     token = new_session_token()
-    _sessions[token] = user.id
+    _start_session(token, user.id)
     response.set_cookie(SESSION_COOKIE_NAME, token, httponly=True)
     return UserOut.from_user(user)
 
@@ -294,7 +306,7 @@ def reset_password(
         raise HTTPException(status_code=400, detail="Invalid or expired token.")
 
     user.password_hash = hash_password(body.password)
-    for session_token, session_user_id in list(_sessions.items()):
+    for session_token, (session_user_id, _expires_at) in list(_sessions.items()):
         if session_user_id == user_id:
             del _sessions[session_token]
 
