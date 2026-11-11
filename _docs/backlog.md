@@ -1076,7 +1076,7 @@ Ref: `_docs/specs.md` → Calendar.
 
 ## order-11 · #12 — Settings screen
 
-- **Status**: OPEN
+- **Status**: CLOSED
 - **Labels**: frontend, design
 - **Link**: https://github.com/nachiketnasa/petri-v2/issues/12
 
@@ -1088,42 +1088,42 @@ A Settings screen, reachable from the signed-in app, where a user can pick one o
 
 **Access**
 
-- [ ] A new `/settings` route exists and renders a `Settings` screen.
-- [ ] A "Settings" link is visible in the app's header (next to the existing "Sign out" button in `Header`) whenever a user is signed in, and navigates to `/settings`.
-- [ ] Visiting `/settings` while signed out redirects away, the same as every other `RequireAuth`-gated route today (e.g. `/dashboard`).
+- [x] A new `/settings` route exists and renders a `Settings` screen.
+- [x] A "Settings" link is visible in the app's header (next to the existing "Sign out" button in `Header`) whenever a user is signed in, and navigates to `/settings`.
+- [x] Visiting `/settings` while signed out redirects away, the same as every other `RequireAuth`-gated route today (e.g. `/dashboard`).
 
 **Theme**
 
-- [ ] Exactly four selectable options are shown, labeled "Petri Light", "Petri Dark", "Solarized Light", "Solarized Dark"; exactly one is selected at a time.
-- [ ] Selecting a theme re-skins the whole app immediately, not just the Settings screen itself — visible by selecting a theme, then navigating to the Dashboard or Greeting screen and seeing the same palette there.
-- [ ] The selected theme survives a full page reload (read back from `localStorage`).
-- [ ] A first-time visitor who has never opened Settings sees today's existing look unchanged (current default counts as "Petri Light"); no visual change happens before anyone picks anything.
-- [ ] Petri Light/Dark build on the sage-accent neumorphic palette already in `neumorphic.css`/`index.css`; Solarized Light/Dark use the published Solarized color values. All four are implemented as CSS variable sets selected by one attribute (e.g. `data-theme` on `<html>`), not four separate stylesheets and not per-component hardcoded colors.
+- [x] Exactly four selectable options are shown, labeled "Petri Light", "Petri Dark", "Solarized Light", "Solarized Dark"; exactly one is selected at a time.
+- [x] Selecting a theme re-skins the whole app immediately, not just the Settings screen itself — visible by selecting a theme, then navigating to the Dashboard or Greeting screen and seeing the same palette there.
+- [x] The selected theme survives a full page reload (read back from `localStorage`).
+- [x] A first-time visitor who has never opened Settings sees today's existing look unchanged (current default counts as "Petri Light"); no visual change happens before anyone picks anything.
+- [x] Petri Light/Dark build on the sage-accent neumorphic palette already in `neumorphic.css`/`index.css`; Solarized Light/Dark use the published Solarized color values. All four are implemented as CSS variable sets selected by one attribute (e.g. `data-theme` on `<html>`), not four separate stylesheets and not per-component hardcoded colors.
 
 **Sound effects**
 
-- [ ] A single "Sound effects" on/off toggle, off by default, stored in `localStorage`.
-- [ ] When on, a short synthesized tone (Web Audio API, no shipped audio files) plays at exactly three moments that have a real UI hook today: opening the experiment creation wizard (`/experiments/new` mount), successfully submitting it, and successfully logging a check-in on `ExperimentDetail`.
-- [ ] When off, none of those three actions produce any sound.
-- [ ] The fourth moment named in `_docs/specs.md`'s Design system section, "pausing or removing a cadence," is not wired in this pass — confirmed there is no pause action and no cadence-removal/delete action anywhere in the backend (`app.py`) or frontend today, so there is nothing for a tone to attach to yet. See Out of scope.
+- [x] A single "Sound effects" on/off toggle, off by default, stored in `localStorage`.
+- [x] When on, a short synthesized tone (Web Audio API, no shipped audio files) plays at exactly three moments that have a real UI hook today: opening the experiment creation wizard (`/experiments/new` mount), successfully submitting it, and successfully logging a check-in on `ExperimentDetail`.
+- [x] When off, none of those three actions produce any sound.
+- [x] The fourth moment named in `_docs/specs.md`'s Design system section, "pausing or removing a cadence," is not wired in this pass — confirmed there is no pause action and no cadence-removal/delete action anywhere in the backend (`app.py`) or frontend today, so there is nothing for a tone to attach to yet. See Out of scope.
 
 **Landing-screen preference**
 
-- [ ] A toggle (default off) lets the user choose to open the dashboard directly after sign-in instead of the greeting screen — this is the toggle #10's grooming named and deferred to this issue.
-- [ ] With the toggle on, signing in (or a signed-in user hitting `/`) goes straight to `/dashboard`, skipping `/greeting`.
-- [ ] With the toggle off (the default), today's greeting-first behavior from #10 is unchanged.
-- [ ] Stored in `localStorage`; the redirect logic already in `App.tsx` (`Home`, and anywhere else a signed-in user is sent to `/greeting`) reads this preference instead of hardcoding `/greeting`.
+- [x] A toggle (default off) lets the user choose to open the dashboard directly after sign-in instead of the greeting screen — this is the toggle #10's grooming named and deferred to this issue.
+- [x] With the toggle on, signing in (or a signed-in user hitting `/`) goes straight to `/dashboard`, skipping `/greeting`.
+- [x] With the toggle off (the default), today's greeting-first behavior from #10 is unchanged.
+- [x] Stored in `localStorage`; the redirect logic already in `App.tsx` (`Home`, and anywhere else a signed-in user is sent to `/greeting`) reads this preference instead of hardcoding `/greeting`.
 
 **Cookie notice**
 
-- [ ] A cookie notice is visible on first load of the app (signed in or not), stating in substance that the site uses only cookies strictly necessary for sign-in and security, and that using the site means accepting this — matching `_docs/specs.md`'s Authentication section.
-- [ ] There is no category picker and no separate accept/reject choice — at most a single dismissal, since strictly-necessary cookies need no opt-in consent.
-- [ ] Once dismissed, the notice does not reappear on a later visit (dismissal remembered in `localStorage`).
-- [ ] The notice never covers or blocks interaction with the rest of the page underneath it (no full-page modal).
+- [x] A cookie notice is visible on first load of the app (signed in or not), stating in substance that the site uses only cookies strictly necessary for sign-in and security, and that using the site means accepting this — matching `_docs/specs.md`'s Authentication section.
+- [x] There is no category picker and no separate accept/reject choice — at most a single dismissal, since strictly-necessary cookies need no opt-in consent.
+- [x] Once dismissed, the notice does not reappear on a later visit (dismissal remembered in `localStorage`).
+- [x] The notice never covers or blocks interaction with the rest of the page underneath it (no full-page modal).
 
 **Explicitly not built this pass**
 
-- [ ] Settings contains no "Other tasks" toggle, no 2FA enrollment control, and no account-deletion control — see Out of scope for exactly why and where each is tracked. (This is checkable: these three controls are simply absent from the screen.)
+- [x] Settings contains no "Other tasks" toggle, no 2FA enrollment control, and no account-deletion control — see Out of scope for exactly why and where each is tracked. (This is checkable: these three controls are simply absent from the screen.)
 
 ## Out of scope
 
