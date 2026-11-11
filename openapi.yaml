@@ -120,6 +120,37 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /users/me:
+    patch:
+      summary: Update the signed-in user's Settings preferences
+      operationId: updateMyPreferences
+      tags: [users]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserPreferencesRequest"
+      responses:
+        "200":
+          description: Updated user.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          description: Missing or invalid field.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /auth/forgot-password:
     post:
       summary: Request a password reset
@@ -434,7 +465,17 @@ components:
       description: >-
         Mirrors repository.py's User dataclass, minus password_hash, which is
         server-internal and never returned.
-      required: [id, email, display_name, timezone, created_at]
+      required:
+        [
+          id,
+          email,
+          display_name,
+          timezone,
+          created_at,
+          theme,
+          sound_effects_enabled,
+          default_landing,
+        ]
       properties:
         id:
           type: string
@@ -448,6 +489,27 @@ components:
         created_at:
           type: string
           format: date-time
+        theme:
+          type: string
+          enum: [petri-light, petri-dark, solarized-light, solarized-dark]
+        sound_effects_enabled:
+          type: boolean
+        default_landing:
+          type: string
+          enum: [greeting, dashboard]
+
+    UpdateUserPreferencesRequest:
+      type: object
+      description: All fields optional; only the ones provided are updated.
+      properties:
+        theme:
+          type: string
+          enum: [petri-light, petri-dark, solarized-light, solarized-dark]
+        sound_effects_enabled:
+          type: boolean
+        default_landing:
+          type: string
+          enum: [greeting, dashboard]
 
     SignupRequest:
       type: object

@@ -270,6 +270,9 @@ class UserOut(BaseModel):
     display_name: str
     timezone: str
     created_at: datetime
+    theme: str
+    sound_effects_enabled: bool
+    default_landing: str
 
     @classmethod
     def from_user(cls, user: User) -> "UserOut":
@@ -279,7 +282,16 @@ class UserOut(BaseModel):
             display_name=user.display_name,
             timezone=user.timezone,
             created_at=user.created_at,
+            theme=user.theme,
+            sound_effects_enabled=user.sound_effects_enabled,
+            default_landing=user.default_landing,
         )
+
+
+class UpdateUserPreferencesRequest(BaseModel):
+    theme: Literal["petri-light", "petri-dark", "solarized-light", "solarized-dark"] | None = None
+    sound_effects_enabled: bool | None = None
+    default_landing: Literal["greeting", "dashboard"] | None = None
 
 
 @app.get("/health")
@@ -331,6 +343,17 @@ def login(
 @app.get("/auth/me", response_model=UserOut)
 def get_me(current_user: User = Depends(get_current_user)) -> UserOut:
     return UserOut.from_user(current_user)
+
+
+@app.patch("/users/me", response_model=UserOut)
+def update_my_preferences(
+    body: UpdateUserPreferencesRequest,
+    current_user: User = Depends(get_current_user),
+    repository: Repository = Depends(get_repository),
+) -> UserOut:
+    fields = body.model_dump(exclude_unset=True)
+    updated = repository.update_user(user_id=current_user.id, **fields)
+    return UserOut.from_user(updated)
 
 
 @app.post("/auth/logout", status_code=204)

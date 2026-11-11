@@ -20,6 +20,7 @@ def test_implements_exactly_the_interface_methods():
         "create_user",
         "get_user_by_id",
         "get_user_by_email",
+        "update_user",
         "create_experiment",
         "list_experiments",
         "get_experiment",

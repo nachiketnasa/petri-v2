@@ -35,6 +35,20 @@ _EXPERIMENT_UPDATABLE_FIELDS = {
     "archived_at",
 }
 
+# Columns `update_user` is allowed to set -- Settings preferences only (#37);
+# email/password/display_name/timezone go through their own dedicated flows.
+_USER_UPDATABLE_FIELDS = {
+    "theme",
+    "sound_effects_enabled",
+    "default_landing",
+}
+
+
+_USER_COLUMNS = (
+    "id, email, password_hash, display_name, timezone, created_at, "
+    "theme, sound_effects_enabled, default_landing"
+)
+
 
 def _row_to_user(row: tuple) -> User:
     return User(
@@ -44,6 +58,9 @@ def _row_to_user(row: tuple) -> User:
         display_name=row[3],
         timezone=row[4],
         created_at=row[5],
+        theme=row[6],
+        sound_effects_enabled=row[7],
+        default_landing=row[8],
     )
 
 
@@ -108,10 +125,10 @@ class PostgresRepository(Repository):
     ) -> User:
         with self._connect() as conn, conn.cursor() as cur:
             cur.execute(
-                """
+                f"""
                 insert into users (email, password_hash, display_name, timezone)
                 values (%s, %s, %s, %s)
-                returning id, email, password_hash, display_name, timezone, created_at
+                returning {_USER_COLUMNS}
                 """,
                 (email, password_hash, display_name, timezone),
             )
@@ -120,8 +137,7 @@ class PostgresRepository(Repository):
     def get_user_by_id(self, *, user_id: str) -> User | None:
         with self._connect() as conn, conn.cursor() as cur:
             cur.execute(
-                "select id, email, password_hash, display_name, timezone, created_at "
-                "from users where id = %s",
+                f"select {_USER_COLUMNS} from users where id = %s",
                 (user_id,),
             )
             row = cur.fetchone()
@@ -131,9 +147,26 @@ class PostgresRepository(Repository):
         # `users.email` is `citext` — case-insensitive comparison without lower().
         with self._connect() as conn, conn.cursor() as cur:
             cur.execute(
-                "select id, email, password_hash, display_name, timezone, created_at "
-                "from users where email = %s",
+                f"select {_USER_COLUMNS} from users where email = %s",
                 (email,),
+            )
+            row = cur.fetchone()
+            return _row_to_user(row) if row else None
+
+    def update_user(self, *, user_id: str, **fields) -> User | None:
+        if not fields:
+            return self.get_user_by_id(user_id=user_id)
+
+        unknown = set(fields) - _USER_UPDATABLE_FIELDS
+        if unknown:
+            raise ValueError(f"unknown user field(s): {sorted(unknown)}")
+
+        set_clause = ", ".join(f"{key} = %s" for key in fields)
+        values = list(fields.values()) + [user_id]
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute(
+                f"update users set {set_clause} where id = %s returning {_USER_COLUMNS}",
+                values,
             )
             row = cur.fetchone()
             return _row_to_user(row) if row else None

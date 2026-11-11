@@ -21,6 +21,9 @@ class User:
     display_name: str
     timezone: str
     created_at: datetime
+    theme: str = "petri-light"
+    sound_effects_enabled: bool = True
+    default_landing: str = "greeting"
 
 
 @dataclass
@@ -80,6 +83,9 @@ class Repository(ABC):
 
     @abstractmethod
     def get_user_by_email(self, *, email: str) -> User | None: ...
+
+    @abstractmethod
+    def update_user(self, *, user_id: str, **fields) -> User | None: ...
 
     @abstractmethod
     def create_experiment(

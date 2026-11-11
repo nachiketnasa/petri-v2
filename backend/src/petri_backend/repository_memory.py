@@ -50,6 +50,14 @@ class InMemoryRepository(Repository):
                 return user
         return None
 
+    def update_user(self, *, user_id: str, **fields) -> User | None:
+        user = self.get_user_by_id(user_id=user_id)
+        if user is None:
+            return None
+        for key, value in fields.items():
+            setattr(user, key, value)
+        return user
+
     def create_experiment(
         self,
         *,
