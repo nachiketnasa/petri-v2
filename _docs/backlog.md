@@ -900,7 +900,7 @@ Add the public landing page that does not exist yet: an unauthenticated visitor 
 
 ## order-10 · #11 — Calendar: week and month views
 
-- **Status**: OPEN
+- **Status**: CLOSED
 - **Labels**: frontend
 - **Link**: https://github.com/nachiketnasa/petri-v2/issues/11
 
@@ -914,39 +914,39 @@ backend change needed for this part.
 
 ## Acceptance criteria
 
-- [ ] Week view shows exactly Monday through Sunday in its own layout (not a
+- [x] Week view shows exactly Monday through Sunday in its own layout (not a
       7-day slice cropped out of the month grid). Prev/next controls move
       the view back/forward exactly one week at a time.
-- [ ] Month view starts on the Monday of the week containing the 1st of the
+- [x] Month view starts on the Monday of the week containing the 1st of the
       month and ends on the Sunday closing the week containing the month's
       last day, so every day of the month appears, plus the leading/trailing
       adjacent-month days needed to complete the first/last week — those
       adjacent-month days are visually faded/de-emphasized relative to
       in-month days. Prev/next controls move the view back/forward exactly
       one month at a time.
-- [ ] Today's date is visually highlighted, distinct from all other days, in
+- [x] Today's date is visually highlighted, distinct from all other days, in
       both week and month view.
-- [ ] Each day cell shows a marker per active experiment whose cadence lands
+- [x] Each day cell shows a marker per active experiment whose cadence lands
       on that date: `daily` → every day from `start_date` onward; `weekly` →
       every 7th day from `start_date`; `custom` → every `cadence_days` days
       from `start_date`. This is schedule math only (is this date a cadence
       occurrence), not a check-in-completion check — see Out of scope.
-- [ ] Scope toggle has two options for this pass: "this cadence only" (the
+- [x] Scope toggle has two options for this pass: "this cadence only" (the
       single experiment the calendar was opened from, if opened from an
       experiment's context) and "all active" (every experiment with
       `status == "active"`, merged onto the same grid). Switching the toggle
       changes which markers are drawn without a page reload.
-- [ ] No "Other tasks" option appears in the scope toggle — that feature
+- [x] No "Other tasks" option appears in the scope toggle — that feature
       doesn't exist yet (#8, `order-17`, still open).
-- [ ] Empty state: a user with zero active experiments sees the grid and
+- [x] Empty state: a user with zero active experiments sees the grid and
       navigation render normally, with no day markers and no error.
-- [ ] A `custom`-cadence experiment with `cadence_days` other than 7 (e.g.
+- [x] A `custom`-cadence experiment with `cadence_days` other than 7 (e.g.
       3) shows its markers on the correct non-weekly-aligned days, verifiable
       by counting marked days across at least two consecutive weeks.
-- [ ] Navigating many weeks/months forward and back (e.g. 12+ months either
+- [x] Navigating many weeks/months forward and back (e.g. 12+ months either
       direction, crossing a year boundary) keeps date math and markers
       correct — no drift, no crash, no duplicate/missing day cells.
-- [ ] Days are computed and compared using the browser's local date only
+- [x] Days are computed and compared using the browser's local date only
       (no server round-trip per day, no cross-timezone "due as of a
       specific instant" precision) — see Constraints.
 
