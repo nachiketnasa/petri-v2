@@ -2,9 +2,22 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import ExperimentDetail from './ExperimentDetail'
+import { AuthProvider } from './AuthContext'
 import { playTone } from './sound'
 
 vi.mock('./sound', () => ({ playTone: vi.fn() }))
+
+function renderDetailWithAuth(id: string) {
+  return render(
+    <AuthProvider>
+      <MemoryRouter initialEntries={[`/experiments/${id}`]}>
+        <Routes>
+          <Route path="/experiments/:id" element={<ExperimentDetail />} />
+        </Routes>
+      </MemoryRouter>
+    </AuthProvider>,
+  )
+}
 
 function renderDetail(id: string) {
   return render(
@@ -294,6 +307,33 @@ describe('ExperimentDetail', () => {
       expect.stringContaining('/experiments/exp-1/activate'),
       expect.objectContaining({ method: 'POST', credentials: 'include' }),
     )
+  })
+
+  it('refetches the shared experiments list after activating, so the Dashboard is not stale', async () => {
+    const backlogExperiment = { ...experiment, status: 'backlog' }
+    const activated = { ...experiment, status: 'active' }
+    const listCalls: string[] = []
+    const fetchMock = vi.fn((url: string) => {
+      if (url.includes('/activate')) {
+        return Promise.resolve({ ok: true, json: async () => activated })
+      }
+      if (url.endsWith('/experiments/exp-1')) {
+        return Promise.resolve({ ok: true, json: async () => backlogExperiment })
+      }
+      // AuthProvider's own GET /experiments (the list Dashboard reads).
+      listCalls.push(url)
+      return Promise.resolve({ ok: true, json: async () => [] })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderDetailWithAuth('exp-1')
+    await waitFor(() => expect(screen.getByText('Drink more water')).toBeInTheDocument())
+    const listCallsBeforeActivate = listCalls.length
+
+    fireEvent.click(screen.getByRole('button', { name: 'Activate' }))
+
+    await waitFor(() => expect(screen.getByText('Experiment, active')).toBeInTheDocument())
+    await waitFor(() => expect(listCalls.length).toBeGreaterThan(listCallsBeforeActivate))
   })
 
   it('shows the backend error when activating fails (e.g. WIP cap already reached)', async () => {

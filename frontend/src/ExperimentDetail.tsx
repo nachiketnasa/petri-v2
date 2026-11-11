@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useContext, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { AuthContext } from './AuthContext'
 import { playTone } from './sound'
 import './neumorphic.css'
 
@@ -36,6 +37,12 @@ type ArchiveMode = 'retro' | 'abandon'
 
 function ExperimentDetail() {
   const { id: experimentId } = useParams<{ id: string }>()
+  // Optional: in the real app this is always inside AuthProvider, so a
+  // status change here (activate/archive) can refresh the Dashboard's
+  // shared experiments list. Read via useContext directly (not the
+  // throwing useAuth hook) so standalone tests that render this component
+  // without an AuthProvider keep working unchanged.
+  const authCtx = useContext(AuthContext)
   const [experiment, setExperiment] = useState<Experiment | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
 
@@ -70,6 +77,9 @@ function ExperimentDetail() {
         const data = await res.json()
         if (!res.ok) throw new Error(data.detail)
         setExperiment(data)
+        // So the Dashboard (backlog section, WIP tile) isn't stale when the
+        // user navigates back there after activating from this page.
+        authCtx?.refetch()
       })
       .catch((err: Error) => setActivateError(err.message))
       .finally(() => setActivating(false))
@@ -161,6 +171,9 @@ function ExperimentDetail() {
         const data = await res.json()
         if (!res.ok) throw new Error(data.detail)
         setExperiment(data)
+        // Same reasoning as activate: the Dashboard's WIP/ratio tiles and
+        // backlog/active sections shouldn't go stale after archiving here.
+        authCtx?.refetch()
       })
       .catch((err: Error) => setArchiveError(err.message))
       .finally(() => setArchiving(false))

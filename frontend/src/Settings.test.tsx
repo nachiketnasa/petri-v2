@@ -1,4 +1,5 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it } from 'vitest'
 import Settings, {
   CookieNotice,
@@ -9,6 +10,14 @@ import Settings, {
 } from './Settings'
 import { isSoundEnabled } from './sound'
 
+function renderSettings() {
+  return render(
+    <MemoryRouter>
+      <Settings />
+    </MemoryRouter>,
+  )
+}
+
 describe('Settings', () => {
   afterEach(() => {
     localStorage.clear()
@@ -17,7 +26,7 @@ describe('Settings', () => {
   })
 
   it('renders exactly four theme options, with Petri Light selected by default', () => {
-    render(<Settings />)
+    renderSettings()
 
     expect(screen.getByRole('radio', { name: 'Petri light' })).toBeChecked()
     expect(screen.getByRole('radio', { name: 'Petri dark' })).not.toBeChecked()
@@ -27,7 +36,7 @@ describe('Settings', () => {
   })
 
   it('does not render the deferred Other tasks, 2FA, or account deletion controls', () => {
-    render(<Settings />)
+    renderSettings()
 
     expect(screen.queryByText(/other tasks/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/two.factor|2fa/i)).not.toBeInTheDocument()
@@ -41,7 +50,7 @@ describe('Settings', () => {
   })
 
   it('selecting a theme sets data-theme on <html> immediately and persists it to localStorage', () => {
-    render(<Settings />)
+    renderSettings()
 
     fireEvent.click(screen.getByRole('radio', { name: 'Solarized dark' }))
 
@@ -50,7 +59,7 @@ describe('Settings', () => {
   })
 
   it('a stored theme survives a reload: applyStoredTheme reads it back and re-applies it', () => {
-    render(<Settings />)
+    renderSettings()
     fireEvent.click(screen.getByRole('radio', { name: 'Petri dark' }))
 
     // Simulate a fresh page load.
@@ -61,7 +70,7 @@ describe('Settings', () => {
   });
 
   it('exactly one theme option is selected at a time', () => {
-    render(<Settings />)
+    renderSettings()
 
     fireEvent.click(screen.getByRole('radio', { name: 'Solarized light' }))
 
@@ -71,7 +80,7 @@ describe('Settings', () => {
   })
 
   it('the sound effects toggle is off by default and persists when turned on', () => {
-    render(<Settings />)
+    renderSettings()
 
     const toggle = screen.getByRole('switch', { name: /Sound effects/ })
     expect(toggle).not.toBeChecked()
@@ -85,7 +94,7 @@ describe('Settings', () => {
   })
 
   it('the landing-screen preference is off by default and persists when turned on', () => {
-    render(<Settings />)
+    renderSettings()
 
     const toggle = screen.getByRole('switch', { name: /dashboard directly|greeting screen first/i })
     expect(toggle).not.toBeChecked()
@@ -99,9 +108,16 @@ describe('Settings', () => {
   })
 
   it('shows the strictly-necessary cookie notice text', () => {
-    render(<Settings />)
+    renderSettings()
 
     expect(screen.getByText(COOKIE_NOTICE_TEXT)).toBeInTheDocument()
+  })
+
+  it('links back to the dashboard as an in-app route, not a full page reload', () => {
+    renderSettings()
+
+    const back = screen.getByRole('link', { name: 'Back to the dashboard' })
+    expect(back).toHaveAttribute('href', '/dashboard')
   })
 })
 

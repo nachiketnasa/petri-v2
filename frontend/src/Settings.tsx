@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { isSoundEnabled, setSoundEnabled } from './sound'
 import './neumorphic.css'
 
@@ -115,7 +116,7 @@ function Settings() {
   return (
     <div className="settings-screen">
       <div className="crumb">
-        <a href="/dashboard">Back to the dashboard</a>
+        <Link to="/dashboard">Back to the dashboard</Link>
       </div>
       <h2>Settings</h2>
 

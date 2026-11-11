@@ -23,7 +23,7 @@ type AuthState = {
   refetch: () => void
 }
 
-const AuthContext = createContext<AuthState | null>(null)
+export const AuthContext = createContext<AuthState | null>(null)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [signedIn, setSignedIn] = useState<boolean | null>(null)
