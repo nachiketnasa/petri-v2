@@ -1,6 +1,7 @@
 import os
 from datetime import date, datetime, timedelta, timezone
 from typing import Literal
+from zoneinfo import ZoneInfo
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.exceptions import RequestValidationError
@@ -144,11 +145,18 @@ class ExperimentOut(BaseModel):
     updated_at: datetime
     archived_at: datetime | None
     check_in_due: bool
+    streak: int
 
     @classmethod
     def from_experiment(
-        cls, experiment: Experiment, *, last_check_in_at: datetime | None = None
+        cls,
+        experiment: Experiment,
+        *,
+        check_ins: list[CheckIn] | None = None,
+        user_timezone: str = "UTC",
     ) -> "ExperimentOut":
+        check_ins = check_ins or []
+        last_check_in_at = max((c.checked_in_at for c in check_ins), default=None)
         return cls(
             id=experiment.id,
             user_id=experiment.user_id,
@@ -166,7 +174,16 @@ class ExperimentOut(BaseModel):
             updated_at=experiment.updated_at,
             archived_at=experiment.archived_at,
             check_in_due=_is_check_in_due(experiment, last_check_in_at),
+            streak=_compute_streak(experiment, check_ins, user_timezone),
         )
+
+
+def _cadence_interval_days(experiment: Experiment) -> int:
+    return (
+        experiment.cadence_days
+        if experiment.cadence_type == "custom"
+        else {"daily": 1, "weekly": 7}[experiment.cadence_type]
+    )
 
 
 def _is_check_in_due(experiment: Experiment, last_check_in_at: datetime | None) -> bool:
@@ -178,22 +195,39 @@ def _is_check_in_due(experiment: Experiment, last_check_in_at: datetime | None) 
     reference = last_check_in_at or datetime.combine(
         experiment.start_date, datetime.min.time(), tzinfo=timezone.utc
     )
-    interval_days = (
-        experiment.cadence_days
-        if experiment.cadence_type == "custom"
-        else {"daily": 1, "weekly": 7}[experiment.cadence_type]
-    )
-    return datetime.now(timezone.utc) - reference >= timedelta(days=interval_days)
+    return datetime.now(timezone.utc) - reference >= timedelta(days=_cadence_interval_days(experiment))
 
 
-def _last_check_in_at(repository: Repository, *, experiment_id: str, user_id: str) -> datetime | None:
-    # ponytail: loads the full history just for its max timestamp (fine at
-    # MVP scale); a dedicated "latest check-in" repository query would be
-    # the fix once an experiment's history is large enough to matter.
-    check_ins = repository.list_check_ins(experiment_id=experiment_id, user_id=user_id)
-    if not check_ins:
-        return None
-    return max(c.checked_in_at for c in check_ins)
+def _compute_streak(experiment: Experiment, check_ins: list[CheckIn], user_timezone: str) -> int:
+    # Consecutive, fully-elapsed cadence periods (since start_date) with at
+    # least one check-in each, counting back from the most recently elapsed
+    # period; the first empty period stops the count. The still-in-progress
+    # current period never counts either way (_docs/specs.md -> Streaks: no
+    # freeze/purchase mechanic, a missed period just resets to 0).
+    try:
+        tz = ZoneInfo(user_timezone)
+    except Exception:
+        tz = timezone.utc
+    interval_days = _cadence_interval_days(experiment)
+    start = datetime.combine(experiment.start_date, datetime.min.time(), tzinfo=tz)
+    now = datetime.now(tz)
+    elapsed_periods = int((now - start).days // interval_days)
+    if elapsed_periods <= 0 or not check_ins:
+        return 0
+
+    check_in_dates = {c.checked_in_at.astimezone(tz).date() for c in check_ins}
+
+    def period_has_check_in(period_index: int) -> bool:
+        period_start = (start + timedelta(days=period_index * interval_days)).date()
+        period_end = (start + timedelta(days=(period_index + 1) * interval_days)).date()
+        return any(period_start <= d < period_end for d in check_in_dates)
+
+    streak = 0
+    for period_index in range(elapsed_periods - 1, -1, -1):
+        if not period_has_check_in(period_index):
+            break
+        streak += 1
+    return streak
 
 
 class ArchiveExperimentRequest(BaseModel):
@@ -379,11 +413,8 @@ def list_experiments(
     return [
         ExperimentOut.from_experiment(
             experiment,
-            last_check_in_at=_last_check_in_at(
-                repository, experiment_id=experiment.id, user_id=current_user.id
-            )
-            if experiment.status == "active"
-            else None,
+            check_ins=repository.list_check_ins(experiment_id=experiment.id, user_id=current_user.id),
+            user_timezone=current_user.timezone,
         )
         for experiment in experiments
     ]
@@ -401,12 +432,10 @@ def get_experiment(
         # belongs to another user" - don't distinguish, so a 404 can't leak
         # whether the id exists for someone else.
         raise HTTPException(status_code=404, detail="Experiment not found.")
-    last_check_in_at = (
-        _last_check_in_at(repository, experiment_id=id, user_id=current_user.id)
-        if experiment.status == "active"
-        else None
+    check_ins = repository.list_check_ins(experiment_id=id, user_id=current_user.id)
+    return ExperimentOut.from_experiment(
+        experiment, check_ins=check_ins, user_timezone=current_user.timezone
     )
-    return ExperimentOut.from_experiment(experiment, last_check_in_at=last_check_in_at)
 
 
 @app.post("/experiments/{id}/archive", response_model=ExperimentOut)
@@ -468,7 +497,8 @@ def archive_experiment(
             abandon_reason=body.abandon_reason,
             archived_at=datetime.now(timezone.utc),
         )
-    return ExperimentOut.from_experiment(updated)
+    check_ins = repository.list_check_ins(experiment_id=id, user_id=current_user.id)
+    return ExperimentOut.from_experiment(updated, check_ins=check_ins, user_timezone=current_user.timezone)
 
 
 @app.post("/experiments/{id}/activate", response_model=ExperimentOut)
@@ -492,8 +522,8 @@ def activate_experiment(
 
     updated = repository.update_experiment(experiment_id=id, user_id=current_user.id, status="active")
     # Freshly activated: no check-ins possible yet (backlog can't log one),
-    # so due-ness only depends on start_date vs. now.
-    return ExperimentOut.from_experiment(updated, last_check_in_at=None)
+    # so due-ness/streak only depend on start_date vs. now.
+    return ExperimentOut.from_experiment(updated, check_ins=[], user_timezone=current_user.timezone)
 
 
 @app.post("/experiments/{id}/check-ins", status_code=201, response_model=CheckInOut)

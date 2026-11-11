@@ -514,6 +514,7 @@ components:
         - updated_at
         - archived_at
         - check_in_due
+        - streak
       properties:
         id:
           type: string
@@ -558,6 +559,13 @@ components:
             Derived, not persisted: cadence elapsed since the last check-in
             (or since start_date, if none yet), only ever true while status
             is "active".
+        streak:
+          type: integer
+          description: >-
+            Derived, not persisted: consecutive fully-elapsed cadence
+            periods with at least one check-in each, counting back from the
+            most recently elapsed period; a missed period resets it to 0.
+            Computed in the signed-in user's own timezone.
 
     CreateExperimentRequest:
       type: object
