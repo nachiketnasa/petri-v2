@@ -10,6 +10,8 @@ import Calendar from './Calendar'
 import Greeting, { rememberDisplayName } from './Greeting'
 import NewExperimentForm from './NewExperimentForm'
 import Settings, { CookieNotice, applyStoredTheme, getLandingPreference } from './Settings'
+import ForgotPassword from './ForgotPassword'
+import ResetPassword from './ResetPassword'
 import { AuthProvider, useAuth } from './AuthContext'
 
 function landingPath() {
@@ -70,6 +72,8 @@ function AppRoutes() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/sign-in" element={<SignIn />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route
           path="/greeting"
           element={

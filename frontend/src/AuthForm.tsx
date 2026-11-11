@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import './neumorphic.css'
 
 const BASE_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8000'
@@ -114,6 +115,11 @@ function AuthForm({ onAuthenticated }: Props) {
         <button type="submit" disabled={loading} className="btn btn-primary-exp" style={{ justifyContent: 'center' }}>
           {mode === 'signup' ? 'Sign up' : 'Sign in'}
         </button>
+        {mode === 'signin' && (
+          <div style={{ textAlign: 'center' }}>
+            <Link to="/forgot-password">Forgot password?</Link>
+          </div>
+        )}
         <div className="auth-foot">
           <button type="button" onClick={toggleMode} disabled={loading} className="btn btn-text">
             {mode === 'signup' ? 'Switch to sign in' : 'Switch to sign up'}

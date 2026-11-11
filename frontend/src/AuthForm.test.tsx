@@ -1,6 +1,11 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import AuthForm from './AuthForm'
+
+function renderAuthForm(onAuthenticated = vi.fn()) {
+  return render(<AuthForm onAuthenticated={onAuthenticated} />, { wrapper: MemoryRouter })
+}
 
 describe('AuthForm', () => {
   afterEach(() => {
@@ -24,7 +29,7 @@ describe('AuthForm', () => {
     )
 
     const onAuthenticated = vi.fn()
-    render(<AuthForm onAuthenticated={onAuthenticated} />)
+    renderAuthForm(onAuthenticated)
     fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'new@x.com' } })
     fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'secret123' } })
     fireEvent.change(screen.getByLabelText('Display name'), { target: { value: 'New' } })
@@ -65,7 +70,7 @@ describe('AuthForm', () => {
     )
 
     const onAuthenticated = vi.fn()
-    render(<AuthForm onAuthenticated={onAuthenticated} />)
+    renderAuthForm(onAuthenticated)
     fireEvent.click(screen.getByRole('button', { name: 'Switch to sign in' }))
     fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'foo@x.com' } })
     fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'secret123' } })
@@ -96,7 +101,7 @@ describe('AuthForm', () => {
       }),
     )
 
-    render(<AuthForm onAuthenticated={vi.fn()} />)
+    renderAuthForm()
     fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'new@x.com' } })
     fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'secret123' } })
     fireEvent.change(screen.getByLabelText('Display name'), { target: { value: 'New' } })
@@ -117,7 +122,7 @@ describe('AuthForm', () => {
       }),
     )
 
-    render(<AuthForm onAuthenticated={vi.fn()} />)
+    renderAuthForm()
     fireEvent.click(screen.getByRole('button', { name: 'Switch to sign in' }))
     fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'foo@x.com' } })
     fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'wrong' } })
@@ -138,7 +143,7 @@ describe('AuthForm', () => {
       }),
     )
 
-    render(<AuthForm onAuthenticated={vi.fn()} />)
+    renderAuthForm()
     fireEvent.click(screen.getByRole('button', { name: 'Switch to sign in' }))
     fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'foo@x.com' } })
     fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'wrong' } })
