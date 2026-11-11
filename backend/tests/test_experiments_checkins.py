@@ -114,6 +114,44 @@ def test_check_in_unauthenticated_returns_401(client: TestClient):
     assert response.status_code == 401
 
 
+def test_check_in_rejects_neither_value_bool_nor_value_rating(
+    client: TestClient, repo: InMemoryRepository
+):
+    token = _signup_and_login(client, email="user@example.com")
+    experiment = _create_experiment(client, token)
+    repo.update_experiment(
+        experiment_id=experiment["id"], user_id=experiment["user_id"], status="active"
+    )
+
+    response = client.post(
+        f"/experiments/{experiment['id']}/check-ins",
+        cookies={"session_id": token},
+        json={},
+    )
+
+    assert response.status_code == 400
+    assert "exactly one" in response.json()["detail"]
+
+
+def test_check_in_rejects_both_value_bool_and_value_rating(
+    client: TestClient, repo: InMemoryRepository
+):
+    token = _signup_and_login(client, email="user@example.com")
+    experiment = _create_experiment(client, token)
+    repo.update_experiment(
+        experiment_id=experiment["id"], user_id=experiment["user_id"], status="active"
+    )
+
+    response = client.post(
+        f"/experiments/{experiment['id']}/check-ins",
+        cookies={"session_id": token},
+        json={"value_bool": True, "value_rating": 3},
+    )
+
+    assert response.status_code == 400
+    assert "exactly one" in response.json()["detail"]
+
+
 def test_check_in_defaults_checked_in_at_to_utc_now(client: TestClient, repo: InMemoryRepository):
     token = _signup_and_login(client, email="user@example.com")
     experiment = _create_experiment(client, token)
@@ -125,7 +163,7 @@ def test_check_in_defaults_checked_in_at_to_utc_now(client: TestClient, repo: In
     response = client.post(
         f"/experiments/{experiment['id']}/check-ins",
         cookies={"session_id": token},
-        json={},
+        json={"value_bool": True},
     )
     after = datetime.now(timezone.utc)
 
@@ -181,7 +219,7 @@ def test_check_in_route_maps_repository_value_error_to_404(
     response = client.post(
         f"/experiments/{experiment['id']}/check-ins",
         cookies={"session_id": token},
-        json={},
+        json={"value_bool": True},
     )
     assert response.status_code == 404
     assert response.json() == {"detail": "Experiment not found."}

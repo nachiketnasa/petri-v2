@@ -69,11 +69,19 @@ def _on_validation_error(request: Request, exc: RequestValidationError) -> JSONR
 
 @app.exception_handler(Exception)
 def _on_unhandled_error(request: Request, exc: Exception) -> JSONResponse:
-    # Exception handlers run inside CORSMiddleware; Starlette's own default
-    # 500 handler runs outside it, so an uncaught error (e.g. a DB CHECK
-    # constraint violation) would otherwise reach the browser with no CORS
-    # headers, surfacing as a confusing "Load failed" instead of a real error.
-    return JSONResponse(status_code=500, content={"detail": "Internal server error."})
+    # A handler registered for the bare `Exception` class is pulled out by
+    # Starlette to become ServerErrorMiddleware's handler, which runs
+    # OUTSIDE CORSMiddleware (not inside it, despite every other
+    # exception_handler) -- so its response never gets CORS headers from
+    # CORSMiddleware and has to set them itself, or an uncaught error
+    # reaches the browser as a bare, header-less 500: a confusing
+    # "Load failed" instead of a readable error.
+    allowed_origin = os.environ.get("FRONTEND_ORIGIN", "http://localhost:5173")
+    headers = {}
+    if request.headers.get("origin") == allowed_origin:
+        headers["Access-Control-Allow-Origin"] = allowed_origin
+        headers["Access-Control-Allow-Credentials"] = "true"
+    return JSONResponse(status_code=500, content={"detail": "Internal server error."}, headers=headers)
 
 
 class SignupRequest(BaseModel):
@@ -437,6 +445,15 @@ def create_check_in(
     if experiment.status != "active":
         raise HTTPException(
             status_code=400, detail="Check-ins can only be logged while active."
+        )
+    # schema.sql's check_ins_check1 constraint requires exactly one of
+    # value_bool/value_rating -- validate it here instead of letting a bad
+    # request crash through to a DB CheckViolation.
+    if (body.value_bool is None) == (body.value_rating is None):
+        raise HTTPException(
+            status_code=400,
+            detail="Provide exactly one of value_bool or value_rating, matching this "
+            f"experiment's check_in_kind ('{experiment.check_in_kind}').",
         )
     try:
         check_in = repository.add_check_in(

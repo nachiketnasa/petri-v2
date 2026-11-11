@@ -91,8 +91,11 @@ function ExperimentDetail() {
     setSubmitError(null)
 
     const body: Record<string, unknown> = {}
-    if (valueBool) body.value_bool = valueBool
-    if (valueRating !== '') body.value_rating = Number(valueRating)
+    if (experiment!.check_in_kind === 'rating') {
+      body.value_rating = Number(valueRating)
+    } else {
+      body.value_bool = valueBool
+    }
     if (note !== '') body.note = note
     if (checkedInAt !== '') body.checked_in_at = checkedInAt
 
@@ -226,26 +229,32 @@ function ExperimentDetail() {
           {experiment.status === 'active' ? (
             <form onSubmit={handleSubmit} className="raised checkin-card">
               <div className="checkin-title">Log a check in</div>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <input
-                  type="checkbox"
-                  checked={valueBool}
-                  onChange={(e) => setValueBool(e.target.checked)}
-                />
-                Value (bool)
-              </label>
-              <div className="auth-field">
-                <label className="label" htmlFor="value-rating">
-                  Rating
+              {experiment.check_in_kind === 'rating' ? (
+                <div className="auth-field">
+                  <label className="label" htmlFor="value-rating">
+                    Rating (1 to 5)
+                  </label>
+                  <input
+                    id="value-rating"
+                    type="number"
+                    min={1}
+                    max={5}
+                    required
+                    value={valueRating}
+                    onChange={(e) => setValueRating(e.target.value)}
+                    className="input"
+                  />
+                </div>
+              ) : (
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input
+                    type="checkbox"
+                    checked={valueBool}
+                    onChange={(e) => setValueBool(e.target.checked)}
+                  />
+                  Done today
                 </label>
-                <input
-                  id="value-rating"
-                  type="number"
-                  value={valueRating}
-                  onChange={(e) => setValueRating(e.target.value)}
-                  className="input"
-                />
-              </div>
+              )}
               <div className="auth-field">
                 <label className="label" htmlFor="checkin-note">
                   Note, this part is optional

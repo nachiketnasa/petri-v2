@@ -93,6 +93,7 @@ describe('ExperimentDetail', () => {
     renderDetail("exp-1")
     await waitFor(() => expect(screen.getByText('Drink more water')).toBeInTheDocument())
 
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Done today' }))
     fireEvent.change(screen.getByLabelText(/Note/), { target: { value: 'felt good' } })
     fireEvent.click(screen.getByRole('button', { name: 'Save check in' }))
 
@@ -106,8 +107,64 @@ describe('ExperimentDetail', () => {
       expect.objectContaining({
         method: 'POST',
         credentials: 'include',
-        body: JSON.stringify({ note: 'felt good' }),
+        body: JSON.stringify({ value_bool: true, note: 'felt good' }),
       }),
+    )
+  })
+
+  it('sends value_bool: false (not omitted) when logging an unchecked boolean day', async () => {
+    const checkIn = {
+      id: 'ci-2',
+      experiment_id: 'exp-1',
+      value_bool: false,
+      value_rating: null,
+      note: null,
+      checked_in_at: '2026-01-02T09:00:00Z',
+    }
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => experiment })
+      .mockResolvedValueOnce({ ok: true, status: 201, json: async () => checkIn })
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderDetail('exp-1')
+    await waitFor(() => expect(screen.getByText('Drink more water')).toBeInTheDocument())
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save check in' }))
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2))
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      expect.stringContaining('/experiments/exp-1/check-ins'),
+      expect.objectContaining({ body: JSON.stringify({ value_bool: false }) }),
+    )
+  })
+
+  it('sends value_rating instead of value_bool for a rating-kind experiment', async () => {
+    const ratingExperiment = { ...experiment, check_in_kind: 'rating' }
+    const checkIn = {
+      id: 'ci-3',
+      experiment_id: 'exp-1',
+      value_bool: null,
+      value_rating: 4,
+      note: null,
+      checked_in_at: '2026-01-02T09:00:00Z',
+    }
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ratingExperiment })
+      .mockResolvedValueOnce({ ok: true, status: 201, json: async () => checkIn })
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderDetail('exp-1')
+    await waitFor(() => expect(screen.getByText('Drink more water')).toBeInTheDocument())
+
+    fireEvent.change(screen.getByLabelText(/Rating/), { target: { value: '4' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save check in' }))
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2))
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      expect.stringContaining('/experiments/exp-1/check-ins'),
+      expect.objectContaining({ body: JSON.stringify({ value_rating: 4 }) }),
     )
   })
 
