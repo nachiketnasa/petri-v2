@@ -21,6 +21,97 @@
   }
 }
 
+/* Same four named themes as index.css, kept here since the neumorphic
+   surface/shadow variables live in this file. See index.css for why the
+   attribute selector takes precedence over prefers-color-scheme. */
+:root[data-theme='petri-light'] {
+  --sage: #7c9473;
+  --sage-soft: rgba(124, 148, 115, 0.16);
+  --neu-surface: #eef1ea;
+  --neu-shadow-dark: rgba(60, 66, 55, 0.18);
+  --neu-shadow-light: rgba(255, 255, 255, 0.9);
+}
+
+:root[data-theme='petri-dark'] {
+  --sage: #9bb591;
+  --sage-soft: rgba(155, 181, 145, 0.18);
+  --neu-surface: #1c1f1a;
+  --neu-shadow-dark: rgba(0, 0, 0, 0.5);
+  --neu-shadow-light: rgba(255, 255, 255, 0.04);
+}
+
+:root[data-theme='solarized-light'] {
+  --sage: #859900;
+  --sage-soft: rgba(133, 153, 0, 0.16);
+  --neu-surface: #eee8d5;
+  --neu-shadow-dark: rgba(88, 110, 117, 0.25);
+  --neu-shadow-light: rgba(253, 246, 227, 0.9);
+}
+
+:root[data-theme='solarized-dark'] {
+  --sage: #859900;
+  --sage-soft: rgba(133, 153, 0, 0.18);
+  --neu-surface: #073642;
+  --neu-shadow-dark: rgba(0, 0, 0, 0.5);
+  --neu-shadow-light: rgba(238, 232, 213, 0.06);
+}
+
+.settings-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px 0;
+  text-align: left;
+}
+
+.settings-section {
+  padding: 16px 20px;
+}
+
+.settings-section h3 {
+  margin: 0 0 10px;
+  font-size: 15px;
+  color: var(--text-h);
+}
+
+.settings-theme-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--text);
+}
+
+.cookie-notice {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  bottom: 16px;
+  max-width: 480px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  z-index: 10;
+  text-align: left;
+}
+
+.cookie-notice p {
+  color: var(--text);
+  margin: 0;
+}
+
+.cookie-notice button {
+  flex-shrink: 0;
+  border: none;
+  border-radius: 10px;
+  padding: 8px 16px;
+  background: var(--neu-surface);
+  color: var(--text-h);
+  box-shadow: 4px 4px 8px var(--neu-shadow-dark), -4px -4px 8px var(--neu-shadow-light);
+  cursor: pointer;
+}
+
 .greeting-screen {
   display: flex;
   flex-direction: column;

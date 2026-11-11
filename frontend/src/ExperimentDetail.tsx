@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { playTone } from './sound'
 
 const BASE_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8000'
 
@@ -83,6 +84,7 @@ function ExperimentDetail() {
       .then(async (res) => {
         const data = await res.json()
         if (!res.ok) throw new Error(data.detail)
+        playTone('check-in-log')
         setLastCheckIn(data)
         setValueBool(false)
         setValueRating('')

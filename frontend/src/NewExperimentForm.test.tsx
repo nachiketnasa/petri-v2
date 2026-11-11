@@ -3,6 +3,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import NewExperimentForm from './NewExperimentForm'
 import { AuthProvider } from './AuthContext'
+import { playTone } from './sound'
+
+vi.mock('./sound', () => ({ playTone: vi.fn() }))
 
 const created = {
   id: 'exp-1',
@@ -50,7 +53,27 @@ function stubFetch(postResponse: { ok: boolean; status: number; json: () => Prom
 describe('NewExperimentForm wizard', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
+    vi.clearAllMocks()
     cleanup()
+  })
+
+  it('plays a wizard-open tone when the wizard mounts', () => {
+    stubFetch({ ok: true, status: 201, json: async () => created })
+    renderWizard()
+
+    expect(playTone).toHaveBeenCalledWith('wizard-open')
+  })
+
+  it('plays a wizard-submit tone only after a successful submission, not on failure', async () => {
+    stubFetch({ ok: false, status: 400, json: async () => ({ detail: 'cadence_type is required' }) })
+    renderWizard()
+    fillDetailsAndAdvance()
+    fillCadenceAndAdvance()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Create experiment' }))
+
+    await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument())
+    expect(playTone).not.toHaveBeenCalledWith('wizard-submit')
   })
 
   it('renders Step 1 Details first, with the rail showing it current', () => {
@@ -152,6 +175,7 @@ describe('NewExperimentForm wizard', () => {
 
     await waitFor(() => expect(screen.getByText('Dashboard view')).toBeInTheDocument())
 
+    expect(playTone).toHaveBeenCalledWith('wizard-submit')
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining('/experiments'),
       expect.objectContaining({

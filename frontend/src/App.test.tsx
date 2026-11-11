@@ -169,4 +169,113 @@ describe('App', () => {
 
     await waitFor(() => expect(screen.getByText(/^Good (morning|afternoon|evening)/)).toBeInTheDocument())
   })
+
+  it('shows a Settings link in the header when signed in, which navigates to /settings', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => [] })
+    vi.stubGlobal('fetch', fetchMock)
+    window.history.pushState({}, '', '/dashboard')
+
+    render(<App />)
+
+    await waitFor(() => expect(screen.getByRole('link', { name: 'Settings' })).toBeInTheDocument())
+
+    fireEvent.click(screen.getByRole('link', { name: 'Settings' }))
+
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Settings' })).toBeInTheDocument())
+  })
+
+  it('has no Settings link in the header when signed out', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 401, json: async () => ({ detail: 'nope' }) })
+    vi.stubGlobal('fetch', fetchMock)
+    window.history.pushState({}, '', '/')
+
+    render(<App />)
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument())
+    expect(screen.queryByRole('link', { name: 'Settings' })).not.toBeInTheDocument()
+  })
+
+  it('redirects away from /settings when signed out, same as any other RequireAuth route', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 401, json: async () => ({ detail: 'nope' }) })
+    vi.stubGlobal('fetch', fetchMock)
+    window.history.pushState({}, '', '/settings')
+
+    render(<App />)
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument())
+    expect(screen.queryByRole('heading', { name: 'Settings' })).not.toBeInTheDocument()
+  })
+
+  it('with the landing preference off (default), a signed-in visitor at / still lands on /greeting', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => [] })
+    vi.stubGlobal('fetch', fetchMock)
+    window.history.pushState({}, '', '/')
+
+    render(<App />)
+
+    await waitFor(() => expect(screen.getByText(/^Good (morning|afternoon|evening)/)).toBeInTheDocument())
+  })
+
+  it('with the landing preference on, a signed-in visitor at / lands straight on /dashboard, skipping /greeting', async () => {
+    localStorage.setItem('petri:landingPreference', 'dashboard')
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => [] })
+    vi.stubGlobal('fetch', fetchMock)
+    window.history.pushState({}, '', '/')
+
+    render(<App />)
+
+    await waitFor(() => expect(screen.getByText('No experiments yet.')).toBeInTheDocument())
+    expect(screen.queryByText(/^Good (morning|afternoon|evening)/)).not.toBeInTheDocument()
+  })
+
+  it('with the landing preference on, signing in goes straight to /dashboard instead of /greeting', async () => {
+    localStorage.setItem('petri:landingPreference', 'dashboard')
+    let signedUp = false
+    const fetchMock = vi.fn((url: string) => {
+      if (url.includes('/auth/signup')) {
+        signedUp = true
+        return Promise.resolve({ ok: true, json: async () => user })
+      }
+      if (url.includes('/experiments')) {
+        if (!signedUp) {
+          return Promise.resolve({ ok: false, status: 401, json: async () => ({ detail: 'Not authenticated' }) })
+        }
+        return Promise.resolve({ ok: true, json: async () => [] })
+      }
+      return Promise.resolve({ ok: false, status: 401, json: async () => ({ detail: 'nope' }) })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    window.history.pushState({}, '', '/sign-in')
+
+    render(<App />)
+
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Sign up' })).toBeInTheDocument())
+
+    fireEvent.change(screen.getByPlaceholderText('Email'), { target: { value: 'new@x.com' } })
+    fireEvent.change(screen.getByPlaceholderText('Password'), { target: { value: 'secret123' } })
+    fireEvent.change(screen.getByPlaceholderText('Display name'), { target: { value: 'New' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Sign up' }))
+
+    await waitFor(() => expect(screen.getByText('No experiments yet.')).toBeInTheDocument())
+    expect(screen.queryByText(/New\.$/)).not.toBeInTheDocument()
+  })
+
+  it('shows the cookie notice on first load and it never reappears once dismissed', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 401, json: async () => ({ detail: 'nope' }) })
+    vi.stubGlobal('fetch', fetchMock)
+    window.history.pushState({}, '', '/')
+
+    const { unmount } = render(<App />)
+
+    await waitFor(() => expect(screen.getByText(/cookies necessary for sign-in and security/)).toBeInTheDocument())
+    expect(screen.getAllByRole('button', { name: 'Got it' })).toHaveLength(1)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Got it' }))
+    expect(screen.queryByText(/cookies necessary for sign-in and security/)).not.toBeInTheDocument()
+
+    unmount()
+    render(<App />)
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument())
+    expect(screen.queryByText(/cookies necessary for sign-in and security/)).not.toBeInTheDocument()
+  })
 })

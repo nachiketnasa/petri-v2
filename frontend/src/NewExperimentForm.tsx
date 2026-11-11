@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from './AuthContext'
+import { playTone } from './sound'
 import './neumorphic.css'
 
 const BASE_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8000'
@@ -32,6 +33,10 @@ function NewExperimentForm() {
   const [stepError, setStepError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+
+  useEffect(() => {
+    playTone('wizard-open')
+  }, [])
 
   function goToStep(target: Step) {
     if (target > furthest) return
@@ -94,6 +99,7 @@ function NewExperimentForm() {
       .then(async (res) => {
         const data = await res.json()
         if (!res.ok) throw new Error(data.detail)
+        playTone('wizard-submit')
         refetch()
         navigate('/dashboard')
       })

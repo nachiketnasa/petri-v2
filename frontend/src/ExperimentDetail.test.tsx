@@ -2,6 +2,9 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import ExperimentDetail from './ExperimentDetail'
+import { playTone } from './sound'
+
+vi.mock('./sound', () => ({ playTone: vi.fn() }))
 
 function renderDetail(id: string) {
   return render(
@@ -34,6 +37,7 @@ const experiment = {
 describe('ExperimentDetail', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
+    vi.clearAllMocks()
     cleanup()
   })
 
@@ -95,6 +99,7 @@ describe('ExperimentDetail', () => {
     await waitFor(() =>
       expect(screen.getByText(/Last check-in logged: 2026-01-02T09:00:00Z/)).toBeInTheDocument(),
     )
+    expect(playTone).toHaveBeenCalledWith('check-in-log')
     expect(fetchMock).toHaveBeenCalledTimes(2)
     expect(fetchMock).toHaveBeenLastCalledWith(
       expect.stringContaining('/experiments/exp-1/check-ins'),
@@ -140,6 +145,7 @@ describe('ExperimentDetail', () => {
     await waitFor(() =>
       expect(screen.getByRole('alert')).toHaveTextContent('Experiment is not active'),
     )
+    expect(playTone).not.toHaveBeenCalled()
   })
 
   it('archives via the retro path and hides both forms on success', async () => {

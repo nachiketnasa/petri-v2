@@ -50,6 +50,60 @@
   }
 }
 
+/* Named themes, selected by a single data-theme attribute on <html> (set from
+   Settings.tsx). An attribute selector outranks the plain :root rules above
+   and the prefers-color-scheme block, so an explicit choice always wins over
+   the OS setting. No data-theme attribute (a first-time visitor) falls back
+   to the rules above unchanged. Petri Light/Dark match the existing sage
+   palette; Solarized Light/Dark use Solarized's published colors. */
+:root[data-theme='petri-light'] {
+  --text: #6b6375;
+  --text-h: #08060d;
+  --bg: #fff;
+  --border: #e5e4e7;
+  --code-bg: #f4f3ec;
+  --accent: #aa3bff;
+  --accent-bg: rgba(170, 59, 255, 0.1);
+  --accent-border: rgba(170, 59, 255, 0.5);
+  --social-bg: rgba(244, 243, 236, 0.5);
+}
+
+:root[data-theme='petri-dark'] {
+  --text: #9ca3af;
+  --text-h: #f3f4f6;
+  --bg: #16171d;
+  --border: #2e303a;
+  --code-bg: #1f2028;
+  --accent: #c084fc;
+  --accent-bg: rgba(192, 132, 252, 0.15);
+  --accent-border: rgba(192, 132, 252, 0.5);
+  --social-bg: rgba(47, 48, 58, 0.5);
+}
+
+:root[data-theme='solarized-light'] {
+  --text: #657b83;
+  --text-h: #073642;
+  --bg: #fdf6e3;
+  --border: #eee8d5;
+  --code-bg: #eee8d5;
+  --accent: #268bd2;
+  --accent-bg: rgba(38, 139, 210, 0.1);
+  --accent-border: rgba(38, 139, 210, 0.5);
+  --social-bg: rgba(238, 232, 213, 0.5);
+}
+
+:root[data-theme='solarized-dark'] {
+  --text: #839496;
+  --text-h: #eee8d5;
+  --bg: #002b36;
+  --border: #073642;
+  --code-bg: #073642;
+  --accent: #268bd2;
+  --accent-bg: rgba(38, 139, 210, 0.15);
+  --accent-border: rgba(38, 139, 210, 0.5);
+  --social-bg: rgba(7, 54, 66, 0.5);
+}
+
 #root {
   width: 1126px;
   max-width: 100%;

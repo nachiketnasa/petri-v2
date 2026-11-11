@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
-import { BrowserRouter, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
+import { useEffect } from 'react'
+import { BrowserRouter, Link, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import HealthStatus from './HealthStatus'
 import AuthForm from './AuthForm'
 import Landing from './Landing'
@@ -8,8 +9,13 @@ import ExperimentDetail from './ExperimentDetail'
 import Calendar from './Calendar'
 import Greeting, { rememberDisplayName } from './Greeting'
 import NewExperimentForm from './NewExperimentForm'
+import Settings, { CookieNotice, applyStoredTheme, getLandingPreference } from './Settings'
 import { AuthProvider, useAuth } from './AuthContext'
 import './App.css'
+
+function landingPath() {
+  return getLandingPreference() === 'dashboard' ? '/dashboard' : '/greeting'
+}
 
 function Header() {
   const { signedIn, signOut } = useAuth()
@@ -24,9 +30,12 @@ function Header() {
     <header>
       <HealthStatus />
       {signedIn && (
-        <button type="button" onClick={handleSignOut}>
-          Sign out
-        </button>
+        <>
+          <Link to="/settings">Settings</Link>
+          <button type="button" onClick={handleSignOut}>
+            Sign out
+          </button>
+        </>
       )}
     </header>
   )
@@ -43,7 +52,7 @@ function Home() {
   const { signedIn } = useAuth()
 
   if (signedIn === null) return <p>Loading…</p>
-  if (signedIn) return <Navigate to="/greeting" replace />
+  if (signedIn) return <Navigate to={landingPath()} replace />
 
   return <Landing />
 }
@@ -53,23 +62,28 @@ function SignIn() {
   const navigate = useNavigate()
 
   if (signedIn === null) return <p>Loading…</p>
-  if (signedIn) return <Navigate to="/greeting" replace />
+  if (signedIn) return <Navigate to={landingPath()} replace />
 
   return (
     <AuthForm
       onAuthenticated={(user) => {
         rememberDisplayName(user.display_name)
         signIn()
-        navigate('/greeting')
+        navigate(landingPath())
       }}
     />
   )
 }
 
 function AppRoutes() {
+  useEffect(() => {
+    applyStoredTheme()
+  }, [])
+
   return (
     <>
       <Header />
+      <CookieNotice />
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/sign-in" element={<SignIn />} />
@@ -86,6 +100,14 @@ function AppRoutes() {
           element={
             <RequireAuth>
               <Dashboard />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/settings"
+          element={
+            <RequireAuth>
+              <Settings />
             </RequireAuth>
           }
         />
