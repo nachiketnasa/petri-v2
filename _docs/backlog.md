@@ -394,6 +394,35 @@ Discovered during QA verification of #10 (dashboard/greeting screen) — QA used
 
 ---
 
+## order-04i · #36 — Backend: no CORS configuration -- real browser fetches from frontend are blocked
+
+- **Status**: CLOSED
+- **Labels**: backend
+- **Link**: https://github.com/nachiketnasa/petri-v2/issues/36
+
+## Goal
+A real browser running the frontend (port 5173) must be able to call the backend (port 8000) with `fetch(..., { credentials: 'include' })` — cross-origin requests need actual CORS headers, which the backend currently has none of.
+
+## Acceptance criteria
+- [x] An `OPTIONS` preflight to any backend endpoint with `Origin: http://localhost:5173` returns 200 (not 405) with `Access-Control-Allow-Origin`, `Access-Control-Allow-Credentials: true`, and the needed `Access-Control-Allow-Methods`/`-Headers`.
+- [x] A real `GET`/`POST` response to an allowed origin includes `Access-Control-Allow-Origin` matching that origin (not `*`, since credentials are used — browsers reject `*` with credentialed requests).
+- [x] The allowed origin(s) are configurable via environment (e.g. a `FRONTEND_ORIGIN` env var defaulting to `http://localhost:5173`), not hardcoded, so the eventual production domain (petri.nachiketnasa.com, tracked in #15) can be added without another code change.
+- [x] Verified with a real browser-equivalent check: a request carrying an `Origin` header that is NOT in the allowed list does not get an `Access-Control-Allow-Origin` header back.
+
+## Out of scope
+- Production domain configuration itself — tracked in #15 (order-12). This issue only makes the mechanism configurable.
+- Any frontend code change — the frontend's existing fetch calls (BASE_URL + credentials: include) are already written correctly for a CORS-enabled backend; this is purely a backend gap.
+
+## Constraints
+- Files: `backend/src/petri_backend/app.py` — add FastAPI's `CORSMiddleware` (`fastapi.middleware.cors`), which is part of FastAPI/Starlette already, no new dependency needed.
+- Add a backend test asserting the preflight and real-response headers above.
+- Also update `docker-compose.yml`'s backend service environment if the new env var needs a default value set there to match the frontend's published port.
+
+## Found by
+Discovered while implementing/verifying #11 (Calendar) — the Engineer had to route around this with Playwright request interception just to manually test in a real browser, and flagged it as a pre-existing, out-of-scope finding. Confirmed directly by the orchestrator: `curl -i -X OPTIONS http://localhost:8000/experiments -H "Origin: http://localhost:5173" -H "Access-Control-Request-Method: GET"` returns 405 with no CORS headers at all. This likely means every real-browser click-through of the app has been silently broken (fetches blocked by the browser's own CORS enforcement) despite every curl-based and Playwright-interception-based verification in this session passing, since neither of those methods enforces CORS the way a real browser does.
+
+---
+
 ## order-05 · #4 — Experiments: CRUD + lifecycle + check-ins + retro gate
 
 - **Status**: OPEN
