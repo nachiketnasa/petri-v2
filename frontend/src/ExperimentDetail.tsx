@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { playTone } from './sound'
+import './neumorphic.css'
 
 const BASE_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8000'
 
@@ -146,24 +147,28 @@ function ExperimentDetail() {
   if (!experiment) return <p>Loading…</p>
 
   return (
-    <div>
-      <h2>{experiment.title}</h2>
-      <p>{experiment.hypothesis}</p>
-      <p>
-        Cadence: {experiment.cadence_type}
-        {experiment.cadence_days != null && ` (every ${experiment.cadence_days} days)`}
-      </p>
-      <p>Check-in kind: {experiment.check_in_kind}</p>
-      <p>Start date: {experiment.start_date}</p>
-      <p>Target days: {experiment.target_days}</p>
-      <p>Status: {experiment.status}</p>
-      {experiment.abandon_reason != null && <p>Abandon reason: {experiment.abandon_reason}</p>}
-      <p>
-        <Link to={`/calendar/${experiment.id}`}>View on calendar</Link>
-      </p>
+    <div className="detail-screen">
+      <div className="detail-card neu-card">
+        <h2>{experiment.title}</h2>
+        <p>{experiment.hypothesis}</p>
+        <p>
+          Cadence: {experiment.cadence_type}
+          {experiment.cadence_days != null && ` (every ${experiment.cadence_days} days)`}
+        </p>
+        <p>Check-in kind: {experiment.check_in_kind}</p>
+        <p>Start date: {experiment.start_date}</p>
+        <p>Target days: {experiment.target_days}</p>
+        <p>Status: {experiment.status}</p>
+        {experiment.abandon_reason != null && <p>Abandon reason: {experiment.abandon_reason}</p>}
+        <p>
+          <Link to={`/calendar/${experiment.id}`} className="neu-button-ghost">
+            View on calendar
+          </Link>
+        </p>
+      </div>
 
       {experiment.status === 'active' ? (
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} className="detail-form neu-card">
           <h3>Log a check-in</h3>
           <label>
             <input
@@ -178,21 +183,24 @@ function ExperimentDetail() {
             placeholder="Rating"
             value={valueRating}
             onChange={(e) => setValueRating(e.target.value)}
+            className="neu-input"
           />
           <input
             type="text"
             placeholder="Note"
             value={note}
             onChange={(e) => setNote(e.target.value)}
+            className="neu-input"
           />
           <input
             type="datetime-local"
             placeholder="Checked in at"
             value={checkedInAt}
             onChange={(e) => setCheckedInAt(e.target.value)}
+            className="neu-input"
           />
           {submitError && <p role="alert">{submitError}</p>}
-          <button type="submit" disabled={submitting}>
+          <button type="submit" disabled={submitting} className="neu-button">
             Log check-in
           </button>
         </form>
@@ -206,9 +214,9 @@ function ExperimentDetail() {
       {lastCheckIn && <p>Last check-in logged: {lastCheckIn.checked_in_at}</p>}
 
       {(experiment.status === 'active' || experiment.status === 'reflect') && (
-        <form onSubmit={handleArchiveSubmit}>
+        <form onSubmit={handleArchiveSubmit} className="detail-form neu-card">
           <h3>Archive this experiment</h3>
-          <button type="button" onClick={toggleArchiveMode} disabled={archiving}>
+          <button type="button" onClick={toggleArchiveMode} disabled={archiving} className="neu-button-ghost">
             {archiveMode === 'retro' ? 'Switch to abandon early' : 'Switch to retro'}
           </button>
           {archiveMode === 'retro' ? (
@@ -218,18 +226,21 @@ function ExperimentDetail() {
                 placeholder="What worked"
                 value={whatWorked}
                 onChange={(e) => setWhatWorked(e.target.value)}
+                className="neu-input"
               />
               <input
                 type="text"
                 placeholder="What didn't"
                 value={whatDidnt}
                 onChange={(e) => setWhatDidnt(e.target.value)}
+                className="neu-input"
               />
               <input
                 type="text"
                 placeholder="Decision"
                 value={decision}
                 onChange={(e) => setDecision(e.target.value)}
+                className="neu-input"
               />
             </>
           ) : (
@@ -238,10 +249,11 @@ function ExperimentDetail() {
               placeholder="Abandon reason"
               value={abandonReason}
               onChange={(e) => setAbandonReason(e.target.value)}
+              className="neu-input"
             />
           )}
           {archiveError && <p role="alert">{archiveError}</p>}
-          <button type="submit" disabled={archiving}>
+          <button type="submit" disabled={archiving} className="neu-button">
             Archive
           </button>
         </form>

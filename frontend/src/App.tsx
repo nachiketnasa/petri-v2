@@ -27,7 +27,7 @@ function Header() {
   }
 
   return (
-    <header>
+    <header className="app-header">
       <HealthStatus />
       {signedIn && (
         <>

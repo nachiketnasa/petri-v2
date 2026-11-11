@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import './neumorphic.css'
 
 const BASE_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8000'
 
@@ -59,39 +60,44 @@ function AuthForm({ onAuthenticated }: Props) {
   }
 
   return (
-    <form onSubmit={handleSubmit}>
-      <h2>{mode === 'signup' ? 'Sign up' : 'Sign in'}</h2>
-      <input
-        type="email"
-        placeholder="Email"
-        required
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-      />
-      <input
-        type="password"
-        placeholder="Password"
-        required
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-      />
-      {mode === 'signup' && (
+    <div className="auth-screen">
+      <form onSubmit={handleSubmit} className="auth-form neu-card">
+        <h2>{mode === 'signup' ? 'Sign up' : 'Sign in'}</h2>
         <input
-          type="text"
-          placeholder="Display name"
+          type="email"
+          placeholder="Email"
           required
-          value={displayName}
-          onChange={(e) => setDisplayName(e.target.value)}
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="neu-input"
         />
-      )}
-      {error && <p role="alert">{error}</p>}
-      <button type="submit" disabled={loading}>
-        {mode === 'signup' ? 'Sign up' : 'Sign in'}
-      </button>
-      <button type="button" onClick={toggleMode} disabled={loading}>
-        {mode === 'signup' ? 'Switch to sign in' : 'Switch to sign up'}
-      </button>
-    </form>
+        <input
+          type="password"
+          placeholder="Password"
+          required
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          className="neu-input"
+        />
+        {mode === 'signup' && (
+          <input
+            type="text"
+            placeholder="Display name"
+            required
+            value={displayName}
+            onChange={(e) => setDisplayName(e.target.value)}
+            className="neu-input"
+          />
+        )}
+        {error && <p role="alert">{error}</p>}
+        <button type="submit" disabled={loading} className="neu-button">
+          {mode === 'signup' ? 'Sign up' : 'Sign in'}
+        </button>
+        <button type="button" onClick={toggleMode} disabled={loading} className="neu-button-ghost">
+          {mode === 'signup' ? 'Switch to sign in' : 'Switch to sign up'}
+        </button>
+      </form>
+    </div>
   )
 }
 

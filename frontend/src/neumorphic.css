@@ -431,6 +431,130 @@
   margin-top: 6px;
 }
 
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 20px;
+}
+
+.health-status {
+  font-size: 13px;
+  color: var(--text);
+}
+
+.health-status::before {
+  content: '● ';
+}
+
+.health-status.ok {
+  color: var(--sage);
+}
+
+.health-status.error {
+  color: #c0392b;
+}
+
+.neu-input {
+  border: none;
+  border-radius: 10px;
+  padding: 10px 14px;
+  background: var(--neu-surface);
+  color: var(--text-h);
+  box-shadow: inset 3px 3px 6px var(--neu-shadow-dark), inset -3px -3px 6px var(--neu-shadow-light);
+  font: inherit;
+}
+
+.neu-input::placeholder {
+  color: var(--text);
+}
+
+.neu-button {
+  border: none;
+  border-radius: 12px;
+  padding: 10px 20px;
+  font-size: 15px;
+  background: var(--neu-surface);
+  color: var(--text-h);
+  box-shadow: 6px 6px 12px var(--neu-shadow-dark), -6px -6px 12px var(--neu-shadow-light);
+  cursor: pointer;
+}
+
+.neu-button:hover {
+  box-shadow: 4px 4px 8px var(--neu-shadow-dark), -4px -4px 8px var(--neu-shadow-light);
+}
+
+.neu-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+  box-shadow: none;
+}
+
+.neu-button-ghost {
+  background: transparent;
+  box-shadow: none;
+  color: var(--sage);
+  text-decoration: underline;
+  padding: 6px 4px;
+}
+
+.auth-screen {
+  display: flex;
+  justify-content: center;
+  padding: 24px;
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  max-width: 360px;
+  padding: 24px;
+  text-align: left;
+}
+
+.auth-form h2 {
+  margin: 0 0 4px;
+  color: var(--text-h);
+}
+
+.detail-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px 0;
+  text-align: left;
+  max-width: 480px;
+}
+
+.detail-card,
+.detail-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 20px 20px 20px 24px;
+}
+
+.detail-card h2,
+.detail-form h3 {
+  margin: 0 0 4px;
+  color: var(--text-h);
+}
+
+.detail-card p {
+  margin: 0;
+  color: var(--text);
+}
+
+.detail-form label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+}
+
 .calendar-marker {
   display: inline-block;
   width: 8px;

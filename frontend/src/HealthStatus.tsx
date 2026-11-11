@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import './neumorphic.css'
 
 const BASE_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8000'
 
@@ -17,9 +18,9 @@ function HealthStatus() {
       .catch(() => setStatus('error'))
   }, [])
 
-  if (status === 'loading') return <p>Backend: checking…</p>
-  if (status === 'ok') return <p>Backend: ok</p>
-  return <p>Backend: unreachable</p>
+  if (status === 'loading') return <p className="health-status">Backend: checking…</p>
+  if (status === 'ok') return <p className="health-status ok">Backend: ok</p>
+  return <p className="health-status error">Backend: unreachable</p>
 }
 
 export default HealthStatus
