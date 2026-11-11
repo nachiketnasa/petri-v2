@@ -251,6 +251,11 @@ def login(
     return UserOut.from_user(user)
 
 
+@app.get("/auth/me", response_model=UserOut)
+def get_me(current_user: User = Depends(get_current_user)) -> UserOut:
+    return UserOut.from_user(current_user)
+
+
 @app.post("/auth/logout", status_code=204)
 def logout(
     request: Request,

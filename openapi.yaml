@@ -101,6 +101,25 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /auth/me:
+    get:
+      summary: Get the signed-in user
+      operationId: getMe
+      tags: [auth]
+      responses:
+        "200":
+          description: The signed-in user.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
   /auth/forgot-password:
     post:
       summary: Request a password reset
