@@ -45,6 +45,7 @@ function ExperimentCard({
       {variant === 'active' && (
         <div className="card-foot">
           <div className="streak mono">— streak</div>
+          {experiment.check_in_due && <span className="badge badge-exp">due today</span>}
         </div>
       )}
     </Link>

@@ -22,6 +22,7 @@ type Experiment = {
   created_at: string
   updated_at: string
   archived_at: string | null
+  check_in_due: boolean
 }
 
 type CheckIn = {
@@ -203,7 +204,10 @@ function ExperimentDetail() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           <div className="raised head-card">
             <div className="htop">
-              <span className="badge badge-exp">Experiment, {experiment.status}</span>
+              <div>
+                <span className="badge badge-exp">Experiment, {experiment.status}</span>
+                {experiment.check_in_due && <span className="badge badge-exp">due today</span>}
+              </div>
               <Link to={`/calendar/${experiment.id}`} className="btn btn-text">
                 View on calendar
               </Link>

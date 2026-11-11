@@ -513,6 +513,7 @@ components:
         - created_at
         - updated_at
         - archived_at
+        - check_in_due
       properties:
         id:
           type: string
@@ -551,6 +552,12 @@ components:
           type: string
           format: date-time
           nullable: true
+        check_in_due:
+          type: boolean
+          description: >-
+            Derived, not persisted: cadence elapsed since the last check-in
+            (or since start_date, if none yet), only ever true while status
+            is "active".
 
     CreateExperimentRequest:
       type: object

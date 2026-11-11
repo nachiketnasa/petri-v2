@@ -11,6 +11,7 @@ export type Experiment = {
   start_date?: string | null
   status: string
   ended_early?: boolean
+  check_in_due?: boolean
 }
 
 type AuthState = {

@@ -84,6 +84,29 @@ describe('ExperimentDetail', () => {
     cleanup()
   })
 
+  it('shows a "due today" badge when the backend says check_in_due is true', async () => {
+    const { fn } = mockFetch({
+      '/experiments/exp-1': { ok: true, json: async () => ({ ...experiment, check_in_due: true }) },
+    })
+    vi.stubGlobal('fetch', fn)
+
+    renderDetail('exp-1')
+
+    await waitFor(() => expect(screen.getByText('due today')).toBeInTheDocument())
+  })
+
+  it('does not show a "due today" badge when check_in_due is false', async () => {
+    const { fn } = mockFetch({
+      '/experiments/exp-1': { ok: true, json: async () => ({ ...experiment, check_in_due: false }) },
+    })
+    vi.stubGlobal('fetch', fn)
+
+    renderDetail('exp-1')
+
+    await waitFor(() => expect(screen.getByText('Drink more water')).toBeInTheDocument())
+    expect(screen.queryByText('due today')).not.toBeInTheDocument()
+  })
+
   it('fetches and renders the experiment on mount', async () => {
     const { fn } = mockFetch({
       '/experiments/exp-1': { ok: true, json: async () => experiment },

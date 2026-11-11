@@ -143,9 +143,12 @@ class ExperimentOut(BaseModel):
     created_at: datetime
     updated_at: datetime
     archived_at: datetime | None
+    check_in_due: bool
 
     @classmethod
-    def from_experiment(cls, experiment: Experiment) -> "ExperimentOut":
+    def from_experiment(
+        cls, experiment: Experiment, *, last_check_in_at: datetime | None = None
+    ) -> "ExperimentOut":
         return cls(
             id=experiment.id,
             user_id=experiment.user_id,
@@ -162,7 +165,35 @@ class ExperimentOut(BaseModel):
             created_at=experiment.created_at,
             updated_at=experiment.updated_at,
             archived_at=experiment.archived_at,
+            check_in_due=_is_check_in_due(experiment, last_check_in_at),
         )
+
+
+def _is_check_in_due(experiment: Experiment, last_check_in_at: datetime | None) -> bool:
+    # "Check-in Due" (_docs/specs.md -> Board model, item 3): a derived badge
+    # on Active experiments, cadence elapsed since the last check-in (or
+    # since start_date, if there isn't one yet) with no log entry since.
+    if experiment.status != "active":
+        return False
+    reference = last_check_in_at or datetime.combine(
+        experiment.start_date, datetime.min.time(), tzinfo=timezone.utc
+    )
+    interval_days = (
+        experiment.cadence_days
+        if experiment.cadence_type == "custom"
+        else {"daily": 1, "weekly": 7}[experiment.cadence_type]
+    )
+    return datetime.now(timezone.utc) - reference >= timedelta(days=interval_days)
+
+
+def _last_check_in_at(repository: Repository, *, experiment_id: str, user_id: str) -> datetime | None:
+    # ponytail: loads the full history just for its max timestamp (fine at
+    # MVP scale); a dedicated "latest check-in" repository query would be
+    # the fix once an experiment's history is large enough to matter.
+    check_ins = repository.list_check_ins(experiment_id=experiment_id, user_id=user_id)
+    if not check_ins:
+        return None
+    return max(c.checked_in_at for c in check_ins)
 
 
 class ArchiveExperimentRequest(BaseModel):
@@ -345,7 +376,17 @@ def list_experiments(
     repository: Repository = Depends(get_repository),
 ) -> list[ExperimentOut]:
     experiments = repository.list_experiments(user_id=current_user.id, status=status)
-    return [ExperimentOut.from_experiment(experiment) for experiment in experiments]
+    return [
+        ExperimentOut.from_experiment(
+            experiment,
+            last_check_in_at=_last_check_in_at(
+                repository, experiment_id=experiment.id, user_id=current_user.id
+            )
+            if experiment.status == "active"
+            else None,
+        )
+        for experiment in experiments
+    ]
 
 
 @app.get("/experiments/{id}", response_model=ExperimentOut)
@@ -360,7 +401,12 @@ def get_experiment(
         # belongs to another user" - don't distinguish, so a 404 can't leak
         # whether the id exists for someone else.
         raise HTTPException(status_code=404, detail="Experiment not found.")
-    return ExperimentOut.from_experiment(experiment)
+    last_check_in_at = (
+        _last_check_in_at(repository, experiment_id=id, user_id=current_user.id)
+        if experiment.status == "active"
+        else None
+    )
+    return ExperimentOut.from_experiment(experiment, last_check_in_at=last_check_in_at)
 
 
 @app.post("/experiments/{id}/archive", response_model=ExperimentOut)
@@ -445,7 +491,9 @@ def activate_experiment(
         )
 
     updated = repository.update_experiment(experiment_id=id, user_id=current_user.id, status="active")
-    return ExperimentOut.from_experiment(updated)
+    # Freshly activated: no check-ins possible yet (backlog can't log one),
+    # so due-ness only depends on start_date vs. now.
+    return ExperimentOut.from_experiment(updated, last_check_in_at=None)
 
 
 @app.post("/experiments/{id}/check-ins", status_code=201, response_model=CheckInOut)

@@ -125,6 +125,18 @@ describe('Dashboard', () => {
     expect(screen.getAllByText('— streak').length).toBeGreaterThan(0)
   })
 
+  it('shows a "due today" badge only on an active card whose check_in_due is true', async () => {
+    stubExperiments([
+      { id: '1', title: 'Due one', cadence_type: 'daily', status: 'active', ended_early: false, check_in_due: true },
+      { id: '2', title: 'Not due', cadence_type: 'daily', status: 'active', ended_early: false, check_in_due: false },
+    ])
+
+    renderDashboard()
+
+    await waitFor(() => expect(screen.getByText('Due one')).toBeInTheDocument())
+    expect(screen.getAllByText('due today')).toHaveLength(1)
+  })
+
   it('lists Backlog experiments separately from the active grid', async () => {
     stubExperiments([
       { id: '1', title: 'Active one', cadence_type: 'daily', status: 'active', ended_early: false },
