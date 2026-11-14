@@ -338,29 +338,33 @@ into a fresh successor of the same kind, an experiment into a new experiment, a 
 into a new goal, so a result can lead straight into the next round without starting
 from a blank backlog. Every evolve and branch is stored as a real link between the two
 items involved, not just copied data, laying the groundwork for a future node-based
-diagram showing that lineage across all or selected experiments and goals. That
-diagram itself isn't built in v2, but the data it would need already is.
+diagram showing that lineage. **Evolve and branch are not yet built** ([#6](https://github.com/nachiketnasa/petri-v2/issues/6)): the
+`goals` table has the lineage columns, but no endpoint or screen sets them yet, and the
+diagram itself is out of scope for v2.
 
 ### Work in progress limits
-At most 2 experiments and 1 goal can be active at the same time, enforced by the
-system, not just suggested by the UI. The product is built around working through
+At most 2 experiments and 1 goal can be active at the same time. The experiment
+limit is enforced server-side; the 1-goal limit is only shown in the UI for now, not
+yet enforced by the backend ([#29](https://github.com/nachiketnasa/petri-v2/issues/29)). The product is built around working through
 things one at a time rather than juggling several at once.
 
 ### Transparent endings
 Ending or deleting anything before its cadence or duration is up requires a one-line
 reason, which is kept permanently on that item's record. The dashboard shows a plain,
-always-visible count of completed versus abandoned items, so the pattern stays
+always-visible count of completed versus abandoned experiments, so the pattern stays
 visible rather than something you'd have to go dig up.
 
 ### Streaks
-Consecutive logged cadence periods are counted and shown in a persistent, visible
-spot, similar in presentation to apps like Duolingo. Unlike those apps, there is no
+Consecutive logged cadence periods are counted by the backend (a `streak` on every
+experiment), but the dashboard card does not display the number yet (it shows a
+placeholder). Unlike Duolingo-style apps, there is no
 streak freeze to buy, no social or friend-streak pressure mechanic, and nothing is
 lost beyond the number resetting if a day is missed.
 
 ### Dashboard and landing screen
-Signing in opens a calm greeting screen first (a time-of-day greeting plus a single
-line noting how many things are due today), not the full dashboard. From there the
+Signing in opens a calm greeting screen first (a time-of-day greeting; its "due
+today" line is static for now and always says nothing is due, while the dashboard
+cards do flag what's due), not the full dashboard. From there the
 user opens the full dashboard deliberately, or sets it as their default landing view
 in Settings. The dashboard itself is a card grid of active items, filterable by
 Experiments, Goals, or Both, with the work-in-progress counts and the
@@ -376,11 +380,14 @@ A week view (Monday through Sunday) and a month view, each its own layout. The m
 view always renders full weeks: it starts on the Monday of the week containing the
 1st, covers every day of the month, and continues through the Sunday that closes out
 the week containing the last day, showing the spillover days from the neighboring
-months, faded. Both views support moving to the previous or next period, and a scope
-toggle switches between "this cadence only" and "everything active."
+months, faded. Both views support moving to the previous or next period and show every active
+experiment and goal; a "this cadence only" scope toggle is not yet built.
 
 ### Other tasks (optional, off by default)
-A separate, lower-profile feature, turned on from Settings, for ordinary obligations
+**Backend only so far:** the API (`/other-tasks` CRUD, `/daily-load`, push
+subscribe/unsubscribe) is built and tested, but there is no Other tasks screen, Settings
+toggle or Calendar merge in the frontend yet, and push reminders are not actually sent
+yet ([#39](https://github.com/nachiketnasa/petri-v2/issues/39)). The design: a separate, lower-profile feature for ordinary obligations
 that aren't experiments or goals, coursework, a work deadline, exam prep, and so on.
 Each task is one-time (a specific date) or repeating (chosen days or interval, until
 an end date), configured the way a phone's alarm app configures a repeat rule, and
@@ -392,7 +399,9 @@ send a browser push notification (with the standard permission prompt); nothing 
 Petri sends email notifications outside of account security messages.
 
 ### Sharing, likes, and comments
-Any experiment or goal can be made public: a per-item toggle generates a read-only
+**Backend only so far:** the share, public page, like and comment endpoints are built
+and tested, but the frontend has no share toggle, public page or share-to links yet.
+The design: any experiment or goal can be made public: a per-item toggle generates a read-only
 page at an unguessable link, requiring no login to view. An experiment's page shows
 its title, hypothesis, cadence, stage, and check-in streak; a goal's page also shows
 milestone progress. Neither ever shows private notes or retro content. The link can
@@ -403,11 +412,10 @@ deletes all likes and comments on that page and invalidates the link; turning it
 on issues a new link, starting at zero.
 
 ### Accounts
-Sign up or sign in with Google, LinkedIn, or Microsoft OAuth, or with email and
-password (email sign-up requires a verification code, and gets a real forgot-password
-flow). Only one account exists per email address, no matter which method it was
-created with. Explicit logout, and full account deletion on request. The site sits
-behind Cloudflare for DDoS mitigation, and auth forms are protected against bots.
+Sign up or sign in with email and password (email sign-up requires a verification
+code, and gets a real forgot-password flow), one account per email address, and
+explicit logout. Not yet built: Google, LinkedIn and Microsoft OAuth ([#24](https://github.com/nachiketnasa/petri-v2/issues/24)), account
+deletion ([#25](https://github.com/nachiketnasa/petri-v2/issues/25)), and Cloudflare DDoS/bot protection in front of the site.
 Two-factor authentication (TOTP, authenticator app rather than SMS) is implemented in
 the backend only: `POST /auth/2fa/enroll`, `/auth/2fa/confirm` and `/auth/2fa/disable`,
 one-time recovery codes, and a TOTP step at login, all covered by backend tests
@@ -418,10 +426,11 @@ there's nothing optional to pick between.
 
 ### Settings
 Theme (a choice of four: Petri Light, Petri Dark, Solarized Light, Solarized Dark,
-applied across the whole app and saved to the account), a sound effects toggle (short
-tones on starting or finishing setup, logging a check-in, and pausing or removing a
-cadence), the Other tasks feature toggle, the landing-screen preference, and account deletion. (No 2FA controls yet; see
-[Accounts](#accounts).)
+applied across the whole app), a sound effects toggle (short tones on opening or
+submitting the creation wizard and on logging a check-in), and the landing-screen
+preference. These are saved in the browser; the backend can store them per account
+(`PATCH /users/me`), but the Settings screen doesn't call it yet. No Other tasks
+toggle, 2FA controls or account deletion yet (see above, [#25](https://github.com/nachiketnasa/petri-v2/issues/25)).
 
 ## Expected behavior
 
@@ -432,7 +441,8 @@ criterion, and explicit non-goal, lives in [`_docs/specs.md`](_docs/specs.md). I
   isn't Active.
 - Nothing can be archived without a retro (or, if ended early, an abandon reason)
   recorded first.
-- The WIP limit is enforced server-side, not just hinted at in the UI.
+- The WIP limit is enforced server-side, not just hinted at in the UI (experiments
+  today; goals pending [#29](https://github.com/nachiketnasa/petri-v2/issues/29)).
 - A shared page only ever exposes title, hypothesis/goal text, cadence, stage, streak,
   and (for goals) milestone progress — never private notes or retro content.
 - Every user's data is isolated; there is no cross-user access.
@@ -448,12 +458,13 @@ criterion, and explicit non-goal, lives in [`_docs/specs.md`](_docs/specs.md). I
   routing, Vitest and React Testing Library for tests. The same choice Petri v1 used.
 - **Runtime**: Node.js 24 LTS, pinned to **≥24.22.1** (the patched line from the
   October 2026 Node.js security release).
-- **Infra**: Cloudflare in front for DDoS mitigation and bot protection (Turnstile/
-  reCAPTCHA) on auth forms; Web Push for the one notification type the product sends
-  (Other task reminders).
-- **Hosting**: a single VPS (Oracle Cloud's Always Free tier, Hetzner as the paid
-  fallback), frontend and backend as separate Docker Compose containers talking to
-  each other, Postgres as a third. `petri.nachiketnasa.com` points at it.
+- **Infra**: Web Push (VAPID) for the one notification type the product sends, Other
+  task reminders; subscriptions are stored but sending is not built yet ([#39](https://github.com/nachiketnasa/petri-v2/issues/39)).
+  Cloudflare in front of the site is planned, not set up.
+- **Hosting**: Render free plans (a Docker web service for the backend, a static site
+  for the frontend that proxies `/api/*` to it) plus a Neon Postgres project per
+  environment; see [Environments](#environments). Locally, `docker compose` runs
+  frontend, backend and Postgres as three containers.
 - **Sessions**: server-side, not JWT — an httpOnly cookie for the web client now, a
   `Bearer` token for a native mobile app later, both backed by the same session store.
 - **Email**: Resend for now, behind a swappable interface so moving to Brevo or
@@ -474,11 +485,13 @@ criterion, and explicit non-goal, lives in [`_docs/specs.md`](_docs/specs.md). I
 
 ## Status
 
-Full-stack and functional: every feature in this document is built and running,
-except that TOTP 2FA is backend-only for now (see [Accounts](#accounts)) —
-signup/sign-in (email+password), experiments and goals/milestones end to
-end (create, activate, check in, complete via retro or abandon), the calendar,
-sharing/likes/comments, Settings, and Other tasks. Backed by real integration tests
+Full-stack and working end to end in the browser: email+password sign-up/sign-in with
+email verification and password reset, experiments and goals/milestones (create via
+the wizard, activate, check in, complete via retro or abandon), the dashboard, the
+calendar, and Settings. Backend only so far (API built and tested, no screens): TOTP
+2FA, sharing/likes/comments, Other tasks. Not yet built: OAuth ([#24](https://github.com/nachiketnasa/petri-v2/issues/24)), account
+deletion ([#25](https://github.com/nachiketnasa/petri-v2/issues/25)), evolve/branch ([#6](https://github.com/nachiketnasa/petri-v2/issues/6)), server-side goal WIP limit ([#29](https://github.com/nachiketnasa/petri-v2/issues/29)), push
+reminder sending ([#39](https://github.com/nachiketnasa/petri-v2/issues/39)). Each section above says which applies. Backed by real integration tests
 against Postgres, not just the in-memory repository. Deployed on Render (dev and prod)
 with CI/CD; not yet done: observability/alerting (see the evaluator table above for the exact
 breakdown).
