@@ -1,7 +1,11 @@
-# Render Blueprint for the Petri dev environment.
+# Render Blueprint for both Petri environments: dev and production.
 #
-# Three resources: the backend (Docker web service), the frontend (static site)
-# and a managed Postgres database.
+# Three resources each: the backend (Docker web service), the frontend (static
+# site) and a managed Postgres database. One blueprint, six resources — Render
+# syncs one blueprint per blueprint instance, so a second file would need a
+# second repo connection and nothing in the repo would say which is
+# authoritative. Dev block first, prod block second; see README.md's
+# Environments table for which deploy trigger owns which.
 #
 # Auto-deploy is OFF on both services on purpose. Render's own
 # deploy-on-push would fire on the merge commit the instant it lands, in
@@ -70,8 +74,82 @@ services:
       - key: VITE_BACKEND_URL
         value: https://petri-backend-dev.onrender.com
 
+  # ---------------------------------------------------------------------------
+  # Production. Same three resources, prod names, cross-wired to each other.
+  #
+  # Deploys are manual only: .github/workflows/deploy-prod.yml is
+  # `workflow_dispatch`-only, needs a typed confirmation, refuses any ref but
+  # main, and waits on a required reviewer on the `production` GitHub
+  # environment. `autoDeploy: false` + `autoDeployTrigger: "off"` are what make
+  # that true on Render's side too — a prod service left on deploy-on-push
+  # would ship every merge regardless of what the workflow says.
+  #
+  # KNOWN RISK, untestable from the repo: Render may refuse a SECOND free
+  # Postgres instance on one account. If the sync rejects `petri-prod`, pick
+  # one (the engineer deliberately does not pick for you):
+  #   a) upgrade `petri-prod` to the cheapest paid plan, or
+  #   b) temporarily point prod's DATABASE_URL at `petri-dev` — and say so
+  #      plainly in README.md's Environments table. Sharing the dev database
+  #      silently is not an option.
+  # ---------------------------------------------------------------------------
+
+  - type: web
+    name: petri-backend-prod
+    runtime: docker
+    plan: free
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /health
+    autoDeploy: false
+    autoDeployTrigger: "off"
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: petri-prod
+          property: connectionString
+      # The sibling static site's public URL. Feeds CORSMiddleware's
+      # allow_origins and the 500-handler's headers; left unset every browser
+      # call from the deployed frontend is CORS-blocked. `fromService` cannot
+      # produce this: `property: host` is a bare hostname and render.yaml has
+      # no way to prepend "https://".
+      - key: FRONTEND_ORIGIN
+        value: https://petri-frontend-prod.onrender.com
+      # Real secrets: declared here, values entered in the Render Dashboard.
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM_ADDRESS
+        sync: false
+
+  - type: web
+    name: petri-frontend-prod
+    runtime: static
+    rootDir: ./frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: ./frontend/dist
+    autoDeploy: false
+    autoDeployTrigger: "off"
+    # Not inherited from the dev site. App.tsx uses BrowserRouter with real
+    # paths (/sign-in, /reset-password, ...); without this rewrite every prod
+    # deep link and every reload off / hits Render's 404 page.
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      # The sibling backend service's public URL. Vite inlines
+      # import.meta.env.VITE_BACKEND_URL at BUILD time, so this belongs on the
+      # static site, not the backend, and changing it needs a rebuild.
+      # `fromService` cannot produce it (see FRONTEND_ORIGIN above).
+      - key: VITE_BACKEND_URL
+        value: https://petri-backend-prod.onrender.com
+
 databases:
   - name: petri-dev
+    databaseName: petri
+    user: petri
+    plan: free
+
+  - name: petri-prod
     databaseName: petri
     user: petri
     plan: free
