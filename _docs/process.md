@@ -6,6 +6,8 @@ Roles
 
 - PM - grooms a task before anyone implements it, follows _docs/team/pm.md
 - Engineer - implements one groomed task, follows _docs/team/software-engineer.md
+- QA - checks finished work against the issue's acceptance criteria and posts a PASS/FAIL verdict, follows _docs/team/qa-engineer.md
+- UX validator - checks the running frontend for visual and interaction bugs against the mockups, follows _docs/team/ux-validator.md
 
 Orchestrator
 

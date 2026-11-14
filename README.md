@@ -9,6 +9,10 @@ cohort**, this section is for you.
 
 ### Running it locally (no Resend account needed)
 
+Prerequisites: Docker (with Compose) to run the app; additionally
+[`uv`](https://docs.astral.sh/uv/) for the backend tests and Node.js 24 + npm for the
+frontend tests.
+
 ```bash
 git clone https://github.com/nachiketnasa/petri-v2.git
 cd petri-v2
@@ -35,7 +39,7 @@ If any of those ports are already taken on your machine, override them before
 starting — `docker-compose.yml` reads `POSTGRES_PORT` / `BACKEND_PORT` /
 `FRONTEND_PORT` with those same defaults, e.g.:
 ```bash
-BACKEND_PORT=8001 FRONTEND_PORT=5174 docker compose up --build
+POSTGRES_PORT=5433 BACKEND_PORT=8001 FRONTEND_PORT=5174 docker compose up --build
 ```
 
 **Email, without a Resend API key.** The app sends real email (sign-up verification
@@ -51,7 +55,12 @@ docker compose logs backend | grep -A2 "EMAIL ("
 (run from the `petri-v2` directory, same as `docker compose up` — if you started that
 in a different terminal/tab, `cd` back into `petri-v2` first, otherwise `docker compose`
 won't find `docker-compose.yml` and errors with "no configuration file provided: not
-found.")
+found." If you started the stack with a project name, e.g. `docker compose -p myname up`,
+pass the same `-p myname` to `logs` too, or it finds no containers.) Each email prints
+as an `EMAIL (no RESEND_API_KEY set) to=... subject=...` line, and the line right after
+it is the email's HTML: the 6-digit code is inside `<strong>...</strong>`, the reset link
+is the `http://localhost:5173/reset-password?token=...` URL (your `FRONTEND_PORT` if
+you overrode it).
 
 Sign up, then look there for the 6-digit verification code (or use "Resend code" on
 the verify screen to get a fresh one). Same for "Forgot password."
@@ -76,7 +85,7 @@ repo's settings, not in git. You do not need any of them:
 
 | What to check | Where |
 |---|---|
-| Tests run on every PR, and a red suite blocks the merge | [the Actions tab](https://github.com/nachiketnasa/petri-v2/actions/workflows/ci.yml) — filter `event: pull_request`. [PR #40](https://github.com/nachiketnasa/petri-v2/pull/40) is the pipeline's own PR; its checks show `backend` (210 tests against a real `postgres:16` service container, 0 skipped) and `frontend` (160 tests) |
+| Tests run on every PR, and a red suite blocks the merge | [the Actions tab](https://github.com/nachiketnasa/petri-v2/actions/workflows/ci.yml) — filter `event: pull_request`. [PR #40](https://github.com/nachiketnasa/petri-v2/pull/40) is the pipeline's own PR; its checks show the suite sizes at that time, `backend` (210 tests against a real `postgres:16` service container, 0 skipped) and `frontend` (160 tests); the current suite is larger (see row 6 below) |
 | The merge gate is enforced, not advisory | `main` carries a repository ruleset requiring a PR plus both checks, with no bypass: `gh api repos/nachiketnasa/petri-v2/rulesets` |
 | CD deploys to dev automatically | the same Actions tab, filter `event: push` — the `deploy` job runs only after both suites pass on the merge commit, and is **skipped** on PRs. Example: [run 43598749889](https://github.com/nachiketnasa/petri-v2/actions/runs/43598749889) — tests green, then `deploy` POSTs the Render hooks (Render answers with a deploy id) |
 | Production deploy is manual only | [`deploy-prod.yml`](.github/workflows/deploy-prod.yml) — `workflow_dispatch` is its only trigger, behind a typed `deploy-prod` confirmation, a `guard` job that hard-fails on a wrong confirmation or any ref but `main`, and a required reviewer on the `production` environment. Example: [run 43601553067](https://github.com/nachiketnasa/petri-v2/actions/runs/43601553067) — dispatched on `main`, `guard` passed, approved by the reviewer, then deployed. The guard's refusals are live too: [wrong confirmation](https://github.com/nachiketnasa/petri-v2/actions/runs/43585121463) and [non-`main` ref](https://github.com/nachiketnasa/petri-v2/actions/runs/43585202979), both red at `guard` with `deploy` skipped |
@@ -158,8 +167,12 @@ First-time setup — the dashboard steps nobody can do for you, in order:
 
 Known limits of the dev environment: `/api/*` is proxied to the backend through the
 static site, so the session cookie is first-party, and sessions live in the `sessions`
-table, so they survive a redeploy; the full browser walkthrough (Chrome + Safari) is
-still pending in [#41](https://github.com/nachiketnasa/petri-v2/issues/41) line 5. `PETRI_TOTP_KEY` and
+table, so they survive a redeploy. On 2026-11-15 the full end-to-end browser
+walkthrough (sign up, verify email, log in, create an experiment, reload, log out,
+password reset) passed in Firefox, and the session survived a backend redeploy; Safari
+was checked for sign in, reload and sign out only
+([results](https://github.com/nachiketnasa/petri-v2/issues/41#issuecomment-6882653208), D1–D9). Chrome was not run, and session survival across a
+free-tier cold start was not verified. `PETRI_TOTP_KEY` and
 `VAPID_PRIVATE_KEY` are set in the Render Dashboard, so 2FA secrets and the VAPID public
 key survive a redeploy.
 
@@ -257,8 +270,10 @@ schedule can start a prod deploy.
 
 Known limits of the production environment, in the same register as dev's: `/api/*` is
 proxied to the backend through the static site, so the session cookie is first-party,
-and sessions live in the `sessions` table; the full browser walkthrough (Chrome +
-Safari) is still pending in [#41](https://github.com/nachiketnasa/petri-v2/issues/41) line 5. `PETRI_TOTP_KEY` and
+and sessions live in the `sessions` table. On 2026-11-15 the same full walkthrough
+passed here in Firefox, and Safari was checked for sign in, reload and sign out only
+([results](https://github.com/nachiketnasa/petri-v2/issues/41#issuecomment-6882653208), P1–P6 and P8–P9; P7, a prod redeploy, was not run). Chrome was not run,
+and session survival across a cold start was not checked. `PETRI_TOTP_KEY` and
 `VAPID_PRIVATE_KEY` are set in the Render Dashboard. Free Render web services cold-start
 after inactivity, so the first request can take tens of seconds; Neon's free compute
 also scales to zero when idle and wakes on the next query.
@@ -276,19 +291,17 @@ yourself:
 | 3 | Agent team specification | 2 / 2 | [`_docs/process.md`](_docs/process.md) (PM → Engineer → QA lifecycle) and [`_docs/team/`](_docs/team) (one file per role). **Evidence the roles were actually used, not just documented:** [issue #30](https://github.com/nachiketnasa/petri-v2/issues/30)'s comment thread shows the full cycle on one issue — PM's `## Groomed:` comment, Engineer's `Implemented:` comment, QA's `## QA: FAIL`, Engineer's follow-up fix, and QA's final `## QA: PASS` before close. |
 | 4 | Context management | 2 / 2 | [`AGENTS.md`](AGENTS.md) indexes every doc below it; each is scoped to one concern. |
 | 5 | Application | 2 / 2 | `docker compose up --build` runs frontend + backend + Postgres together; see [Running it locally](#running-it-locally-no-resend-account-needed) above. |
-| 6 | Testing | 2 / 2 | Backend, one command runs unit *and* integration tests (against real Postgres, see `backend/tests/test_repository_postgres.py`) together: `docker compose up -d postgres && cd backend && DATABASE_URL=postgresql://petri:petri@localhost:5432/petri uv run pytest` (210 passed, 0 skipped, verified). If port 5432 is already taken on your machine, set `POSTGRES_PORT` first, e.g. `POSTGRES_PORT=5433 docker compose up -d postgres` and point `DATABASE_URL` at that port instead — `docker-compose.yml`'s ports are all overridable this way (`POSTGRES_PORT`, `BACKEND_PORT`, `FRONTEND_PORT`), with the same defaults (5432/8000/5173) if left unset. A bare `uv run pytest` still works and stays green, but skips the Postgres-backed tests — pass `DATABASE_URL` to include them. Frontend: `cd frontend && npm test` (Vitest + React Testing Library). A handful of date-dependent tests briefly flaked on machines whose local timezone trails UTC (the tests used local `date.today()` while the backend anchors the same logic in UTC); fixed by anchoring the tests in UTC too, so this no longer depends on the evaluator's machine timezone. |
+| 6 | Testing | 2 / 2 | Backend, one command runs unit *and* integration tests (against real Postgres, see `backend/tests/test_repository_postgres.py`) together: `docker compose up -d postgres && cd backend && DATABASE_URL=postgresql://petri:petri@localhost:5432/petri uv run pytest` (239 passed, 0 skipped, verified 2026-11-15). If port 5432 is already taken on your machine, set `POSTGRES_PORT` first, e.g. `POSTGRES_PORT=5433 docker compose up -d postgres` and point `DATABASE_URL` at that port instead — `docker-compose.yml`'s ports are all overridable this way (`POSTGRES_PORT`, `BACKEND_PORT`, `FRONTEND_PORT`), with the same defaults (5432/8000/5173) if left unset. A bare `uv run pytest` still works and stays green, but skips the Postgres-backed tests — pass `DATABASE_URL` to include them. **Careful:** the Postgres-backed tests run `truncate table users, experiments, check_ins, retros cascade` after each test (`backend/tests/test_repository_postgres.py`), which wipes accounts and everything that cascades from them in whatever database `DATABASE_URL` points at, so either run them before trying the app, or give them a separate stack: `POSTGRES_PORT=5433 docker compose -p petri-test up -d postgres`, then `DATABASE_URL=postgresql://petri:petri@localhost:5433/petri`, and `docker compose -p petri-test down -v` afterwards. Frontend: `cd frontend && npm ci && npm test` (Vitest + React Testing Library; 160 passed, verified 2026-11-15). A handful of date-dependent tests briefly flaked on machines whose local timezone trails UTC (the tests used local `date.today()` while the backend anchors the same logic in UTC); fixed by anchoring the tests in UTC too, so this no longer depends on the evaluator's machine timezone. |
 | 7 | Containerization | 2 / 2 | Single `docker-compose.yml` for all three services. |
-| 8 | Deployment | 1 / 2 | **Both environments are live on free plans** — Render for the app, a separate Neon Postgres project per environment. Dev: frontend <https://petri-frontend-dev-e9be.onrender.com>, backend <https://petri-backend-dev-vq9g.onrender.com>. Prod: frontend <https://petri-frontend-prod-iin7.onrender.com>, backend <https://petri-backend-prod-h3fe.onrender.com>. Each backend's `/health` → `{"status":"ok"}`. Not 2 / 2 yet: browser end-to-end on both environments (incl. Safari) not yet verified, [#41](https://github.com/nachiketnasa/petri-v2/issues/41) line 5. See [Environments](#environments). |
+| 8 | Deployment | 2 / 2 | **Both environments are live on free plans** — Render for the app, a separate Neon Postgres project per environment. Dev: frontend <https://petri-frontend-dev-e9be.onrender.com>, backend <https://petri-backend-dev-vq9g.onrender.com>. Prod: frontend <https://petri-frontend-prod-iin7.onrender.com>, backend <https://petri-backend-prod-h3fe.onrender.com>. Each backend's `/health` → `{"status":"ok"}`. Browser end-to-end (sign up through password reset) passed on both environments in Firefox on 2026-11-15, with sign in, reload and sign out also checked in Safari ([results](https://github.com/nachiketnasa/petri-v2/issues/41#issuecomment-6882653208)). See [Environments](#environments). |
 | 9 | CI/CD | 3 / 3 | All three parts. **(a) PR merge gate:** [`ci.yml`](.github/workflows/ci.yml) runs backend `pytest` against a real Postgres + frontend `vitest`, both required status checks on `main`. **(b) CD to dev:** a merge to `main` re-runs both suites against the merge commit and only a green run POSTs the Render deploy hooks. **(c) Manual production deploy:** [`deploy-prod.yml`](.github/workflows/deploy-prod.yml), `workflow_dispatch` and nothing else, behind a typed `deploy-prod` confirmation, a `guard` job that hard-fails on a wrong confirmation or any ref but `main`, and a required reviewer on the `production` environment that holds the deploy-hook secrets — click path in [Deploying to Render (production)](#deploying-to-render-production). |
 | 10 | Observability | 0 / 2 | No metrics/traces/structured logs with request correlation yet. |
 | 11 | Alerting | 0 / 1 | None yet. |
 | 12 | On-call agent | 0 / 2 | None yet. |
-| | **Total** | **18 / 24** | Pass threshold is 10. |
+| | **Total** | **19 / 24** | Pass threshold is 10. |
 
-The remaining gap is entirely in the ops layer (deployment — both environments are live
-but the browser end-to-end walkthrough on both, including Safari, is not yet verified, #41 line 5 — plus observability, alerting and
-on-call) — nothing in the product, spec, testing, containerization or CI/CD rows above is
-partial credit.
+The 5 unclaimed points are rows 10–12 (observability, alerting and on-call); every
+other row is self-scored at its maximum.
 
 ## The problem
 
@@ -335,29 +348,33 @@ into a fresh successor of the same kind, an experiment into a new experiment, a 
 into a new goal, so a result can lead straight into the next round without starting
 from a blank backlog. Every evolve and branch is stored as a real link between the two
 items involved, not just copied data, laying the groundwork for a future node-based
-diagram showing that lineage across all or selected experiments and goals. That
-diagram itself isn't built in v2, but the data it would need already is.
+diagram showing that lineage. **Evolve and branch are not yet built** ([#6](https://github.com/nachiketnasa/petri-v2/issues/6)): the
+`goals` table has the lineage columns, but no endpoint or screen sets them yet, and the
+diagram itself is out of scope for v2.
 
 ### Work in progress limits
-At most 2 experiments and 1 goal can be active at the same time, enforced by the
-system, not just suggested by the UI. The product is built around working through
+At most 2 experiments and 1 goal can be active at the same time. The experiment
+limit is enforced server-side; the 1-goal limit is only shown in the UI for now, not
+yet enforced by the backend ([#29](https://github.com/nachiketnasa/petri-v2/issues/29)). The product is built around working through
 things one at a time rather than juggling several at once.
 
 ### Transparent endings
 Ending or deleting anything before its cadence or duration is up requires a one-line
 reason, which is kept permanently on that item's record. The dashboard shows a plain,
-always-visible count of completed versus abandoned items, so the pattern stays
+always-visible count of completed versus abandoned experiments, so the pattern stays
 visible rather than something you'd have to go dig up.
 
 ### Streaks
-Consecutive logged cadence periods are counted and shown in a persistent, visible
-spot, similar in presentation to apps like Duolingo. Unlike those apps, there is no
+Consecutive logged cadence periods are counted by the backend (a `streak` on every
+experiment), but the dashboard card does not display the number yet (it shows a
+placeholder). Unlike Duolingo-style apps, there is no
 streak freeze to buy, no social or friend-streak pressure mechanic, and nothing is
 lost beyond the number resetting if a day is missed.
 
 ### Dashboard and landing screen
-Signing in opens a calm greeting screen first (a time-of-day greeting plus a single
-line noting how many things are due today), not the full dashboard. From there the
+Signing in opens a calm greeting screen first (a time-of-day greeting; its "due
+today" line is static for now and always says nothing is due, while the dashboard
+cards do flag what's due), not the full dashboard. From there the
 user opens the full dashboard deliberately, or sets it as their default landing view
 in Settings. The dashboard itself is a card grid of active items, filterable by
 Experiments, Goals, or Both, with the work-in-progress counts and the
@@ -373,11 +390,14 @@ A week view (Monday through Sunday) and a month view, each its own layout. The m
 view always renders full weeks: it starts on the Monday of the week containing the
 1st, covers every day of the month, and continues through the Sunday that closes out
 the week containing the last day, showing the spillover days from the neighboring
-months, faded. Both views support moving to the previous or next period, and a scope
-toggle switches between "this cadence only" and "everything active."
+months, faded. Both views support moving to the previous or next period and show every active
+experiment and goal; a "this cadence only" scope toggle is not yet built.
 
 ### Other tasks (optional, off by default)
-A separate, lower-profile feature, turned on from Settings, for ordinary obligations
+**Backend only so far:** the API (`/other-tasks` CRUD, `/daily-load`, push
+subscribe/unsubscribe) is built and tested, but there is no Other tasks screen, Settings
+toggle or Calendar merge in the frontend yet, and push reminders are not actually sent
+yet ([#39](https://github.com/nachiketnasa/petri-v2/issues/39)). The design: a separate, lower-profile feature for ordinary obligations
 that aren't experiments or goals, coursework, a work deadline, exam prep, and so on.
 Each task is one-time (a specific date) or repeating (chosen days or interval, until
 an end date), configured the way a phone's alarm app configures a repeat rule, and
@@ -389,7 +409,9 @@ send a browser push notification (with the standard permission prompt); nothing 
 Petri sends email notifications outside of account security messages.
 
 ### Sharing, likes, and comments
-Any experiment or goal can be made public: a per-item toggle generates a read-only
+**Backend only so far:** the share, public page, like and comment endpoints are built
+and tested, but the frontend has no share toggle, public page or share-to links yet.
+The design: any experiment or goal can be made public: a per-item toggle generates a read-only
 page at an unguessable link, requiring no login to view. An experiment's page shows
 its title, hypothesis, cadence, stage, and check-in streak; a goal's page also shows
 milestone progress. Neither ever shows private notes or retro content. The link can
@@ -400,25 +422,25 @@ deletes all likes and comments on that page and invalidates the link; turning it
 on issues a new link, starting at zero.
 
 ### Accounts
-Sign up or sign in with Google, LinkedIn, or Microsoft OAuth, or with email and
-password (email sign-up requires a verification code, and gets a real forgot-password
-flow). Only one account exists per email address, no matter which method it was
-created with. Explicit logout, and full account deletion on request. The site sits
-behind Cloudflare for DDoS mitigation, and auth forms are protected against bots.
-Two-factor authentication is optional, off by default, and uses a standard
-authenticator app of the user's choice (Google Authenticator, Authy, 1Password, and
-the like) rather than SMS, a genuinely free addition since TOTP is an open protocol
-with no carrier cost behind it. Turning it on shows a QR code and a set of one-time
-recovery codes. The only cookies the site sets are strictly necessary ones (sign-in,
+Sign up or sign in with email and password (email sign-up requires a verification
+code, and gets a real forgot-password flow), one account per email address, and
+explicit logout. Not yet built: Google, LinkedIn and Microsoft OAuth ([#24](https://github.com/nachiketnasa/petri-v2/issues/24)), account
+deletion ([#25](https://github.com/nachiketnasa/petri-v2/issues/25)), and Cloudflare DDoS/bot protection in front of the site.
+Two-factor authentication (TOTP, authenticator app rather than SMS) is implemented in
+the backend only: `POST /auth/2fa/enroll`, `/auth/2fa/confirm` and `/auth/2fa/disable`,
+one-time recovery codes, and a TOTP step at login, all covered by backend tests
+(`backend/tests/test_auth_2fa.py`). The frontend has no enrolment screen or sign-in
+code step yet, so 2FA cannot be turned on from the UI. The only cookies the site sets are strictly necessary ones (sign-in,
 security), disclosed with a simple notice rather than a cookie-category picker, since
 there's nothing optional to pick between.
 
 ### Settings
 Theme (a choice of four: Petri Light, Petri Dark, Solarized Light, Solarized Dark,
-applied across the whole app and saved to the account), a sound effects toggle (short
-tones on starting or finishing setup, logging a check-in, and pausing or removing a
-cadence), the Other tasks feature toggle, the landing-screen preference, two-factor
-authentication, and account deletion.
+applied across the whole app), a sound effects toggle (short tones on opening or
+submitting the creation wizard and on logging a check-in), and the landing-screen
+preference. These are saved in the browser; the backend can store them per account
+(`PATCH /users/me`), but the Settings screen doesn't call it yet. No Other tasks
+toggle, 2FA controls or account deletion yet (see above, [#25](https://github.com/nachiketnasa/petri-v2/issues/25)).
 
 ## Expected behavior
 
@@ -429,7 +451,8 @@ criterion, and explicit non-goal, lives in [`_docs/specs.md`](_docs/specs.md). I
   isn't Active.
 - Nothing can be archived without a retro (or, if ended early, an abandon reason)
   recorded first.
-- The WIP limit is enforced server-side, not just hinted at in the UI.
+- The WIP limit is enforced server-side, not just hinted at in the UI (experiments
+  today; goals pending [#29](https://github.com/nachiketnasa/petri-v2/issues/29)).
 - A shared page only ever exposes title, hypothesis/goal text, cadence, stage, streak,
   and (for goals) milestone progress — never private notes or retro content.
 - Every user's data is isolated; there is no cross-user access.
@@ -443,14 +466,17 @@ criterion, and explicit non-goal, lives in [`_docs/specs.md`](_docs/specs.md). I
   route/service code never depends on it directly.
 - **Frontend**: React 18 (no meta-framework), Vite, TypeScript, React Router for
   routing, Vitest and React Testing Library for tests. The same choice Petri v1 used.
-- **Runtime**: Node.js 24 LTS, pinned to **≥24.22.1** (the patched line from the
-  October 2026 Node.js security release).
-- **Infra**: Cloudflare in front for DDoS mitigation and bot protection (Turnstile/
-  reCAPTCHA) on auth forms; Web Push for the one notification type the product sends
-  (Other task reminders).
-- **Hosting**: a single VPS (Oracle Cloud's Always Free tier, Hetzner as the paid
-  fallback), frontend and backend as separate Docker Compose containers talking to
-  each other, Postgres as a third. `petri.nachiketnasa.com` points at it.
+- **Runtime**: Node.js 24 LTS is the target (≥24.22.1, the patched line from the
+  October 2026 Node.js security release); CI runs Node 24, but `frontend/Dockerfile`
+  still uses `node:22-slim`
+  ([#43](https://github.com/nachiketnasa/petri-v2/issues/43)).
+- **Infra**: Web Push (VAPID) for the one notification type the product sends, Other
+  task reminders; subscriptions are stored but sending is not built yet ([#39](https://github.com/nachiketnasa/petri-v2/issues/39)).
+  Cloudflare in front of the site is planned, not set up.
+- **Hosting**: Render free plans (a Docker web service for the backend, a static site
+  for the frontend that proxies `/api/*` to it) plus a Neon Postgres project per
+  environment; see [Environments](#environments). Locally, `docker compose` runs
+  frontend, backend and Postgres as three containers.
 - **Sessions**: server-side, not JWT — an httpOnly cookie for the web client now, a
   `Bearer` token for a native mobile app later, both backed by the same session store.
 - **Email**: Resend for now, behind a swappable interface so moving to Brevo or
@@ -467,16 +493,20 @@ criterion, and explicit non-goal, lives in [`_docs/specs.md`](_docs/specs.md). I
 - [Issue tracker](https://github.com/nachiketnasa/petri-v2/issues) — every acceptance
   criterion above broken into tasks; [`_docs/backlog.md`](_docs/backlog.md) is a
   generated snapshot of it, committed for convenience (the tracker is authoritative).
-- Agent team docs: in progress.
+- [`_docs/process.md`](_docs/process.md) and [`_docs/team/`](_docs/team) — the agent team:
+  lifecycle and one file per role.
 
 ## Status
 
-Full-stack and functional: every feature in this document is built and running —
-signup/sign-in (email+password, TOTP 2FA), experiments and goals/milestones end to
-end (create, activate, check in, complete via retro or abandon), the calendar,
-sharing/likes/comments, Settings, and Other tasks. Backed by real integration tests
-against Postgres, not just the in-memory repository. Not yet done: a deployed public
-URL, CI/CD, and observability/alerting (see the evaluator table above for the exact
+Full-stack and working end to end in the browser: email+password sign-up/sign-in with
+email verification and password reset, experiments and goals/milestones (create via
+the wizard, activate, check in, complete via retro or abandon), the dashboard, the
+calendar, and Settings. Backend only so far (API built and tested, no screens): TOTP
+2FA, sharing/likes/comments, Other tasks. Not yet built: OAuth ([#24](https://github.com/nachiketnasa/petri-v2/issues/24)), account
+deletion ([#25](https://github.com/nachiketnasa/petri-v2/issues/25)), evolve/branch ([#6](https://github.com/nachiketnasa/petri-v2/issues/6)), server-side goal WIP limit ([#29](https://github.com/nachiketnasa/petri-v2/issues/29)), push
+reminder sending ([#39](https://github.com/nachiketnasa/petri-v2/issues/39)). Each section above says which applies. Backed by real integration tests
+against Postgres, not just the in-memory repository. Deployed on Render (dev and prod)
+with CI/CD; not yet done: observability/alerting (see the evaluator table above for the exact
 breakdown).
 
 ## Credits and disclaimers
