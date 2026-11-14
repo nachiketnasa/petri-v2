@@ -1,11 +1,18 @@
 # Render Blueprint for both Petri environments: dev and production.
 #
-# Three resources each: the backend (Docker web service), the frontend (static
-# site) and a managed Postgres database. One blueprint, six resources — Render
-# syncs one blueprint per blueprint instance, so a second file would need a
-# second repo connection and nothing in the repo would say which is
-# authoritative. Dev block first, prod block second; see README.md's
-# Environments table for which deploy trigger owns which.
+# Two services each on Render: the backend (Docker web service) and the
+# frontend (static site). Four resources in one blueprint — Render syncs one
+# blueprint per blueprint instance, so a second file would need a second repo
+# connection and nothing in the repo would say which is authoritative. Dev
+# block first, prod block second; see README.md's Environments table for which
+# deploy trigger owns which.
+#
+# The databases are NOT on Render. Render's free tier allows one free Postgres
+# per account (a real sync failed on the second one) and expires it after 30
+# days. Each environment instead gets its own Neon project (petri-dev,
+# petri-prod) on Neon's free plan: separate databases, no expiry. DATABASE_URL
+# is therefore `sync: false` on both backends — you paste each Neon
+# connection string into the Render Dashboard; it never lives in this repo.
 #
 # Auto-deploy is OFF on both services on purpose. Render's own
 # deploy-on-push would fire on the merge commit the instant it lands, in
@@ -35,10 +42,10 @@ services:
     healthCheckPath: /health
     autoDeployTrigger: "off"
     envVars:
+      # The Neon petri-dev project's direct (non-pooled) connection string (it carries
+      # ?sslmode=require). Entered in the Render Dashboard, never committed.
       - key: DATABASE_URL
-        fromDatabase:
-          name: petri-dev
-          property: connectionString
+        sync: false
       # The sibling static site's public URL. Feeds CORSMiddleware's
       # allow_origins and the 500-handler's headers; left unset every browser
       # call from the deployed frontend is CORS-blocked. `fromService` cannot
@@ -74,7 +81,8 @@ services:
         value: https://petri-backend-dev.onrender.com
 
   # ---------------------------------------------------------------------------
-  # Production. Same three resources, prod names, cross-wired to each other.
+  # Production. Same two services, prod names, cross-wired to each other, with
+  # their own Neon database (petri-prod) — nothing is shared with dev.
   #
   # Deploys are manual only: .github/workflows/deploy-prod.yml is
   # `workflow_dispatch`-only, needs a typed confirmation, refuses any ref but
@@ -82,14 +90,6 @@ services:
   # environment. `autoDeployTrigger: "off"` is what makes that true on
   # Render's side too — a prod service left on deploy-on-push would ship
   # every merge regardless of what the workflow says.
-  #
-  # KNOWN RISK, untestable from the repo: Render may refuse a SECOND free
-  # Postgres instance on one account. If the sync rejects `petri-prod`, pick
-  # one (the engineer deliberately does not pick for you):
-  #   a) upgrade `petri-prod` to the cheapest paid plan, or
-  #   b) temporarily point prod's DATABASE_URL at `petri-dev` — and say so
-  #      plainly in README.md's Environments table. Sharing the dev database
-  #      silently is not an option.
   # ---------------------------------------------------------------------------
 
   - type: web
@@ -101,10 +101,10 @@ services:
     healthCheckPath: /health
     autoDeployTrigger: "off"
     envVars:
+      # The Neon petri-prod project's direct (non-pooled) connection string (it carries
+      # ?sslmode=require). Entered in the Render Dashboard, never committed.
       - key: DATABASE_URL
-        fromDatabase:
-          name: petri-prod
-          property: connectionString
+        sync: false
       # The sibling static site's public URL. Feeds CORSMiddleware's
       # allow_origins and the 500-handler's headers; left unset every browser
       # call from the deployed frontend is CORS-blocked. `fromService` cannot
@@ -139,14 +139,3 @@ services:
       # `fromService` cannot produce it (see FRONTEND_ORIGIN above).
       - key: VITE_BACKEND_URL
         value: https://petri-backend-prod.onrender.com
-
-databases:
-  - name: petri-dev
-    databaseName: petri
-    user: petri
-    plan: free
-
-  - name: petri-prod
-    databaseName: petri
-    user: petri
-    plan: free
