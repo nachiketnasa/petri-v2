@@ -1,4 +1,5 @@
 import os
+import uuid
 from datetime import date, datetime, timedelta, timezone
 from typing import Literal
 from zoneinfo import ZoneInfo
@@ -50,13 +51,9 @@ app.add_middleware(
 
 _repository: Repository = InMemoryRepository()
 
-# ponytail: module-level dict, no persistence; fine for in-memory MVP.
-# Maps token -> (user_id, expires_at).
-_sessions: dict[str, tuple[str, datetime]] = {}
-
-# Reset tokens and verification codes live in the password_resets /
-# email_verifications tables (_docs/schema.sql), not a module-level dict --
-# they must survive a backend restart, unlike _sessions above.
+# Sessions, reset tokens and verification codes live in the sessions /
+# password_resets / email_verifications tables (_docs/schema.sql), not a
+# module-level dict -- they must survive a backend restart or redeploy.
 
 SESSION_COOKIE_NAME = "session_id"
 RESET_TOKEN_TTL = timedelta(minutes=15)
@@ -64,8 +61,37 @@ SESSION_TTL = timedelta(days=30)
 VERIFICATION_CODE_TTL = timedelta(minutes=30)
 
 
-def _start_session(token: str, user_id: str) -> None:
-    _sessions[token] = (user_id, datetime.now(timezone.utc) + SESSION_TTL)
+def _session_id(token: str) -> str:
+    # The raw cookie token is never stored; any string maps to a valid UUID.
+    return str(uuid.UUID(hex=hash_lookup_code(token)[:32]))
+
+
+def _cookie_attrs() -> dict:
+    # Read per request so tests can monkeypatch FRONTEND_ORIGIN.
+    origin = os.environ.get("FRONTEND_ORIGIN", "http://localhost:5173")
+    return {
+        "path": "/",
+        "httponly": True,
+        "samesite": "lax",
+        "secure": origin.startswith("https://"),
+    }
+
+
+def _start_session(
+    repository: Repository, response: Response, user_id: str
+) -> None:
+    token = new_session_token()
+    repository.create_session(
+        session_id=_session_id(token),
+        user_id=user_id,
+        expires_at=datetime.now(timezone.utc) + SESSION_TTL,
+    )
+    response.set_cookie(
+        SESSION_COOKIE_NAME,
+        token,
+        max_age=int(SESSION_TTL.total_seconds()),
+        **_cookie_attrs(),
+    )
 
 
 def get_repository() -> Repository:
@@ -78,14 +104,10 @@ def get_repository() -> Repository:
 def get_current_user(
     request: Request, repository: Repository = Depends(get_repository)
 ) -> User:
-    session_id = request.cookies.get(SESSION_COOKIE_NAME)
-    entry = _sessions.get(session_id) if session_id else None
-    user_id = None
-    if entry is not None:
-        user_id, expires_at = entry
-        if datetime.now(timezone.utc) > expires_at:
-            _sessions.pop(session_id, None)
-            user_id = None
+    token = request.cookies.get(SESSION_COOKIE_NAME)
+    user_id = (
+        repository.get_session_user_id(session_id=_session_id(token)) if token else None
+    )
     user = repository.get_user_by_id(user_id=user_id) if user_id else None
     if user is None:
         raise HTTPException(status_code=401, detail="Not authenticated.")
@@ -453,9 +475,7 @@ def signup(
     )
     send_verification_email(to=user.email, code=code)
 
-    token = new_session_token()
-    _start_session(token, user.id)
-    response.set_cookie(SESSION_COOKIE_NAME, token, httponly=True)
+    _start_session(repository, response, user.id)
     return UserOut.from_user(user)
 
 
@@ -482,9 +502,7 @@ def login(
             # which half of a two-factor check failed is not observable.
             raise HTTPException(status_code=401, detail="Invalid email or password.")
 
-    token = new_session_token()
-    _start_session(token, user.id)
-    response.set_cookie(SESSION_COOKIE_NAME, token, httponly=True)
+    _start_session(repository, response, user.id)
     return UserOut.from_user(user)
 
 
@@ -580,10 +598,11 @@ def logout(
     request: Request,
     response: Response,
     current_user: User = Depends(get_current_user),
+    repository: Repository = Depends(get_repository),
 ) -> None:
     token = request.cookies.get(SESSION_COOKIE_NAME)
-    _sessions.pop(token, None)
-    response.delete_cookie(SESSION_COOKIE_NAME)
+    repository.revoke_session(session_id=_session_id(token))
+    response.delete_cookie(SESSION_COOKIE_NAME, **_cookie_attrs())
 
 
 @app.post("/auth/forgot-password")
@@ -619,9 +638,7 @@ def reset_password(
         # Defensive: the user the token pointed at no longer exists.
         raise HTTPException(status_code=400, detail="Invalid or expired token.")
 
-    for session_token, (session_user_id, _expires_at) in list(_sessions.items()):
-        if session_user_id == user_id:
-            del _sessions[session_token]
+    repository.revoke_user_sessions(user_id=user_id)
 
     return {"status": "ok"}
 

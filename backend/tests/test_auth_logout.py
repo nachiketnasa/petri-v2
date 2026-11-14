@@ -1,7 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from petri_backend.app import _sessions, app, get_repository
+from petri_backend.app import _session_id, app, get_repository
 from _email_capture import sent_verification_codes
 from petri_backend.repository_memory import InMemoryRepository
 
@@ -32,15 +32,17 @@ def _signup_and_login(client: TestClient, email: str = "user@example.com", passw
     return response.cookies["session_id"]
 
 
-def test_logout_success_removes_session_and_clears_cookie(client: TestClient):
+def test_logout_success_removes_session_and_clears_cookie(
+    client: TestClient, repo: InMemoryRepository
+):
     token = _signup_and_login(client)
-    assert token in _sessions
+    assert repo.get_session_user_id(session_id=_session_id(token)) is not None
 
     response = client.post("/auth/logout", cookies={"session_id": token})
 
     assert response.status_code == 204
     assert response.content == b""
-    assert token not in _sessions
+    assert repo.get_session_user_id(session_id=_session_id(token)) is None
     # Set-Cookie header clears the cookie (expired / empty value).
     set_cookie = response.headers.get("set-cookie", "")
     assert "session_id" in set_cookie

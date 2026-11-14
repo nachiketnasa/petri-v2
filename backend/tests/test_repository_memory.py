@@ -1,4 +1,5 @@
-from datetime import date, datetime, timezone
+import uuid
+from datetime import date, datetime, timedelta, timezone
 
 import pytest
 
@@ -48,6 +49,10 @@ def test_implements_exactly_the_interface_methods():
         "consume_email_verification",
         "create_password_reset",
         "consume_password_reset",
+        "create_session",
+        "get_session_user_id",
+        "revoke_session",
+        "revoke_user_sessions",
         "create_other_task",
         "list_other_tasks",
         "get_other_task",
@@ -245,3 +250,52 @@ def test_memory_repo_does_not_enforce_business_rules(repo: InMemoryRepository):
     )
     assert archived.status == "archived"
     assert repo.get_retro(experiment_id=experiment.id, user_id=user.id) is None
+
+
+# --- sessions (#41 line 2); same cases in the other repository test file ---
+
+
+def _two_users_with_sessions(repo):
+    a = repo.create_user(email="a@example.com", password_hash=None, display_name="A")
+    b = repo.create_user(email="b@example.com", password_hash=None, display_name="B")
+    later = datetime.now(timezone.utc) + timedelta(days=1)
+    ids = {k: str(uuid.uuid4()) for k in ("a1", "a2", "b1")}
+    repo.create_session(session_id=ids["a1"], user_id=a.id, expires_at=later)
+    repo.create_session(session_id=ids["a2"], user_id=a.id, expires_at=later)
+    repo.create_session(session_id=ids["b1"], user_id=b.id, expires_at=later)
+    return a, b, ids
+
+
+def test_session_create_then_lookup_returns_user_id(repo):
+    a, b, ids = _two_users_with_sessions(repo)
+    assert repo.get_session_user_id(session_id=ids["a1"]) == a.id
+    assert repo.get_session_user_id(session_id=ids["b1"]) == b.id
+
+
+def test_session_unknown_id_returns_none(repo):
+    assert repo.get_session_user_id(session_id=str(uuid.uuid4())) is None
+
+
+def test_session_expired_returns_none(repo):
+    a = repo.create_user(email="a@example.com", password_hash=None, display_name="A")
+    sid = str(uuid.uuid4())
+    repo.create_session(
+        session_id=sid, user_id=a.id,
+        expires_at=datetime.now(timezone.utc) - timedelta(seconds=1),
+    )
+    assert repo.get_session_user_id(session_id=sid) is None
+
+
+def test_revoke_session_only_revokes_that_session(repo):
+    a, b, ids = _two_users_with_sessions(repo)
+    repo.revoke_session(session_id=ids["a1"])
+    assert repo.get_session_user_id(session_id=ids["a1"]) is None
+    assert repo.get_session_user_id(session_id=ids["a2"]) == a.id
+
+
+def test_revoke_user_sessions_revokes_all_of_that_users_sessions(repo):
+    a, b, ids = _two_users_with_sessions(repo)
+    repo.revoke_user_sessions(user_id=a.id)
+    assert repo.get_session_user_id(session_id=ids["a1"]) is None
+    assert repo.get_session_user_id(session_id=ids["a2"]) is None
+    assert repo.get_session_user_id(session_id=ids["b1"]) == b.id
