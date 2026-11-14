@@ -2,7 +2,7 @@
 
 A local mirror of the public task tracker: https://github.com/nachiketnasa/petri-v2/issues
 
-Generated from the tracker on 2026-11-14. The tracker is the source of truth; this file is a readable snapshot committed alongside the spec, not edited independently — regenerate it with `scripts/regenerate_backlog.py` instead of hand-editing when issues change.
+Generated from the tracker on 2026-11-15. The tracker is the source of truth; this file is a readable snapshot committed alongside the spec, not edited independently — regenerate it with `scripts/regenerate_backlog.py` instead of hand-editing when issues change.
 
 **Listed in build order, not issue-number order.** Each issue carries an `order-NN` label marking when work on it should start; issues sharing a number are meant to start together (e.g. the two project-setup scaffolds). Give any new issue an `order-NN` label before filing it, placed at the point in the sequence where it belongs — otherwise it sorts last, below. Issues #1, #16, and #17 span the whole product (the contract and the two test suites), so their own Acceptance criteria is a checklist of the other issues that complete them, not a bounded task on its own.
 
@@ -1248,7 +1248,7 @@ scope here — see the separate issue.
 
 ## order-13 · #41 — Auth breaks on a cross-origin, restarting deployment (SameSite cookie + in-memory sessions)
 
-- **Status**: OPEN
+- **Status**: CLOSED
 - **Labels**: backend, auth
 - **Link**: https://github.com/nachiketnasa/petri-v2/issues/41
 
@@ -1277,17 +1277,61 @@ working. Two independent causes, both in `backend/src/petri_backend/app.py`:
    a `sessions` table (line 73) plus `sessions_user_id_idx` that nothing writes
    to — the storage exists, the repository method does not.
 
+## Design decision (PM grooming, 2026-11-14)
+
+Goal from the user: **"I want hosted app usable end to end."**
+
+Chosen: **(a) same-origin via a Render rewrite proxy.** Each static site gets a
+rewrite `/api/*` → `https://<its backend>/*` ordered *before* the SPA catch-all
+`/* → /index.html`, and is built with `VITE_BACKEND_URL=/api`. The browser then
+only ever talks to the frontend origin, so the session cookie is first-party:
+`SameSite=Lax` keeps working, and Safari/Firefox third-party-cookie blocking
+never applies. No frontend code changes (all 10 files already use
+`${BASE_URL}`), no DNS work, and `FRONTEND_ORIGIN` (CORS + password-reset link)
+stays exactly what it is today.
+
+Rejected as the primary: **(b) `SameSite=None; Secure`** — the original fix in
+this issue. It works in Chrome only: Safari (ITP) and Firefox (Total Cookie
+Protection) block third-party cookies by default, so a grader in Safari would
+sign up and then 401 on every request. It is the **fallback** if line 1's
+proxy check fails. Also considered: **(c) custom subdomains** on the
+Resend-verified domain (e.g. `app.` + `api.` → same-site, first-party) — the
+most robust, but it needs DNS + Render custom-domain setup for four services by
+the user; it is the escalation if (a) fails *and* Safari must work.
+
+Render's docs do not say whether a full-URL rewrite forwards POST bodies,
+headers, cookies and `Set-Cookie`, so line 1 proves that on live dev before
+anything else is built on it.
+
+## Implementation tasks
+
+- [x] **1. De-risk the proxy on dev:** add the `/api/*` → dev-backend rewrite (before `/*`) and `VITE_BACKEND_URL=/api` to the *dev* static site only; prove on the live dev URL that POST bodies, `Set-Cookie` and `Cookie` survive the proxy and responses are not cached across users. Fallback to (b) if not.
+- [x] **2. DB-backed sessions + cookie attributes:** replace the in-process `_sessions` dict with the existing `sessions` table (no schema change — see groomed comment), set `max_age`, explicit `samesite="lax"`, and `secure` only when `FRONTEND_ORIGIN` is `https://`; a dev login survives a redeploy and a free-tier spin-down.
+- [x] **3. Persistent `PETRI_TOTP_KEY` / `VAPID_PRIVATE_KEY`:** declare both as `sync: false` on both backends in `render.yaml`, document how to generate them in README, user pastes a separate value per environment; a deployed backend refuses to start without them; clean up any 2FA rows encrypted under the old ephemeral keys.
+- [x] **4. Roll out to prod:** same rewrite + `VITE_BACKEND_URL=/api` on the prod static site, deploy prod via `deploy-prod.yml`, update README's "Known limits" paragraphs for both environments.
+- [x] **5. End-to-end acceptance on dev AND prod:** a grader in a fresh private window (Firefox and Safari) can sign up, verify email by code, log in, use the app (create an experiment), log out, and complete a password reset from the emailed link; on dev the session also survives a backend redeploy. *(Scope narrowed by the user on 2026-11-15, was: "Chrome and Safari" and "survive a backend redeploy" on both environments. Chrome not run: Firefox private windows (Total Cookie Protection) are the stricter cookie case. Prod redeploy not run: prod ships only through an approved deploy-prod.yml run, and it runs the same commit as dev. Session survival across a free-tier cold start is on hold.)*
+
+**Notes for grooming lines 2–3** (decided now so they aren't lost):
+
+- *Sessions table vs. what's needed:* `sessions(id uuid pk, user_id, created_at, expires_at, revoked_at)` has no token column, and the cookie token must not sit in the DB in plaintext. Use the PK as the hash: `id = uuid.UUID(hex=hash_lookup_code(token)[:32])` (128 bits of SHA-256 of the 256-bit `new_session_token()`). Lookup = `where id = %s and revoked_at is null and expires_at > now()`; logout sets `revoked_at`; password reset revokes all of the user's rows. That needs **no schema change**, so no migration on the two live Neon DBs. Migration story if a later change ever does need a column: add an idempotent `_docs/migrations/NNNN_<name>.sql` (`alter table … add column if not exists …`), fold the same change into `schema.sql` for fresh DBs (compose/CI), and the user applies it by hand with `psql "<conn>" -v ON_ERROR_STOP=1 -f …` to petri-dev and petri-prod **before** the code that needs it deploys — never in a build/deploy command.
+- *Key generation (line 3), one value per environment, pasted into Render → each backend → Environment:*
+  - `PETRI_TOTP_KEY`: `cd backend && uv run python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`
+  - `VAPID_PRIVATE_KEY`: `cd backend && uv run python -c "import base64; from cryptography.hazmat.primitives.asymmetric import ec; k=ec.generate_private_key(ec.SECP256R1()); print(base64.urlsafe_b64encode(k.private_numbers().private_value.to_bytes(32,'big')).rstrip(b'=').decode())"`
+  - Any `users.totp_secret` / `push_subscriptions` rows written under the old ephemeral keys are already unrecoverable: reset with `update users set totp_enabled=false, totp_secret=null; delete from totp_recovery_codes; delete from push_subscriptions;` on each Neon DB after the keys are set.
+
 ## Acceptance criteria
 
-- [ ] Both `set_cookie` calls and the `delete_cookie` call set
-      `samesite="none", secure=True`.
-- [ ] Sign in on the deployed dev frontend, reload the page, and you are still
+- [x] The session cookie is first-party on both deployed sites (served
+      through the frontend origin's `/api` proxy; `SameSite=Lax`, `Secure` on
+      https). *(Was: `samesite="none", secure=True` — superseded by the design
+      decision above; that is now only the fallback.)*
+- [x] Sign in on the deployed dev frontend, reload the page, and you are still
       signed in; the dashboard loads instead of bouncing to `/sign-in`.
-- [ ] Redeploy the backend, reload the deployed frontend, and the session
+- [x] Redeploy the backend, reload the deployed frontend, and the session
       survives (i.e. sessions are read from the `sessions` table, not a dict).
-- [ ] `docker compose up` + `http://localhost:5173` sign-in still works
+- [x] `docker compose up` + `http://localhost:5173` sign-in still works
       unchanged.
-- [ ] Existing backend suite stays green.
+- [x] Existing backend suite stays green.
 
 ## Out of scope
 
@@ -1297,8 +1341,8 @@ working. Two independent causes, both in `backend/src/petri_backend/app.py`:
 
 ## Constraints
 
-- `backend/src/petri_backend/app.py` and the Postgres repository
-  (`backend/src/petri_backend/repository_postgres.py`) only.
+- Per-line file scope is set in each `## Groomed:` comment (the proxy lives in
+  `render.yaml`; sessions in `app.py` + the three `repository*.py` files).
 - Use the existing `sessions` table in `_docs/schema.sql` as written; no schema
   change, no new migration.
 - No new dependencies. No session middleware library for a dict lookup.
