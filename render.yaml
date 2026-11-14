@@ -52,7 +52,7 @@ services:
       # produce this: `property: host` is a bare hostname and render.yaml has
       # no way to prepend "https://".
       - key: FRONTEND_ORIGIN
-        value: https://petri-frontend-dev.onrender.com
+        value: https://petri-frontend-dev-e9be.onrender.com
       # Real secrets: declared here, values entered in the Render Dashboard.
       - key: RESEND_API_KEY
         sync: false
@@ -78,7 +78,7 @@ services:
       # import.meta.env.VITE_BACKEND_URL at BUILD time, so this belongs on the
       # static site, not the backend, and changing it needs a rebuild.
       - key: VITE_BACKEND_URL
-        value: https://petri-backend-dev.onrender.com
+        value: https://petri-backend-dev-vq9g.onrender.com
       # Render picks its own default Node otherwise; pin the project's Node 24.
       - key: NODE_VERSION
         value: "24"
@@ -114,7 +114,7 @@ services:
       # produce this: `property: host` is a bare hostname and render.yaml has
       # no way to prepend "https://".
       - key: FRONTEND_ORIGIN
-        value: https://petri-frontend-prod.onrender.com
+        value: https://petri-frontend-prod-iin7.onrender.com
       # Real secrets: declared here, values entered in the Render Dashboard.
       - key: RESEND_API_KEY
         sync: false
@@ -141,7 +141,7 @@ services:
       # static site, not the backend, and changing it needs a rebuild.
       # `fromService` cannot produce it (see FRONTEND_ORIGIN above).
       - key: VITE_BACKEND_URL
-        value: https://petri-backend-prod.onrender.com
+        value: https://petri-backend-prod-h3fe.onrender.com
       # Render picks its own default Node otherwise; pin the project's Node 24.
       - key: NODE_VERSION
         value: "24"
