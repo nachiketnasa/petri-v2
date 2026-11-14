@@ -64,7 +64,7 @@ services:
     runtime: static
     rootDir: ./frontend
     buildCommand: npm ci && npm run build
-    staticPublishPath: ./frontend/dist
+    staticPublishPath: ./dist  # relative to rootDir, per Render's monorepo docs
     autoDeployTrigger: "off"
     # App.tsx uses BrowserRouter with real paths (/sign-in, /reset-password,
     # ...). Without this rewrite every deep link and every reload off / hits
@@ -79,6 +79,9 @@ services:
       # static site, not the backend, and changing it needs a rebuild.
       - key: VITE_BACKEND_URL
         value: https://petri-backend-dev.onrender.com
+      # Render picks its own default Node otherwise; pin the project's Node 24.
+      - key: NODE_VERSION
+        value: "24"
 
   # ---------------------------------------------------------------------------
   # Production. Same two services, prod names, cross-wired to each other, with
@@ -123,7 +126,7 @@ services:
     runtime: static
     rootDir: ./frontend
     buildCommand: npm ci && npm run build
-    staticPublishPath: ./frontend/dist
+    staticPublishPath: ./dist  # relative to rootDir, per Render's monorepo docs
     autoDeployTrigger: "off"
     # Not inherited from the dev site. App.tsx uses BrowserRouter with real
     # paths (/sign-in, /reset-password, ...); without this rewrite every prod
@@ -139,3 +142,6 @@ services:
       # `fromService` cannot produce it (see FRONTEND_ORIGIN above).
       - key: VITE_BACKEND_URL
         value: https://petri-backend-prod.onrender.com
+      # Render picks its own default Node otherwise; pin the project's Node 24.
+      - key: NODE_VERSION
+        value: "24"
