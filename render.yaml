@@ -1,7 +1,8 @@
 # Render Blueprint for both Petri environments: dev and production.
 #
-# Three resources each: the backend (Docker web service), the frontend (static
-# site) and a managed Postgres database. One blueprint, six resources — Render
+# Dev gets three resources (backend, frontend, Postgres); prod gets two
+# (backend, frontend) and shares dev's Postgres — see the DATABASE note in
+# the prod block below for why. One blueprint, five resources — Render
 # syncs one blueprint per blueprint instance, so a second file would need a
 # second repo connection and nothing in the repo would say which is
 # authoritative. Dev block first, prod block second; see README.md's
@@ -83,13 +84,16 @@ services:
   # Render's side too — a prod service left on deploy-on-push would ship
   # every merge regardless of what the workflow says.
   #
-  # KNOWN RISK, untestable from the repo: Render may refuse a SECOND free
-  # Postgres instance on one account. If the sync rejects `petri-prod`, pick
-  # one (the engineer deliberately does not pick for you):
-  #   a) upgrade `petri-prod` to the cheapest paid plan, or
-  #   b) temporarily point prod's DATABASE_URL at `petri-dev` — and say so
-  #      plainly in README.md's Environments table. Sharing the dev database
-  #      silently is not an option.
+  # DATABASE: Render's free tier allows exactly one free Postgres per
+  # account, and a real sync confirmed it — a second `databases:` entry
+  # failed with "cannot have more than one active free tier database" and
+  # took the rest of that sync down with it. So prod's DATABASE_URL below
+  # points at `petri-dev`, not a `petri-prod` database (there is none).
+  # This is a real corner being cut, not an oversight — see README.md's
+  # Environments table, which says so plainly rather than hiding it.
+  # Upgrade path: create a paid `petri-prod` database and change the
+  # `fromDatabase.name` below back to it, once this project needs prod
+  # data isolated from dev.
   # ---------------------------------------------------------------------------
 
   - type: web
@@ -101,9 +105,12 @@ services:
     healthCheckPath: /health
     autoDeployTrigger: "off"
     envVars:
+      # ponytail: shares petri-dev's database — Render's free tier allows
+      # only one free Postgres per account. Upgrade: a paid petri-prod
+      # database, then point this back at it.
       - key: DATABASE_URL
         fromDatabase:
-          name: petri-prod
+          name: petri-dev
           property: connectionString
       # The sibling static site's public URL. Feeds CORSMiddleware's
       # allow_origins and the 500-handler's headers; left unset every browser
@@ -142,11 +149,6 @@ services:
 
 databases:
   - name: petri-dev
-    databaseName: petri
-    user: petri
-    plan: free
-
-  - name: petri-prod
     databaseName: petri
     user: petri
     plan: free
