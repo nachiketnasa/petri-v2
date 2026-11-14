@@ -1,8 +1,12 @@
 name: CI
 
-# PR merge gate only: runs both test suites, deploys nothing, reads no secrets.
+# Merge gate on PRs, and on push to main the same two suites re-run against the
+# merge commit and gate the dev deploy. Only the `deploy` job reads secrets, so
+# PRs (including fork PRs) still run the full gate with none.
 on:
   pull_request:
+    branches: [main]
+  push:
     branches: [main]
   workflow_dispatch:
 
@@ -45,7 +49,9 @@ jobs:
         env:
           # Without this the Postgres integration tests skipif-skip silently.
           DATABASE_URL: postgresql://petri:petri@localhost:5432/petri
-        run: uv run --frozen pytest
+        # --locked, not --frozen: it asserts uv.lock agrees with pyproject.toml
+        # instead of just using whatever the lock says.
+        run: uv run --locked pytest
 
   frontend:
     runs-on: ubuntu-latest
@@ -63,3 +69,23 @@ jobs:
       - name: vitest
         working-directory: frontend
         run: npm test
+
+  # render.yaml sets autoDeploy off on both services, so this is the only thing
+  # that starts a dev deploy — and `needs:` means it cannot run until both
+  # suites are green on the merge commit. A red suite skips it entirely.
+  deploy:
+    needs: [backend, frontend]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      # The hook URLs are bearer credentials in URL form: they go in via env,
+      # are never echoed, and only Render's JSON response (with the deploy id)
+      # is printed. --fail turns a non-2xx into a failed job.
+      - name: Trigger backend deploy
+        env:
+          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_BACKEND }}
+        run: curl --fail --silent --show-error -X POST "$HOOK"
+      - name: Trigger frontend deploy
+        env:
+          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_FRONTEND }}
+        run: curl --fail --silent --show-error -X POST "$HOOK"

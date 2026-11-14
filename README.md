@@ -60,6 +60,59 @@ If you'd rather see real delivery, set `RESEND_API_KEY` (and `EMAIL_FROM_ADDRESS
 once sent from a domain verified on your Resend account) in a root `.env` file before
 `docker compose up` — `docker-compose.yml` already passes both through.
 
+### Deploying to Render (dev)
+
+[`render.yaml`](render.yaml) at the repo root is a Render Blueprint declaring the whole
+dev environment: the backend as a Docker web service, the frontend as a static site, and
+a managed Postgres database.
+
+CI owns the deploy trigger, not Render. All services set auto-deploy off; merging a PR
+into `main` re-runs both test suites against the merge commit and only then does the
+`deploy` job in [`.github/workflows/ci.yml`](.github/workflows/ci.yml) POST a Render
+deploy hook per service. A red suite skips the deploy job, and `main`'s ruleset means
+nothing reaches `main` without a green PR run first.
+
+First-time setup — the dashboard steps nobody can do for you, in order:
+
+1. **Render Dashboard → New → Blueprint.** Connect the `nachiketnasa/petri-v2` repo and
+   pick branch `main`. Render reads `render.yaml`.
+2. **Blueprint creation screen.** Confirm it lists exactly three resources:
+   `petri-backend-dev` (web / Docker), `petri-frontend-dev` (static site) and
+   `petri-dev` (Postgres).
+3. **Same screen, the secret prompts.** Render asks for the two `sync: false` values:
+   paste `RESEND_API_KEY` and `EMAIL_FROM_ADDRESS` from your local `.env`. Click
+   **Apply**.
+4. **Dashboard → petri-backend-dev / petri-frontend-dev → Settings.** Copy each
+   service's public URL (normally `https://<service-name>.onrender.com`, but Render
+   appends a suffix on a global name-collision). If either differs from the
+   `FRONTEND_ORIGIN` / `VITE_BACKEND_URL` literals in `render.yaml`, fix the literals
+   and commit — a wrong value fails silently as "Backend: unreachable".
+5. **Dashboard → petri-dev → Info → Connections → External Database URL.** Copy it, then
+   run the schema **once**, from your machine:
+   ```
+   psql "<external connection string>" -v ON_ERROR_STOP=1 -f _docs/schema.sql
+   ```
+   `_docs/schema.sql` is not idempotent (`create table users (`, no `if not exists`), so
+   it is a one-time manual step and deliberately not part of any build or deploy command
+   — re-applying it means dropping the schema first. A Render free Postgres instance
+   expires after 30 days, so the dev database is disposable and its replacement needs
+   this command run again.
+6. **Dashboard → petri-backend-dev → Settings → Deploy Hook.** Copy the hook URL. Repeat
+   for `petri-frontend-dev`. Treat both as passwords — they are bearer credentials in URL
+   form.
+7. **GitHub → repo Settings → Secrets and variables → Actions → New repository secret.**
+   Add `RENDER_DEPLOY_HOOK_BACKEND` and `RENDER_DEPLOY_HOOK_FRONTEND` with those two URLs.
+   These are the only secrets CI reads, and only the `deploy` job reads them, so PRs from
+   forks still run the full test gate unchanged.
+
+Known limits of the dev environment: signed-in flows do not work there yet (the session
+cookie is `SameSite=Lax` with no `Secure`, and `onrender.com` makes the two services
+cross-site; sessions are also an in-process dict that empties on every deploy) — tracked
+in [#41](https://github.com/nachiketnasa/petri-v2/issues/41). `PETRI_TOTP_KEY` and
+`VAPID_PRIVATE_KEY` are left unset; both modules fall back to an ephemeral per-process
+key with a printed warning, which is honest for an environment whose sessions do not
+survive a restart anyway.
+
 ### Self-assessment against the grading rubric
 
 12 criteria, 24 points, 10 to pass. Scored against this repository as submitted —
@@ -75,16 +128,16 @@ yourself:
 | 5 | Application | 2 / 2 | `docker compose up --build` runs frontend + backend + Postgres together; see [Running it locally](#running-it-locally-no-resend-account-needed) above. |
 | 6 | Testing | 2 / 2 | Backend, one command runs unit *and* integration tests (against real Postgres, see `backend/tests/test_repository_postgres.py`) together: `docker compose up -d postgres && cd backend && DATABASE_URL=postgresql://petri:petri@localhost:5432/petri uv run pytest` (210 passed, 0 skipped, verified). If port 5432 is already taken on your machine, set `POSTGRES_PORT` first, e.g. `POSTGRES_PORT=5433 docker compose up -d postgres` and point `DATABASE_URL` at that port instead — `docker-compose.yml`'s ports are all overridable this way (`POSTGRES_PORT`, `BACKEND_PORT`, `FRONTEND_PORT`), with the same defaults (5432/8000/5173) if left unset. A bare `uv run pytest` still works and stays green, but skips the Postgres-backed tests — pass `DATABASE_URL` to include them. Frontend: `cd frontend && npm test` (Vitest + React Testing Library). A handful of date-dependent tests briefly flaked on machines whose local timezone trails UTC (the tests used local `date.today()` while the backend anchors the same logic in UTC); fixed by anchoring the tests in UTC too, so this no longer depends on the evaluator's machine timezone. |
 | 7 | Containerization | 2 / 2 | Single `docker-compose.yml` for all three services. |
-| 8 | Deployment | 0 / 2 | Not deployed yet. `_docs/specs.md`'s Tech stack section names the intended target (a VPS, `petri.nachiketnasa.com`), not yet acted on. |
-| 9 | CI/CD | 0 / 3 | No `.github/workflows` yet. |
+| 8 | Deployment | 1 / 2 | Dev environment on Render from [`render.yaml`](render.yaml): frontend <https://petri-frontend-dev.onrender.com>, backend <https://petri-backend-dev.onrender.com> (`/health` → `{"status":"ok"}`), plus a managed Postgres. See [Deploying to Render (dev)](#deploying-to-render-dev). Production is not up yet, and `_docs/specs.md`'s Tech stack section still names the old VPS target. |
+| 9 | CI/CD | 2 / 3 | [`.github/workflows/ci.yml`](.github/workflows/ci.yml): a PR merge gate (backend `pytest` against a real Postgres + frontend `vitest`, both required status checks on `main`), and continuous deployment to dev — a merge to `main` re-runs both suites against the merge commit and only a green run triggers the Render deploy hooks. No manual production deploy yet. |
 | 10 | Observability | 0 / 2 | No metrics/traces/structured logs with request correlation yet. |
 | 11 | Alerting | 0 / 1 | None yet. |
 | 12 | On-call agent | 0 / 2 | None yet. |
-| | **Total** | **14 / 24** | Pass threshold is 10. |
+| | **Total** | **17 / 24** | Pass threshold is 10. |
 
-The honest gap is entirely in the ops layer (deployment, CI/CD, observability,
-alerting, on-call) — nothing in the product, spec, testing, or containerization rows
-above is partial credit.
+The remaining gap is entirely in the ops layer (the rest of deployment and CI/CD,
+observability, alerting, on-call) — nothing in the product, spec, testing, or
+containerization rows above is partial credit.
 
 ## The problem
 

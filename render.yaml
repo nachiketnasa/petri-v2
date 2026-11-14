@@ -1,0 +1,77 @@
+# Render Blueprint for the Petri dev environment.
+#
+# Three resources: the backend (Docker web service), the frontend (static site)
+# and a managed Postgres database.
+#
+# Auto-deploy is OFF on both services on purpose. Render's own
+# deploy-on-push would fire on the merge commit the instant it lands, in
+# parallel with the test run, and could ship code whose suites have not passed
+# on the merge result. The `deploy` job in .github/workflows/ci.yml owns the
+# trigger instead: it runs with `needs: [backend, frontend]` and POSTs a Render
+# deploy hook per service, so a red suite means no deploy.
+#
+# `autoDeploy` is the deprecated spelling and `autoDeployTrigger: "off"` is the
+# current one; both are set so the intent survives either way (Render gives
+# `autoDeployTrigger` precedence when both are present). "off" is quoted
+# because YAML would otherwise parse the bare word as the boolean false.
+#
+# One-time manual step after the first sync: apply _docs/schema.sql to the
+# database. It is NOT idempotent (`create table users (` with no
+# `if not exists`), so it must never go in a build or deploy command. See
+# README.md's "Deploying to Render (dev)" section.
+
+services:
+  - type: web
+    name: petri-backend-dev
+    runtime: docker
+    plan: free
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /health
+    autoDeploy: false
+    autoDeployTrigger: "off"
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: petri-dev
+          property: connectionString
+      # The sibling static site's public URL. Feeds CORSMiddleware's
+      # allow_origins and the 500-handler's headers; left unset every browser
+      # call from the deployed frontend is CORS-blocked. `fromService` cannot
+      # produce this: `property: host` is a bare hostname and render.yaml has
+      # no way to prepend "https://".
+      - key: FRONTEND_ORIGIN
+        value: https://petri-frontend-dev.onrender.com
+      # Real secrets: declared here, values entered in the Render Dashboard.
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM_ADDRESS
+        sync: false
+
+  - type: web
+    name: petri-frontend-dev
+    runtime: static
+    rootDir: ./frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: ./frontend/dist
+    autoDeploy: false
+    autoDeployTrigger: "off"
+    # App.tsx uses BrowserRouter with real paths (/sign-in, /reset-password,
+    # ...). Without this rewrite every deep link and every reload off / hits
+    # Render's 404 page.
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      # The sibling backend service's public URL. Vite inlines
+      # import.meta.env.VITE_BACKEND_URL at BUILD time, so this belongs on the
+      # static site, not the backend, and changing it needs a rebuild.
+      - key: VITE_BACKEND_URL
+        value: https://petri-backend-dev.onrender.com
+
+databases:
+  - name: petri-dev
+    databaseName: petri
+    user: petri
+    plan: free
