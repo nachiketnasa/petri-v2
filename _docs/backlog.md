@@ -2,7 +2,7 @@
 
 A local mirror of the public task tracker: https://github.com/nachiketnasa/petri-v2/issues
 
-Generated from the tracker on 2026-11-11. The tracker is the source of truth; this file is a readable snapshot committed alongside the spec, not edited independently — regenerate it with `scripts/regenerate_backlog.py` instead of hand-editing when issues change.
+Generated from the tracker on 2026-11-14. The tracker is the source of truth; this file is a readable snapshot committed alongside the spec, not edited independently — regenerate it with `scripts/regenerate_backlog.py` instead of hand-editing when issues change.
 
 **Listed in build order, not issue-number order.** Each issue carries an `order-NN` label marking when work on it should start; issues sharing a number are meant to start together (e.g. the two project-setup scaffolds). Give any new issue an `order-NN` label before filing it, placed at the point in the sequence where it belongs — otherwise it sorts last, below. Issues #1, #16, and #17 span the whole product (the contract and the two test suites), so their own Acceptance criteria is a checklist of the other issues that complete them, not a bounded task on its own.
 
@@ -1202,24 +1202,47 @@ Ref: `_docs/specs.md` → Tech stack (Infra, Hosting).
 
 ---
 
-## order-13 · #18 — CI/CD pipeline (deferred)
+## order-13 · #18 — CI/CD pipeline: PR test gate, auto-deploy to dev, manual deploy to prod
 
 - **Status**: OPEN
 - **Labels**: infra
 - **Link**: https://github.com/nachiketnasa/petri-v2/issues/18
 
 ## What
-CI/CD pipeline.
+CI/CD pipeline: tests on every PR, automatic deploy to a dev environment, and a
+manual (button-press) deploy to production.
 
-**Deferred** — explicitly held for later in discussion with the user; revisit once the MVP backend/frontend exist. Should include: automated test run on PR, Dependabot/Renovate for dependency updates with CI as the merge gate (see cost/vulnerability discussion), and a deploy step to the VPS.
+Hosting target: **Render**, deploying straight from this GitHub repo via a
+`render.yaml` blueprint (backend = Docker web service, frontend = static site,
+Postgres = Render managed Postgres). Chosen over the VPS named in
+`_docs/specs.md` → Tech stack because it deploys from the repo with no server
+to provision; update the spec's Hosting section to match.
 
-Ref: conversation history — "hold for now" on CI/CD.
+Dependency updates (Dependabot/Renovate with CI as the merge gate) stay out of
+scope here — see the separate issue.
 
+## Acceptance criteria
+- Opening a PR against `main` runs the backend `pytest` suite (including the
+  Postgres-backed tests) and the frontend `vitest run` suite; a failing suite
+  blocks the merge.
+- Merging to `main` automatically deploys to the dev environment, with no
+  human step.
+- Production deploys are manual only — a `workflow_dispatch` run in GitHub
+  Actions (or equivalent explicit trigger), never automatic on push.
+- A reader of `README.md` can tell which environment is which, what their URLs
+  are, and how to trigger a production deploy.
 
+## Implementation tasks
 
-## Implementation tasks (MVP slice)
-
-- [ ] GitHub Actions workflow: run `pytest` and `vitest run` on every pull request against `main`. This is just the merge gate — the deploy step stays deferred as noted above.
+- [x] GitHub Actions workflow: run backend `pytest` (against a real Postgres
+      service container) and frontend `vitest run` on every pull request
+      against `main`. This is the merge gate.
+- [ ] `render.yaml` blueprint + CD: merging to `main` deploys the dev
+      environment automatically (backend, frontend, Postgres), triggered from
+      CI after the tests pass.
+- [ ] Manual production deploy: a `workflow_dispatch`-only GitHub Actions job
+      that deploys the prod environment, plus README/spec docs covering both
+      environments and how to run the prod deploy.
 
 ---
 
