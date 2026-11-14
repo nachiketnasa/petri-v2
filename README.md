@@ -87,29 +87,24 @@ our Render services with secrets it does not have; a fork still runs the full te
 ### Environments
 
 Two of them, both declared in one file — [`render.yaml`](render.yaml) at the repo root is
-a Render Blueprint with five resources: a backend (Docker web service) and a frontend
-(static site) per environment, plus **one** managed Postgres database shared by both.
+a Render Blueprint with six resources: a backend (Docker web service), a frontend (static
+site) and a managed Postgres database per environment.
 
 | Environment | Frontend URL | Backend URL | Database | Deploy trigger |
 |---|---|---|---|---|
 | **dev** | <https://petri-frontend-dev.onrender.com> *(not live yet)* | <https://petri-backend-dev.onrender.com> *(not live yet)* | `petri-dev` (Render free Postgres) | **automatic, on green merge to `main`** — the `deploy` job in [`ci.yml`](.github/workflows/ci.yml) |
-| **prod** | <https://petri-frontend-prod.onrender.com> *(not live yet)* | <https://petri-backend-prod.onrender.com> *(not live yet)* | **shares `petri-dev`** — see below | **manual only — `workflow_dispatch`** in [`deploy-prod.yml`](.github/workflows/deploy-prod.yml) |
-
-> **Prod shares dev's database.** A real sync confirmed Render's free tier allows only
-> one free Postgres per account — a second `databases:` entry failed with "cannot have
-> more than one active free tier database" and took the rest of that sync down with it.
-> `petri-backend-prod`'s `DATABASE_URL` points at `petri-dev` rather than at a dedicated
-> `petri-prod` database, which does not exist. This means **prod and dev read and write
-> the same rows** — a deliberate corner cut to stay on the free tier, not an oversight,
-> and not hidden: it's called out here, in `render.yaml`'s comments, and tagged
-> `ponytail:` at the env var itself. Upgrade path: create a paid `petri-prod` database
-> on Render and point `petri-backend-prod`'s `fromDatabase.name` back at it.
+| **prod** | <https://petri-frontend-prod.onrender.com> *(not live yet)* | <https://petri-backend-prod.onrender.com> *(not live yet)* | `petri-prod` (Render free Postgres) | **manual only — `workflow_dispatch`** in [`deploy-prod.yml`](.github/workflows/deploy-prod.yml) |
 
 Neither environment is synced to a Render account yet, so none of the four URLs resolve
 today; they are the names the blueprint will create, and Render appends a suffix if a
 name collides globally. Render's own auto-deploy is off on all four services
-(`autoDeployTrigger: "off"`), so the triggers in the table are the only things that
-start a deploy.
+(`autoDeploy: false` + `autoDeployTrigger: "off"`), so the triggers in the table are the
+only things that start a deploy.
+
+> If Render refuses a second free Postgres instance (one free database per account is a
+> real possibility), the fallback is either a paid plan for `petri-prod` or pointing
+> prod's `DATABASE_URL` at `petri-dev`. If you take the second option, change the prod
+> Database cell above to say so — a shared database must not be invisible here.
 
 ### Deploying to Render (dev)
 
@@ -165,10 +160,8 @@ survive a restart anyway.
 
 ### Deploying to Render (production)
 
-The prod half of [`render.yaml`](render.yaml): `petri-backend-prod` and
-`petri-frontend-prod`, sharing `petri-dev`'s database (see
-[Environments](#environments) — Render's free tier allows only one free Postgres).
-Nothing deploys production automatically. The
+The prod half of [`render.yaml`](render.yaml): `petri-backend-prod`,
+`petri-frontend-prod` and `petri-prod`. Nothing deploys production automatically. The
 only way in is [`.github/workflows/deploy-prod.yml`](.github/workflows/deploy-prod.yml),
 whose `on:` block contains `workflow_dispatch` and nothing else — no push, no merge, no
 schedule can start a prod deploy.
@@ -203,19 +196,24 @@ schedule can start a prod deploy.
 #### One-time production setup (dashboard work, in order)
 
 1. **Render Dashboard → your existing blueprint → Sync** (or **New → Blueprint** if you
-   have not created one yet). Render re-reads `render.yaml` and now finds two more
-   resources; confirm it proposes to create `petri-backend-prod` and
-   `petri-frontend-prod` — no new database, `petri-backend-prod` reads `petri-dev`'s
-   `DATABASE_URL`.
+   have not created one yet). Render re-reads `render.yaml` and now finds six resources;
+   confirm it proposes to create `petri-backend-prod`, `petri-frontend-prod` and
+   `petri-prod`. If it refuses `petri-prod` as a second free Postgres, take one of the
+   two options in the note under [Environments](#environments) — and if you share
+   `petri-dev`, edit that table.
 2. **Same screen, the secret prompts.** Paste `RESEND_API_KEY` and
    `EMAIL_FROM_ADDRESS` for `petri-backend-prod`. Click **Apply**.
 3. **Dashboard → petri-backend-prod / petri-frontend-prod → Settings.** Copy both public
    URLs. If Render appended a collision suffix, fix the `FRONTEND_ORIGIN` and
    `VITE_BACKEND_URL` literals in `render.yaml` (and the table above) and commit — a
    wrong value fails silently as "Backend: unreachable".
-4. **No schema step here.** `petri-backend-prod` shares `petri-dev`'s database, which
-   already has the schema applied from the dev setup above. Running `schema.sql` again
-   against the same database would fail on every `CREATE TABLE` — it is not idempotent.
+4. **Dashboard → petri-prod → Info → Connections → External Database URL.** Copy it and
+   run the schema **once**, from your machine:
+   ```
+   psql "<petri-prod external connection string>" -v ON_ERROR_STOP=1 -f _docs/schema.sql
+   ```
+   Same warning as dev: `_docs/schema.sql` is not idempotent, so this is a one-time
+   manual step and never part of a build or deploy command.
 5. **Dashboard → petri-backend-prod → Settings → Deploy Hook.** Copy the hook URL.
    Repeat for `petri-frontend-prod`. Both are bearer credentials in URL form.
 6. ~~**GitHub → repo Settings → Environments → New environment →** name it
@@ -257,7 +255,7 @@ yourself:
 | 5 | Application | 2 / 2 | `docker compose up --build` runs frontend + backend + Postgres together; see [Running it locally](#running-it-locally-no-resend-account-needed) above. |
 | 6 | Testing | 2 / 2 | Backend, one command runs unit *and* integration tests (against real Postgres, see `backend/tests/test_repository_postgres.py`) together: `docker compose up -d postgres && cd backend && DATABASE_URL=postgresql://petri:petri@localhost:5432/petri uv run pytest` (210 passed, 0 skipped, verified). If port 5432 is already taken on your machine, set `POSTGRES_PORT` first, e.g. `POSTGRES_PORT=5433 docker compose up -d postgres` and point `DATABASE_URL` at that port instead — `docker-compose.yml`'s ports are all overridable this way (`POSTGRES_PORT`, `BACKEND_PORT`, `FRONTEND_PORT`), with the same defaults (5432/8000/5173) if left unset. A bare `uv run pytest` still works and stays green, but skips the Postgres-backed tests — pass `DATABASE_URL` to include them. Frontend: `cd frontend && npm test` (Vitest + React Testing Library). A handful of date-dependent tests briefly flaked on machines whose local timezone trails UTC (the tests used local `date.today()` while the backend anchors the same logic in UTC); fixed by anchoring the tests in UTC too, so this no longer depends on the evaluator's machine timezone. |
 | 7 | Containerization | 2 / 2 | Single `docker-compose.yml` for all three services. |
-| 8 | Deployment | 0 / 2 | Not yet live — **both** environments are **defined** but neither is synced. [`render.yaml`](render.yaml) declares five resources (a Docker backend and a static frontend per environment, plus one shared managed Postgres — see [Environments](#environments)) and the pipelines deploy them, but the blueprint has not been synced to a Render account, so none of the four `*.onrender.com` URLs resolve. Once dev is up: frontend <https://petri-frontend-dev.onrender.com>, backend <https://petri-backend-dev.onrender.com> (`/health` → `{"status":"ok"}`). Follow [Deploying to Render (dev)](#deploying-to-render-dev) and [(production)](#deploying-to-render-production) to bring them up; this row only moves above 0 once a live URL actually answers. |
+| 8 | Deployment | 0 / 2 | Not yet live — **both** environments are **defined** but neither is synced. [`render.yaml`](render.yaml) declares six resources (a Docker backend, a static frontend and a managed Postgres per environment, see [Environments](#environments)) and the pipelines deploy them, but the blueprint has not been synced to a Render account, so none of the four `*.onrender.com` URLs resolve. Once dev is up: frontend <https://petri-frontend-dev.onrender.com>, backend <https://petri-backend-dev.onrender.com> (`/health` → `{"status":"ok"}`). Follow [Deploying to Render (dev)](#deploying-to-render-dev) and [(production)](#deploying-to-render-production) to bring them up; this row only moves above 0 once a live URL actually answers. |
 | 9 | CI/CD | 3 / 3 | All three parts. **(a) PR merge gate:** [`ci.yml`](.github/workflows/ci.yml) runs backend `pytest` against a real Postgres + frontend `vitest`, both required status checks on `main`. **(b) CD to dev:** a merge to `main` re-runs both suites against the merge commit and only a green run POSTs the Render deploy hooks. **(c) Manual production deploy:** [`deploy-prod.yml`](.github/workflows/deploy-prod.yml), `workflow_dispatch` and nothing else, behind a typed `deploy-prod` confirmation, a `guard` job that hard-fails on a wrong confirmation or any ref but `main`, and a required reviewer on the `production` environment that holds the deploy-hook secrets — click path in [Deploying to Render (production)](#deploying-to-render-production). |
 | 10 | Observability | 0 / 2 | No metrics/traces/structured logs with request correlation yet. |
 | 11 | Alerting | 0 / 1 | None yet. |
