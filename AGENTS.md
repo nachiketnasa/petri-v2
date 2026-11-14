@@ -45,17 +45,13 @@ table and the lifecycle above get updated each time one does.
 
 ## Commands
 
-No code exists yet — this repo is still at the spec/backlog stage (see
-`_docs/backlog.md` issues #16 and #17 for the scaffold tasks). Once those
-land, these are the commands:
-
-- `uv sync` — install backend dependencies (Python, via `uv`)
-- `uv run pytest` — the backend test suite
-- `npm install` — install frontend dependencies (run inside `frontend/`)
-- `npm test` — the frontend test suite (Vitest)
-
-Until the scaffold tasks are done, don't guess at these — check the issue
-checklists instead.
+- `docker compose up --build` — run Postgres, backend and frontend together
+- `cd backend && uv run pytest` — backend tests (Postgres-backed ones skip)
+- `cd backend && DATABASE_URL=postgresql://petri:petri@localhost:5432/petri uv run pytest`
+  — full backend suite against the compose Postgres (`docker compose up -d postgres`);
+  it truncates users/experiments/check_ins/retros, so use a separate `-p` stack if
+  you care about the data
+- `cd frontend && npm ci && npm test` — frontend tests (Vitest)
 
 ## Rules
 

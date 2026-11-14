@@ -9,6 +9,10 @@ cohort**, this section is for you.
 
 ### Running it locally (no Resend account needed)
 
+Prerequisites: Docker (with Compose) to run the app; additionally
+[`uv`](https://docs.astral.sh/uv/) for the backend tests and Node.js 24 + npm for the
+frontend tests.
+
 ```bash
 git clone https://github.com/nachiketnasa/petri-v2.git
 cd petri-v2
@@ -51,7 +55,12 @@ docker compose logs backend | grep -A2 "EMAIL ("
 (run from the `petri-v2` directory, same as `docker compose up` — if you started that
 in a different terminal/tab, `cd` back into `petri-v2` first, otherwise `docker compose`
 won't find `docker-compose.yml` and errors with "no configuration file provided: not
-found.")
+found." If you started the stack with a project name, e.g. `docker compose -p myname up`,
+pass the same `-p myname` to `logs` too, or it finds no containers.) Each email prints
+as an `EMAIL (no RESEND_API_KEY set) to=... subject=...` line, and the line right after
+it is the email's HTML: the 6-digit code is inside `<strong>...</strong>`, the reset link
+is the `http://localhost:5173/reset-password?token=...` URL (your `FRONTEND_PORT` if
+you overrode it).
 
 Sign up, then look there for the 6-digit verification code (or use "Resend code" on
 the verify screen to get a fresh one). Same for "Forgot password."
@@ -76,7 +85,7 @@ repo's settings, not in git. You do not need any of them:
 
 | What to check | Where |
 |---|---|
-| Tests run on every PR, and a red suite blocks the merge | [the Actions tab](https://github.com/nachiketnasa/petri-v2/actions/workflows/ci.yml) — filter `event: pull_request`. [PR #40](https://github.com/nachiketnasa/petri-v2/pull/40) is the pipeline's own PR; its checks show `backend` (210 tests against a real `postgres:16` service container, 0 skipped) and `frontend` (160 tests) |
+| Tests run on every PR, and a red suite blocks the merge | [the Actions tab](https://github.com/nachiketnasa/petri-v2/actions/workflows/ci.yml) — filter `event: pull_request`. [PR #40](https://github.com/nachiketnasa/petri-v2/pull/40) is the pipeline's own PR; its checks show the suite sizes at that time, `backend` (210 tests against a real `postgres:16` service container, 0 skipped) and `frontend` (160 tests); the current suite is larger (see row 6 below) |
 | The merge gate is enforced, not advisory | `main` carries a repository ruleset requiring a PR plus both checks, with no bypass: `gh api repos/nachiketnasa/petri-v2/rulesets` |
 | CD deploys to dev automatically | the same Actions tab, filter `event: push` — the `deploy` job runs only after both suites pass on the merge commit, and is **skipped** on PRs. Example: [run 43598749889](https://github.com/nachiketnasa/petri-v2/actions/runs/43598749889) — tests green, then `deploy` POSTs the Render hooks (Render answers with a deploy id) |
 | Production deploy is manual only | [`deploy-prod.yml`](.github/workflows/deploy-prod.yml) — `workflow_dispatch` is its only trigger, behind a typed `deploy-prod` confirmation, a `guard` job that hard-fails on a wrong confirmation or any ref but `main`, and a required reviewer on the `production` environment. Example: [run 43601553067](https://github.com/nachiketnasa/petri-v2/actions/runs/43601553067) — dispatched on `main`, `guard` passed, approved by the reviewer, then deployed. The guard's refusals are live too: [wrong confirmation](https://github.com/nachiketnasa/petri-v2/actions/runs/43585121463) and [non-`main` ref](https://github.com/nachiketnasa/petri-v2/actions/runs/43585202979), both red at `guard` with `deploy` skipped |
@@ -158,11 +167,12 @@ First-time setup — the dashboard steps nobody can do for you, in order:
 
 Known limits of the dev environment: `/api/*` is proxied to the backend through the
 static site, so the session cookie is first-party, and sessions live in the `sessions`
-table, so they survive a redeploy. The end-to-end browser walkthrough (sign up, verify
-email, log in, create an experiment, reload, log out, password reset) passed on
-2026-11-15 in Firefox and Safari, and the session survived a backend redeploy
-([results](https://github.com/nachiketnasa/petri-v2/issues/41#issuecomment-6882653208)); Chrome was not run, and session survival across a free-tier cold
-start was not verified. `PETRI_TOTP_KEY` and
+table, so they survive a redeploy. On 2026-11-15 the full end-to-end browser
+walkthrough (sign up, verify email, log in, create an experiment, reload, log out,
+password reset) passed in Firefox, and the session survived a backend redeploy; Safari
+was checked for sign in, reload and sign out only
+([results](https://github.com/nachiketnasa/petri-v2/issues/41#issuecomment-6882653208), D1–D9). Chrome was not run, and session survival across a
+free-tier cold start was not verified. `PETRI_TOTP_KEY` and
 `VAPID_PRIVATE_KEY` are set in the Render Dashboard, so 2FA secrets and the VAPID public
 key survive a redeploy.
 
@@ -260,9 +270,10 @@ schedule can start a prod deploy.
 
 Known limits of the production environment, in the same register as dev's: `/api/*` is
 proxied to the backend through the static site, so the session cookie is first-party,
-and sessions live in the `sessions` table. The same end-to-end browser walkthrough
-passed here on 2026-11-15 in Firefox and Safari ([results](https://github.com/nachiketnasa/petri-v2/issues/41#issuecomment-6882653208)); Chrome was not run,
-and neither a prod redeploy nor session survival across a cold start was checked. `PETRI_TOTP_KEY` and
+and sessions live in the `sessions` table. On 2026-11-15 the same full walkthrough
+passed here in Firefox, and Safari was checked for sign in, reload and sign out only
+([results](https://github.com/nachiketnasa/petri-v2/issues/41#issuecomment-6882653208), P1–P9). Chrome was not run, and neither a prod redeploy nor
+session survival across a cold start was checked. `PETRI_TOTP_KEY` and
 `VAPID_PRIVATE_KEY` are set in the Render Dashboard. Free Render web services cold-start
 after inactivity, so the first request can take tens of seconds; Neon's free compute
 also scales to zero when idle and wakes on the next query.
@@ -280,18 +291,17 @@ yourself:
 | 3 | Agent team specification | 2 / 2 | [`_docs/process.md`](_docs/process.md) (PM → Engineer → QA lifecycle) and [`_docs/team/`](_docs/team) (one file per role). **Evidence the roles were actually used, not just documented:** [issue #30](https://github.com/nachiketnasa/petri-v2/issues/30)'s comment thread shows the full cycle on one issue — PM's `## Groomed:` comment, Engineer's `Implemented:` comment, QA's `## QA: FAIL`, Engineer's follow-up fix, and QA's final `## QA: PASS` before close. |
 | 4 | Context management | 2 / 2 | [`AGENTS.md`](AGENTS.md) indexes every doc below it; each is scoped to one concern. |
 | 5 | Application | 2 / 2 | `docker compose up --build` runs frontend + backend + Postgres together; see [Running it locally](#running-it-locally-no-resend-account-needed) above. |
-| 6 | Testing | 2 / 2 | Backend, one command runs unit *and* integration tests (against real Postgres, see `backend/tests/test_repository_postgres.py`) together: `docker compose up -d postgres && cd backend && DATABASE_URL=postgresql://petri:petri@localhost:5432/petri uv run pytest` (239 passed, 0 skipped, verified 2026-11-15). If port 5432 is already taken on your machine, set `POSTGRES_PORT` first, e.g. `POSTGRES_PORT=5433 docker compose up -d postgres` and point `DATABASE_URL` at that port instead — `docker-compose.yml`'s ports are all overridable this way (`POSTGRES_PORT`, `BACKEND_PORT`, `FRONTEND_PORT`), with the same defaults (5432/8000/5173) if left unset. A bare `uv run pytest` still works and stays green, but skips the Postgres-backed tests — pass `DATABASE_URL` to include them. Frontend: `cd frontend && npm test` (Vitest + React Testing Library; 160 passed, verified 2026-11-15). A handful of date-dependent tests briefly flaked on machines whose local timezone trails UTC (the tests used local `date.today()` while the backend anchors the same logic in UTC); fixed by anchoring the tests in UTC too, so this no longer depends on the evaluator's machine timezone. |
+| 6 | Testing | 2 / 2 | Backend, one command runs unit *and* integration tests (against real Postgres, see `backend/tests/test_repository_postgres.py`) together: `docker compose up -d postgres && cd backend && DATABASE_URL=postgresql://petri:petri@localhost:5432/petri uv run pytest` (239 passed, 0 skipped, verified 2026-11-15). If port 5432 is already taken on your machine, set `POSTGRES_PORT` first, e.g. `POSTGRES_PORT=5433 docker compose up -d postgres` and point `DATABASE_URL` at that port instead — `docker-compose.yml`'s ports are all overridable this way (`POSTGRES_PORT`, `BACKEND_PORT`, `FRONTEND_PORT`), with the same defaults (5432/8000/5173) if left unset. A bare `uv run pytest` still works and stays green, but skips the Postgres-backed tests — pass `DATABASE_URL` to include them. **Careful:** the Postgres-backed tests run `truncate table users, experiments, check_ins, retros cascade` after each test (`backend/tests/test_repository_postgres.py`), which wipes accounts and everything that cascades from them in whatever database `DATABASE_URL` points at, so either run them before trying the app, or give them a separate stack: `POSTGRES_PORT=5433 docker compose -p petri-test up -d postgres`, then `DATABASE_URL=postgresql://petri:petri@localhost:5433/petri`, and `docker compose -p petri-test down -v` afterwards. Frontend: `cd frontend && npm ci && npm test` (Vitest + React Testing Library; 160 passed, verified 2026-11-15). A handful of date-dependent tests briefly flaked on machines whose local timezone trails UTC (the tests used local `date.today()` while the backend anchors the same logic in UTC); fixed by anchoring the tests in UTC too, so this no longer depends on the evaluator's machine timezone. |
 | 7 | Containerization | 2 / 2 | Single `docker-compose.yml` for all three services. |
-| 8 | Deployment | 2 / 2 | **Both environments are live on free plans** — Render for the app, a separate Neon Postgres project per environment. Dev: frontend <https://petri-frontend-dev-e9be.onrender.com>, backend <https://petri-backend-dev-vq9g.onrender.com>. Prod: frontend <https://petri-frontend-prod-iin7.onrender.com>, backend <https://petri-backend-prod-h3fe.onrender.com>. Each backend's `/health` → `{"status":"ok"}`. Browser end-to-end (sign up through password reset) passed on both environments in Firefox and Safari on 2026-11-15 ([results](https://github.com/nachiketnasa/petri-v2/issues/41#issuecomment-6882653208)). See [Environments](#environments). |
+| 8 | Deployment | 2 / 2 | **Both environments are live on free plans** — Render for the app, a separate Neon Postgres project per environment. Dev: frontend <https://petri-frontend-dev-e9be.onrender.com>, backend <https://petri-backend-dev-vq9g.onrender.com>. Prod: frontend <https://petri-frontend-prod-iin7.onrender.com>, backend <https://petri-backend-prod-h3fe.onrender.com>. Each backend's `/health` → `{"status":"ok"}`. Browser end-to-end (sign up through password reset) passed on both environments in Firefox on 2026-11-15, with sign in, reload and sign out also checked in Safari ([results](https://github.com/nachiketnasa/petri-v2/issues/41#issuecomment-6882653208)). See [Environments](#environments). |
 | 9 | CI/CD | 3 / 3 | All three parts. **(a) PR merge gate:** [`ci.yml`](.github/workflows/ci.yml) runs backend `pytest` against a real Postgres + frontend `vitest`, both required status checks on `main`. **(b) CD to dev:** a merge to `main` re-runs both suites against the merge commit and only a green run POSTs the Render deploy hooks. **(c) Manual production deploy:** [`deploy-prod.yml`](.github/workflows/deploy-prod.yml), `workflow_dispatch` and nothing else, behind a typed `deploy-prod` confirmation, a `guard` job that hard-fails on a wrong confirmation or any ref but `main`, and a required reviewer on the `production` environment that holds the deploy-hook secrets — click path in [Deploying to Render (production)](#deploying-to-render-production). |
 | 10 | Observability | 0 / 2 | No metrics/traces/structured logs with request correlation yet. |
 | 11 | Alerting | 0 / 1 | None yet. |
 | 12 | On-call agent | 0 / 2 | None yet. |
 | | **Total** | **19 / 24** | Pass threshold is 10. |
 
-The remaining gap is entirely in the ops layer (observability, alerting and
-on-call) — nothing in the product, spec, testing, containerization, deployment or CI/CD rows above is
-partial credit.
+The 5 unclaimed points are rows 10–12 (observability, alerting and on-call); every
+other row is self-scored at its maximum.
 
 ## The problem
 
@@ -456,8 +466,10 @@ criterion, and explicit non-goal, lives in [`_docs/specs.md`](_docs/specs.md). I
   route/service code never depends on it directly.
 - **Frontend**: React 18 (no meta-framework), Vite, TypeScript, React Router for
   routing, Vitest and React Testing Library for tests. The same choice Petri v1 used.
-- **Runtime**: Node.js 24 LTS, pinned to **≥24.22.1** (the patched line from the
-  October 2026 Node.js security release).
+- **Runtime**: Node.js 24 LTS is the target (≥24.22.1, the patched line from the
+  October 2026 Node.js security release); CI runs Node 24, but `frontend/Dockerfile`
+  still uses `node:22-slim`
+  ([#43](https://github.com/nachiketnasa/petri-v2/issues/43)).
 - **Infra**: Web Push (VAPID) for the one notification type the product sends, Other
   task reminders; subscriptions are stored but sending is not built yet ([#39](https://github.com/nachiketnasa/petri-v2/issues/39)).
   Cloudflare in front of the site is planned, not set up.
@@ -481,7 +493,8 @@ criterion, and explicit non-goal, lives in [`_docs/specs.md`](_docs/specs.md). I
 - [Issue tracker](https://github.com/nachiketnasa/petri-v2/issues) — every acceptance
   criterion above broken into tasks; [`_docs/backlog.md`](_docs/backlog.md) is a
   generated snapshot of it, committed for convenience (the tracker is authoritative).
-- Agent team docs: in progress.
+- [`_docs/process.md`](_docs/process.md) and [`_docs/team/`](_docs/team) — the agent team:
+  lifecycle and one file per role.
 
 ## Status
 
