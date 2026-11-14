@@ -74,8 +74,22 @@ jobs:
       - name: Trigger backend deploy
         env:
           HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_BACKEND_PROD }}
-        run: curl --fail --silent --show-error -X POST "$HOOK"
+        run: |
+          # An unset secret reaches curl as an empty string, which fails with a
+          # bare "URL rejected" that says nothing about the cause. Name it.
+          if [ -z "$HOOK" ]; then
+            echo "::error::Deploy hook secret is not set. See README's Render setup steps."
+            exit 1
+          fi
+          curl --fail --silent --show-error -X POST "$HOOK"
       - name: Trigger frontend deploy
         env:
           HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_FRONTEND_PROD }}
-        run: curl --fail --silent --show-error -X POST "$HOOK"
+        run: |
+          # An unset secret reaches curl as an empty string, which fails with a
+          # bare "URL rejected" that says nothing about the cause. Name it.
+          if [ -z "$HOOK" ]; then
+            echo "::error::Deploy hook secret is not set. See README's Render setup steps."
+            exit 1
+          fi
+          curl --fail --silent --show-error -X POST "$HOOK"
