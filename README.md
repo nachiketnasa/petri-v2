@@ -138,7 +138,9 @@ First-time setup — the dashboard steps nobody can do for you, in order:
    pick branch `main`. Render reads `render.yaml` and lists four services (dev and prod)
    and no database. Render asks for every `sync: false` value: for
    `petri-backend-dev`, paste the `petri-dev` connection string as `DATABASE_URL` and
-   `RESEND_API_KEY` / `EMAIL_FROM_ADDRESS` from your local `.env`. (The prod values are
+   `RESEND_API_KEY` / `EMAIL_FROM_ADDRESS` from your local `.env`, plus a freshly
+   generated `PETRI_TOTP_KEY` / `VAPID_PRIVATE_KEY` pair (see
+   [Generating the app keys](#generating-the-app-keys)). (The prod values are
    covered under [production](#deploying-to-render-production); do that project first
    if you want to fill both in one pass.) Click **Apply**.
 4. **Dashboard → petri-backend-dev / petri-frontend-dev → Settings.** Copy each
@@ -158,9 +160,31 @@ Known limits of the dev environment: signed-in flows do not work there yet (the 
 cookie is `SameSite=Lax` with no `Secure`, and `onrender.com` makes the two services
 cross-site; sessions are also an in-process dict that empties on every deploy) — tracked
 in [#41](https://github.com/nachiketnasa/petri-v2/issues/41). `PETRI_TOTP_KEY` and
-`VAPID_PRIVATE_KEY` are left unset; both modules fall back to an ephemeral per-process
-key with a printed warning, which is honest for an environment whose sessions do not
-survive a restart anyway.
+`VAPID_PRIVATE_KEY` are set in the Render Dashboard, so 2FA secrets and the VAPID public
+key survive a redeploy.
+
+#### Generating the app keys
+
+Each deployed backend needs its own `PETRI_TOTP_KEY` (encrypts 2FA secrets at rest) and
+`VAPID_PRIVATE_KEY` (signs Web Push). On Render (where `RENDER=true`) the backend
+refuses to start without them; locally, in compose and in CI they stay unset and each
+process uses a throwaway key with a printed `WARNING`. Generate **one pair per
+environment** (never reuse dev's on prod), from `backend/`:
+
+```
+uv run python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+uv run python -c "import base64; from cryptography.hazmat.primitives.asymmetric import ec; k=ec.generate_private_key(ec.SECP256R1()); print(base64.urlsafe_b64encode(k.private_numbers().private_value.to_bytes(32,'big')).rstrip(b'=').decode())"
+```
+
+The first prints `PETRI_TOTP_KEY` (44 characters), the second `VAPID_PRIVATE_KEY`
+(43 characters). Paste them into **Render Dashboard → petri-backend-dev (or -prod) →
+Environment → Add Environment Variable**. Services that already exist need this done
+by hand: a Blueprint sync ignores newly added `sync: false` keys, so it never prompts
+for them.
+
+Keep the values only in Render (and a password manager if you want); never commit them.
+**Do not change them later:** a new `PETRI_TOTP_KEY` locks out every user with 2FA
+enabled, and a new `VAPID_PRIVATE_KEY` invalidates every push subscription.
 
 ### Deploying to Render (production)
 
@@ -208,7 +232,9 @@ schedule can start a prod deploy.
    ```
 3. **Render's blueprint prompts** (the same Apply screen as dev's step 3, or Dashboard →
    petri-backend-prod → Environment if you applied already): paste the `petri-prod`
-   connection string as `DATABASE_URL`, plus `RESEND_API_KEY` / `EMAIL_FROM_ADDRESS`.
+   connection string as `DATABASE_URL`, plus `RESEND_API_KEY` / `EMAIL_FROM_ADDRESS` and
+   prod's own `PETRI_TOTP_KEY` / `VAPID_PRIVATE_KEY` pair (see
+   [Generating the app keys](#generating-the-app-keys); never reuse dev's).
 4. **Dashboard → petri-backend-prod / petri-frontend-prod → Settings.** Copy both public
    URLs. If Render appended a collision suffix, fix the `FRONTEND_ORIGIN` and
    `VITE_BACKEND_URL` literals in `render.yaml` (and the table above) and commit — a

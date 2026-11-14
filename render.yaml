@@ -54,9 +54,14 @@ services:
       - key: FRONTEND_ORIGIN
         value: https://petri-frontend-dev-e9be.onrender.com
       # Real secrets: declared here, values entered in the Render Dashboard.
+      # The two app keys are generated per environment (README) and the backend refuses to start on Render without them.
       - key: RESEND_API_KEY
         sync: false
       - key: EMAIL_FROM_ADDRESS
+        sync: false
+      - key: PETRI_TOTP_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
         sync: false
 
   - type: web
@@ -129,9 +134,14 @@ services:
       - key: FRONTEND_ORIGIN
         value: https://petri-frontend-prod-iin7.onrender.com
       # Real secrets: declared here, values entered in the Render Dashboard.
+      # The two app keys are generated per environment (README) and the backend refuses to start on Render without them.
       - key: RESEND_API_KEY
         sync: false
       - key: EMAIL_FROM_ADDRESS
+        sync: false
+      - key: PETRI_TOTP_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
         sync: false
 
   - type: web
