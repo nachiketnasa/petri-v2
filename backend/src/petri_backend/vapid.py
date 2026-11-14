@@ -30,14 +30,26 @@ def _b64url_decode(s: str) -> bytes:
 
 
 def _load_private_key() -> ec.EllipticCurvePrivateKey:
-    raw = os.environ.get(_PRIVATE_KEY_ENV_VAR)
+    raw = os.environ.get(_PRIVATE_KEY_ENV_VAR, "").strip()
     if raw:
-        private_value = int.from_bytes(_b64url_decode(raw), "big")
-        return ec.derive_private_key(private_value, ec.SECP256R1())
-    # ponytail: no key configured (local/dev) -- an ephemeral, process-only
-    # key, same spirit as totp_crypto.py. Existing subscriptions
-    # would need re-subscribing after a restart in a real deployment;
-    # set VAPID_PRIVATE_KEY there.
+        decoded = _b64url_decode(raw)
+        if len(decoded) != 32:
+            # Never echo the value: only its decoded length.
+            raise ValueError(
+                f"{_PRIVATE_KEY_ENV_VAR} must decode to exactly 32 bytes, got {len(decoded)}. "
+                "See README.md's 'Generating the app keys' section."
+            )
+        return ec.derive_private_key(int.from_bytes(decoded, "big"), ec.SECP256R1())
+    if os.environ.get("RENDER"):
+        raise RuntimeError(
+            f"{_PRIVATE_KEY_ENV_VAR} is not set. A backend on Render refuses to start without it; "
+            "generate one per environment as described in README.md's "
+            "'Generating the app keys' section."
+        )
+    # ponytail: local/CI only (compose, CI, plain pytest) -- an ephemeral,
+    # process-only key so the app runs with no setup; push subscriptions made
+    # against it break on restart. On Render (RENDER set) the backend refuses
+    # to start without VAPID_PRIVATE_KEY instead.
     print(
         f"WARNING: {_PRIVATE_KEY_ENV_VAR} not set -- using an ephemeral per-process VAPID key."
     )

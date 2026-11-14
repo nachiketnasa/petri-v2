@@ -16,14 +16,19 @@ _KEY_ENV_VAR = "PETRI_TOTP_KEY"
 
 
 def _load_key() -> bytes:
-    key = os.environ.get(_KEY_ENV_VAR)
+    key = os.environ.get(_KEY_ENV_VAR, "").strip()
     if key:
         return key.encode()
-    # ponytail: no key configured (local/dev) -- an ephemeral, process-only
-    # key so the app still runs, rather than refusing to start. TOTP
-    # secrets encrypted under it won't decrypt after a restart; set
-    # PETRI_TOTP_KEY (a Fernet.generate_key() value) in any real
-    # deployment.
+    if os.environ.get("RENDER"):
+        raise RuntimeError(
+            f"{_KEY_ENV_VAR} is not set. A backend on Render refuses to start without it; "
+            "generate one per environment as described in README.md's "
+            "'Generating the app keys' section."
+        )
+    # ponytail: local/CI only (compose, CI, plain pytest) -- an ephemeral,
+    # process-only key so the app runs with no setup. TOTP secrets encrypted
+    # under it won't decrypt after a restart. On Render (RENDER set) the
+    # backend refuses to start without PETRI_TOTP_KEY instead.
     generated = Fernet.generate_key()
     print(
         f"WARNING: {_KEY_ENV_VAR} not set -- using an ephemeral per-process key. "
