@@ -38,6 +38,10 @@ jobs:
           CONFIRM: ${{ inputs.confirm }}
         run: |
           ok=1
+          if [ "$GITHUB_REPOSITORY" != "nachiketnasa/petri-v2" ]; then
+            echo "::error::This workflow deploys nachiketnasa/petri-v2's own Render services; a fork has none of its secrets. Point it at your own services first."
+            ok=0
+          fi
           if [ "$CONFIRM" != "deploy-prod" ]; then
             echo "::error::confirm input must be exactly 'deploy-prod'."
             ok=0

@@ -60,6 +60,30 @@ If you'd rather see real delivery, set `RESEND_API_KEY` (and `EMAIL_FROM_ADDRESS
 once sent from a domain verified on your Resend account) in a root `.env` file before
 `docker compose up` — `docker-compose.yml` already passes both through.
 
+### Checking the CI/CD pipeline (nothing to install, no secrets needed)
+
+None of this repo's GitHub secrets travel with a clone or a fork — they live in the
+repo's settings, not in git. You do not need any of them:
+
+- **Running the app locally needs no secret of ours.** `docker compose up` uses the
+  literal `petri/petri` Postgres credentials in `docker-compose.yml`; Resend is
+  optional (see above). Follow [Running it locally](#running-it-locally-no-resend-account-needed).
+- **The test gate needs no secrets either, by design.** The `backend` and `frontend`
+  jobs in [`ci.yml`](.github/workflows/ci.yml) read zero secrets, so they run
+  identically in your fork or in a PR opened from one.
+- **The pipeline itself is read-only evidence — this is a public repo, so every link
+  below opens without a login:**
+
+| What to check | Where |
+|---|---|
+| Tests run on every PR, and a red suite blocks the merge | [the Actions tab](https://github.com/nachiketnasa/petri-v2/actions/workflows/ci.yml) — filter `event: pull_request`. [PR #40](https://github.com/nachiketnasa/petri-v2/pull/40) is the pipeline's own PR; its checks show `backend` (210 tests against a real `postgres:16` service container, 0 skipped) and `frontend` (160 tests) |
+| The merge gate is enforced, not advisory | `main` carries a repository ruleset requiring a PR plus both checks, with no bypass: `gh api repos/nachiketnasa/petri-v2/rulesets` |
+| CD deploys to dev automatically | the same Actions tab, filter `event: push` — the `deploy` job runs only after both suites pass on the merge commit, and is **skipped** on PRs |
+| Production deploy is manual only | [`deploy-prod.yml`](.github/workflows/deploy-prod.yml) — `workflow_dispatch` is its only trigger, behind a typed `deploy-prod` confirmation, a `guard` job that hard-fails on a wrong confirmation or any ref but `main`, and a required reviewer on the `production` environment |
+
+Both `deploy` jobs also check `github.repository`, so a fork never tries to deploy to
+our Render services with secrets it does not have; a fork still runs the full test gate.
+
 ### Environments
 
 Two of them, both declared in one file — [`render.yaml`](render.yaml) at the repo root is

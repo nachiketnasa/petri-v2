@@ -73,9 +73,17 @@ jobs:
   # render.yaml sets autoDeploy off on both services, so this is the only thing
   # that starts a dev deploy — and `needs:` means it cannot run until both
   # suites are green on the merge commit. A red suite skips it entirely.
+  # The `github.repository` check keeps forks out: a clone or fork has none of
+  # this repo's secrets, so without it a fork's own merge to `main` would fire
+  # this job against an empty hook URL and go red for reasons that have nothing
+  # to do with the fork's code. The test-gate jobs above read no secrets at all
+  # and so run identically anywhere.
   deploy:
     needs: [backend, frontend]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: >-
+      github.event_name == 'push'
+      && github.ref == 'refs/heads/main'
+      && github.repository == 'nachiketnasa/petri-v2'
     runs-on: ubuntu-latest
     steps:
       # The hook URLs are bearer credentials in URL form: they go in via env,
