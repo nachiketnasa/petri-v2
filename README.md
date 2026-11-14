@@ -192,10 +192,13 @@ schedule can start a prod deploy.
    manual step and never part of a build or deploy command.
 5. **Dashboard → petri-backend-prod → Settings → Deploy Hook.** Copy the hook URL.
    Repeat for `petri-frontend-prod`. Both are bearer credentials in URL form.
-6. **GitHub → repo Settings → Environments → New environment →** name it `production`.
-7. **On that environment:** add yourself under **Required reviewers** (this is what
-   produces the "Waiting for review" pause), and optionally restrict **Deployment
-   branches** to `main` as a belt-and-braces copy of the guard's ref check.
+6. ~~**GitHub → repo Settings → Environments → New environment →** name it
+   `production`.~~ **Already done** — the `production` environment exists.
+7. ~~**On that environment:** add yourself under **Required reviewers**, and restrict
+   **Deployment branches** to `main`.~~ **Already done** — `nachiketnasa` is the required
+   reviewer (this is what produces the "Waiting for review" pause) and deployments are
+   restricted to the `main` branch, a belt-and-braces copy of the guard's ref check.
+   Verify with `gh api repos/nachiketnasa/petri-v2/environments/production`.
 8. **Still on that environment → Environment secrets → Add secret.** Add
    `RENDER_DEPLOY_HOOK_BACKEND_PROD` and `RENDER_DEPLOY_HOOK_FRONTEND_PROD` with the two
    prod hook URLs. **Environment** secrets, explicitly *not* repository secrets: a repo

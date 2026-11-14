@@ -1240,7 +1240,7 @@ scope here — see the separate issue.
 - [x] `render.yaml` blueprint + CD: merging to `main` deploys the dev
       environment automatically (backend, frontend, Postgres), triggered from
       CI after the tests pass.
-- [ ] Manual production deploy: a `workflow_dispatch`-only GitHub Actions job
+- [x] Manual production deploy: a `workflow_dispatch`-only GitHub Actions job
       that deploys the prod environment, plus README/spec docs covering both
       environments and how to run the prod deploy.
 
@@ -1302,6 +1302,99 @@ working. Two independent causes, both in `backend/src/petri_backend/app.py`:
 - Use the existing `sessions` table in `_docs/schema.sql` as written; no schema
   change, no new migration.
 - No new dependencies. No session middleware library for a dict lookup.
+
+---
+
+## order-13a · #42 — CI deploy job hardening: concurrency on main, permissions, deploy-outcome visibility
+
+- **Status**: OPEN
+- **Labels**: infra
+- **Link**: https://github.com/nachiketnasa/petri-v2/issues/42
+
+## What
+Three small, concrete defects in the deploy half of `.github/workflows/ci.yml`, all
+noted during #18's line-2 implementation and QA and deliberately left out of scope
+there. None of them blocks a deploy; each one can silently lose one.
+
+## Acceptance criteria
+- [ ] A dev deploy is never silently skipped by `concurrency`. Today the group is
+      `ci-${{ github.event.pull_request.number || github.ref }}` with
+      `cancel-in-progress: true`, so on `push` to `main` two merges in quick succession
+      cancel the first run and with it its `deploy` job. The second merge deploys newer
+      code, so the end state is right, but the first merge's deploy never fires and
+      nothing says so. Fix by not cancelling in-progress runs on `main` (e.g. a separate
+      concurrency group for pushes with `cancel-in-progress: false`), checkable by
+      pushing two commits to `main` back to back and seeing two `deploy` jobs run.
+- [ ] The `deploy` job (and any prod deploy job) declares `permissions: {}`. It needs no
+      `GITHUB_TOKEN` scope at all — it only `curl`s a deploy hook. One line.
+- [ ] Decide and record whether the deploy job waits for the Render deploy to finish.
+      Today it POSTs the hook, asserts a 2xx and exits, so a build that fails on Render
+      leaves CI green. Polling needs a Render API key as a third secret and a wait loop;
+      either add it or write one line in the README saying CI confirms the trigger, not
+      the outcome.
+- [ ] The dev Postgres (`petri-dev`, `plan: free`) expires after 30 days and
+      `_docs/schema.sql` must be re-applied to its replacement by hand. README already
+      says so; decide whether anything beyond that note is wanted (a reminder, a paid
+      plan, or accept it).
+
+Ref: #18 checklist line 2's QA comment (advisories 1 and 3) and the engineer's
+implementation note.
+
+---
+
+## order-13b · #43 — frontend/Dockerfile pins node:22 while README/specs/CI pin Node 24
+
+- **Status**: OPEN
+- **Labels**: frontend
+- **Link**: https://github.com/nachiketnasa/petri-v2/issues/43
+
+## What
+`frontend/Dockerfile` starts from `node:22-slim`, while `README.md` and `_docs/specs.md`
+pin "Node.js 24 LTS, ≥24.22.1" (the patched line after CVE-2026-111497) and
+`.github/workflows/ci.yml` runs the frontend suite on Node 24. So the container the
+local dev stack runs is on a different major than the one the tests pass on.
+
+Noted and left unfixed by both #18 line 1 and line 2 (there is an inline comment in
+`ci.yml` saying so); it is a one-word change but it rebuilds the dev image, so it got
+its own home rather than riding along with a CI change.
+
+## Acceptance criteria
+- [ ] `frontend/Dockerfile`'s base image is on the Node 24 line that README pins
+      (≥24.22.1).
+- [ ] `docker compose up --build frontend` still serves the Vite dev server on :5173.
+- [ ] `cd frontend && npm test` still green (16 files / 160 tests).
+- [ ] No other version string in the repo still says Node 22.
+
+---
+
+## order-13c · #44 — Dependency update automation (Dependabot/Renovate) with CI as the merge gate
+
+- **Status**: OPEN
+- **Labels**: infra
+- **Link**: https://github.com/nachiketnasa/petri-v2/issues/44
+
+## What
+The issue body of #18 defers dependency updates with "see the separate issue" — that
+issue was never filed. `_docs/specs.md` → Tech stack (Runtime) also commits to it:
+"Dependency upgrades are kept small and continuous (Dependabot/Renovate + CI as the
+merge gate) rather than left to go stale, which is what turns a routine CVE into an
+emergency; this is a plan.md/CI-CD concern."
+
+The merge gate it depends on now exists (`.github/workflows/ci.yml`, `backend` and
+`frontend` as required status checks on `main`), so this is unblocked.
+
+## Acceptance criteria
+- [ ] Dependabot (or Renovate) config committed, covering all three ecosystems the repo
+      actually has: `uv`/pip for `backend/`, npm for `frontend/`, and `github-actions`
+      for `.github/workflows/`.
+- [ ] A dependency PR opens automatically and runs the same `backend` + `frontend` gate
+      as any other PR, so a breaking bump shows red instead of being merged.
+- [ ] Update cadence and grouping are a deliberate choice, written down, not the default
+      firehose (a solo project does not want 30 open PRs).
+- [ ] README/specs reflect what was actually set up.
+
+Out of scope: `oxlint`, `tsc -b` build checks and coverage gates in CI. Repeatedly
+declined in #18's grooms; if any is wanted it needs its own issue first.
 
 ---
 
