@@ -1237,12 +1237,71 @@ scope here — see the separate issue.
 - [x] GitHub Actions workflow: run backend `pytest` (against a real Postgres
       service container) and frontend `vitest run` on every pull request
       against `main`. This is the merge gate.
-- [ ] `render.yaml` blueprint + CD: merging to `main` deploys the dev
+- [x] `render.yaml` blueprint + CD: merging to `main` deploys the dev
       environment automatically (backend, frontend, Postgres), triggered from
       CI after the tests pass.
 - [ ] Manual production deploy: a `workflow_dispatch`-only GitHub Actions job
       that deploys the prod environment, plus README/spec docs covering both
       environments and how to run the prod deploy.
+
+---
+
+## order-13 · #41 — Auth breaks on a cross-origin, restarting deployment (SameSite cookie + in-memory sessions)
+
+- **Status**: OPEN
+- **Labels**: backend, auth
+- **Link**: https://github.com/nachiketnasa/petri-v2/issues/41
+
+## What
+
+Once the app runs as two separate origins (frontend static site, backend web
+service) instead of `localhost:5173` + `localhost:8000`, signed-in flows stop
+working. Two independent causes, both in `backend/src/petri_backend/app.py`:
+
+1. **The session cookie is not cross-site capable.** `response.set_cookie(SESSION_COOKIE_NAME, token, httponly=True)`
+   (app.py:458 signup, app.py:487 login) takes Starlette's defaults, i.e.
+   `SameSite=Lax` and no `Secure`. `onrender.com` is on the Public Suffix List,
+   so `petri-frontend-dev.onrender.com` and `petri-backend-dev.onrender.com`
+   are **cross-site**, and every browser drops a `SameSite=Lax` cookie on a
+   cross-site `fetch`. The frontend sends `credentials: 'include'` everywhere
+   (`frontend/src/AuthContext.tsx` and friends), which additionally *requires*
+   `SameSite=None; Secure` to be honoured. Net effect: sign-up/login return
+   201/200, the cookie never comes back, and every authenticated route 401s.
+   Fix is `samesite="none", secure=True` on both `set_cookie` calls (and the
+   matching `delete_cookie` at app.py:586). `http://localhost` is a secure
+   context, so this does not break local dev or `docker-compose`.
+
+2. **Sessions live in a process dict.** `_sessions` (app.py:55) is in-memory, so
+   every deploy, restart or free-tier spin-down signs everyone out, and the
+   service can never run more than one instance. `_docs/schema.sql` already has
+   a `sessions` table (line 73) plus `sessions_user_id_idx` that nothing writes
+   to — the storage exists, the repository method does not.
+
+## Acceptance criteria
+
+- [ ] Both `set_cookie` calls and the `delete_cookie` call set
+      `samesite="none", secure=True`.
+- [ ] Sign in on the deployed dev frontend, reload the page, and you are still
+      signed in; the dashboard loads instead of bouncing to `/sign-in`.
+- [ ] Redeploy the backend, reload the deployed frontend, and the session
+      survives (i.e. sessions are read from the `sessions` table, not a dict).
+- [ ] `docker compose up` + `http://localhost:5173` sign-in still works
+      unchanged.
+- [ ] Existing backend suite stays green.
+
+## Out of scope
+
+- Anything about how the deploy itself is wired — that is #18 (`order-13`).
+- `_reset_tokens` / verification-code storage: same in-memory shape, but a
+  separate change; call it out in a comment here if it should ride along.
+
+## Constraints
+
+- `backend/src/petri_backend/app.py` and the Postgres repository
+  (`backend/src/petri_backend/repository_postgres.py`) only.
+- Use the existing `sessions` table in `_docs/schema.sql` as written; no schema
+  change, no new migration.
+- No new dependencies. No session middleware library for a dict lookup.
 
 ---
 
