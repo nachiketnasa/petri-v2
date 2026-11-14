@@ -146,8 +146,8 @@ First-time setup — the dashboard steps nobody can do for you, in order:
 4. **Dashboard → petri-backend-dev / petri-frontend-dev → Settings.** Copy each
    service's public URL (normally `https://<service-name>.onrender.com`, but Render
    appends a suffix on a global name-collision). If either differs from the
-   `FRONTEND_ORIGIN` / `VITE_BACKEND_URL` literals in `render.yaml`, fix the literals
-   and commit — a wrong value fails silently as "Backend: unreachable".
+   `FRONTEND_ORIGIN` literal or the `/api/*` rewrite `destination` in `render.yaml`, fix
+   the literals and commit — a wrong value fails silently as "Backend: unreachable".
 5. **Dashboard → petri-backend-dev → Settings → Deploy Hook.** Copy the hook URL. Repeat
    for `petri-frontend-dev`. Treat both as passwords — they are bearer credentials in URL
    form.
@@ -156,10 +156,10 @@ First-time setup — the dashboard steps nobody can do for you, in order:
    These are the only secrets CI reads, and only the `deploy` job reads them, so PRs from
    forks still run the full test gate unchanged.
 
-Known limits of the dev environment: signed-in flows do not work there yet (the session
-cookie is `SameSite=Lax` with no `Secure`, and `onrender.com` makes the two services
-cross-site; sessions are also an in-process dict that empties on every deploy) — tracked
-in [#41](https://github.com/nachiketnasa/petri-v2/issues/41). `PETRI_TOTP_KEY` and
+Known limits of the dev environment: `/api/*` is proxied to the backend through the
+static site, so the session cookie is first-party, and sessions live in the `sessions`
+table, so they survive a redeploy; the full browser walkthrough (Chrome + Safari) is
+still pending in [#41](https://github.com/nachiketnasa/petri-v2/issues/41) line 5. `PETRI_TOTP_KEY` and
 `VAPID_PRIVATE_KEY` are set in the Render Dashboard, so 2FA secrets and the VAPID public
 key survive a redeploy.
 
@@ -236,8 +236,8 @@ schedule can start a prod deploy.
    prod's own `PETRI_TOTP_KEY` / `VAPID_PRIVATE_KEY` pair (see
    [Generating the app keys](#generating-the-app-keys); never reuse dev's).
 4. **Dashboard → petri-backend-prod / petri-frontend-prod → Settings.** Copy both public
-   URLs. If Render appended a collision suffix, fix the `FRONTEND_ORIGIN` and
-   `VITE_BACKEND_URL` literals in `render.yaml` (and the table above) and commit — a
+   URLs. If Render appended a collision suffix, fix the `FRONTEND_ORIGIN` literal and
+   the `/api/*` rewrite `destination` in `render.yaml` (and the table above) and commit — a
    wrong value fails silently as "Backend: unreachable".
 5. **Dashboard → petri-backend-prod → Settings → Deploy Hook.** Copy the hook URL.
    Repeat for `petri-frontend-prod`. Both are bearer credentials in URL form.
@@ -255,12 +255,11 @@ schedule can start a prod deploy.
    an environment secret is only in scope for a job that declares
    `environment: production` and has cleared its reviewer gate.
 
-Known limits of the production environment, in the same register as dev's: signed-in
-flows do not work on `*.onrender.com` yet (cross-site `SameSite=Lax` cookie with no
-`Secure`, plus an in-process session dict that empties on every deploy) — tracked in
-[#41](https://github.com/nachiketnasa/petri-v2/issues/41), so treat prod as a public
-read-only demo for now. `PETRI_TOTP_KEY` and `VAPID_PRIVATE_KEY` are unset, so both
-modules fall back to an ephemeral per-process key. Free Render web services cold-start
+Known limits of the production environment, in the same register as dev's: `/api/*` is
+proxied to the backend through the static site, so the session cookie is first-party,
+and sessions live in the `sessions` table; the full browser walkthrough (Chrome +
+Safari) is still pending in [#41](https://github.com/nachiketnasa/petri-v2/issues/41) line 5. `PETRI_TOTP_KEY` and
+`VAPID_PRIVATE_KEY` are set in the Render Dashboard. Free Render web services cold-start
 after inactivity, so the first request can take tens of seconds; Neon's free compute
 also scales to zero when idle and wakes on the next query.
 
@@ -279,7 +278,7 @@ yourself:
 | 5 | Application | 2 / 2 | `docker compose up --build` runs frontend + backend + Postgres together; see [Running it locally](#running-it-locally-no-resend-account-needed) above. |
 | 6 | Testing | 2 / 2 | Backend, one command runs unit *and* integration tests (against real Postgres, see `backend/tests/test_repository_postgres.py`) together: `docker compose up -d postgres && cd backend && DATABASE_URL=postgresql://petri:petri@localhost:5432/petri uv run pytest` (210 passed, 0 skipped, verified). If port 5432 is already taken on your machine, set `POSTGRES_PORT` first, e.g. `POSTGRES_PORT=5433 docker compose up -d postgres` and point `DATABASE_URL` at that port instead — `docker-compose.yml`'s ports are all overridable this way (`POSTGRES_PORT`, `BACKEND_PORT`, `FRONTEND_PORT`), with the same defaults (5432/8000/5173) if left unset. A bare `uv run pytest` still works and stays green, but skips the Postgres-backed tests — pass `DATABASE_URL` to include them. Frontend: `cd frontend && npm test` (Vitest + React Testing Library). A handful of date-dependent tests briefly flaked on machines whose local timezone trails UTC (the tests used local `date.today()` while the backend anchors the same logic in UTC); fixed by anchoring the tests in UTC too, so this no longer depends on the evaluator's machine timezone. |
 | 7 | Containerization | 2 / 2 | Single `docker-compose.yml` for all three services. |
-| 8 | Deployment | 1 / 2 | **Both environments are live on free plans** — Render for the app, a separate Neon Postgres project per environment. Dev: frontend <https://petri-frontend-dev-e9be.onrender.com>, backend <https://petri-backend-dev-vq9g.onrender.com>. Prod: frontend <https://petri-frontend-prod-iin7.onrender.com>, backend <https://petri-backend-prod-h3fe.onrender.com>. Each backend's `/health` → `{"status":"ok"}`. Not 2 / 2 yet: signed-in flows do not work on `*.onrender.com` (cross-site session cookie and in-process sessions, [#41](https://github.com/nachiketnasa/petri-v2/issues/41)), so the deployed app is a public demo of the signed-out surface only. See [Environments](#environments). |
+| 8 | Deployment | 1 / 2 | **Both environments are live on free plans** — Render for the app, a separate Neon Postgres project per environment. Dev: frontend <https://petri-frontend-dev-e9be.onrender.com>, backend <https://petri-backend-dev-vq9g.onrender.com>. Prod: frontend <https://petri-frontend-prod-iin7.onrender.com>, backend <https://petri-backend-prod-h3fe.onrender.com>. Each backend's `/health` → `{"status":"ok"}`. Not 2 / 2 yet: browser end-to-end on both environments (incl. Safari) not yet verified, [#41](https://github.com/nachiketnasa/petri-v2/issues/41) line 5. See [Environments](#environments). |
 | 9 | CI/CD | 3 / 3 | All three parts. **(a) PR merge gate:** [`ci.yml`](.github/workflows/ci.yml) runs backend `pytest` against a real Postgres + frontend `vitest`, both required status checks on `main`. **(b) CD to dev:** a merge to `main` re-runs both suites against the merge commit and only a green run POSTs the Render deploy hooks. **(c) Manual production deploy:** [`deploy-prod.yml`](.github/workflows/deploy-prod.yml), `workflow_dispatch` and nothing else, behind a typed `deploy-prod` confirmation, a `guard` job that hard-fails on a wrong confirmation or any ref but `main`, and a required reviewer on the `production` environment that holds the deploy-hook secrets — click path in [Deploying to Render (production)](#deploying-to-render-production). |
 | 10 | Observability | 0 / 2 | No metrics/traces/structured logs with request correlation yet. |
 | 11 | Alerting | 0 / 1 | None yet. |
