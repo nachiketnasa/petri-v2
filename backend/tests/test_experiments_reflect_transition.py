@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 import pytest
 from fastapi.testclient import TestClient
@@ -49,7 +49,7 @@ def _create_experiment(client: TestClient, token: str, **overrides):
 
 def test_active_experiment_transitions_to_reflect_once_target_days_has_elapsed(client: TestClient):
     token = _signup_and_login(client)
-    old_start = str(date.today() - timedelta(days=10))  # 10 days in, target_days=7
+    old_start = str(datetime.now(timezone.utc).date() - timedelta(days=10))  # 10 days in, target_days=7
     experiment = _create_experiment(client, token, start_date=old_start)
     client.post(f"/experiments/{experiment['id']}/activate", cookies={"session_id": token})
 
@@ -60,7 +60,7 @@ def test_active_experiment_transitions_to_reflect_once_target_days_has_elapsed(c
 
 def test_active_experiment_stays_active_before_target_days_elapses(client: TestClient):
     token = _signup_and_login(client)
-    recent_start = str(date.today() - timedelta(days=2))  # 2 days in, target_days=7
+    recent_start = str(datetime.now(timezone.utc).date() - timedelta(days=2))  # 2 days in, target_days=7
     experiment = _create_experiment(client, token, start_date=recent_start)
     client.post(f"/experiments/{experiment['id']}/activate", cookies={"session_id": token})
 
@@ -73,7 +73,7 @@ def test_reflect_transition_is_persisted_not_recomputed_back_to_active(
     client: TestClient, repo: InMemoryRepository
 ):
     token = _signup_and_login(client)
-    old_start = str(date.today() - timedelta(days=10))
+    old_start = str(datetime.now(timezone.utc).date() - timedelta(days=10))
     experiment = _create_experiment(client, token, start_date=old_start)
     client.post(f"/experiments/{experiment['id']}/activate", cookies={"session_id": token})
     client.get(f"/experiments/{experiment['id']}", cookies={"session_id": token})
@@ -84,7 +84,7 @@ def test_reflect_transition_is_persisted_not_recomputed_back_to_active(
 
 def test_reflect_transition_applies_in_list_experiments_too(client: TestClient):
     token = _signup_and_login(client)
-    old_start = str(date.today() - timedelta(days=10))
+    old_start = str(datetime.now(timezone.utc).date() - timedelta(days=10))
     experiment = _create_experiment(client, token, start_date=old_start, title="Due for reflect")
     client.post(f"/experiments/{experiment['id']}/activate", cookies={"session_id": token})
 
@@ -96,7 +96,7 @@ def test_reflect_transition_applies_in_list_experiments_too(client: TestClient):
 
 def test_a_reflect_experiment_can_still_be_archived_directly(client: TestClient):
     token = _signup_and_login(client)
-    old_start = str(date.today() - timedelta(days=10))
+    old_start = str(datetime.now(timezone.utc).date() - timedelta(days=10))
     experiment = _create_experiment(client, token, start_date=old_start)
     client.post(f"/experiments/{experiment['id']}/activate", cookies={"session_id": token})
     client.get(f"/experiments/{experiment['id']}", cookies={"session_id": token})  # triggers reflect
@@ -113,7 +113,7 @@ def test_a_reflect_experiment_can_still_be_archived_directly(client: TestClient)
 
 def test_backlog_experiment_is_unaffected_by_the_transition(client: TestClient):
     token = _signup_and_login(client)
-    old_start = str(date.today() - timedelta(days=10))
+    old_start = str(datetime.now(timezone.utc).date() - timedelta(days=10))
     experiment = _create_experiment(client, token, start_date=old_start)  # never activated
 
     response = client.get(f"/experiments/{experiment['id']}", cookies={"session_id": token})

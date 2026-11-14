@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 import pytest
 from fastapi.testclient import TestClient
@@ -272,7 +272,7 @@ class TestDailyLoad:
         response = client.get("/daily-load", cookies={"session_id": token})
 
         assert response.status_code == 200
-        assert response.json()["date"] == str(date.today())
+        assert response.json()["date"] == str(datetime.now(timezone.utc).date())
 
 
 class TestPushSubscriptions:

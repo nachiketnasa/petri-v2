@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 import pytest
 from fastapi.testclient import TestClient
@@ -60,7 +60,7 @@ def test_check_in_due_false_right_after_activating_with_todays_start_date(
     client: TestClient, repo: InMemoryRepository
 ):
     token = _signup_and_login(client)
-    experiment = _create_experiment(client, token, start_date=str(date.today()))
+    experiment = _create_experiment(client, token, start_date=str(datetime.now(timezone.utc).date()))
 
     response = client.post(f"/experiments/{experiment['id']}/activate", cookies={"session_id": token})
 
@@ -71,7 +71,7 @@ def test_check_in_due_true_for_an_active_daily_experiment_with_no_check_ins_past
     client: TestClient,
 ):
     token = _signup_and_login(client)
-    old_start = str(date.today() - timedelta(days=2))
+    old_start = str(datetime.now(timezone.utc).date() - timedelta(days=2))
     experiment = _create_experiment(client, token, start_date=old_start)
     client.post(f"/experiments/{experiment['id']}/activate", cookies={"session_id": token})
 
@@ -82,7 +82,7 @@ def test_check_in_due_true_for_an_active_daily_experiment_with_no_check_ins_past
 
 def test_check_in_due_false_right_after_logging_todays_check_in(client: TestClient):
     token = _signup_and_login(client)
-    old_start = str(date.today() - timedelta(days=2))
+    old_start = str(datetime.now(timezone.utc).date() - timedelta(days=2))
     experiment = _create_experiment(client, token, start_date=old_start)
     client.post(f"/experiments/{experiment['id']}/activate", cookies={"session_id": token})
 
@@ -100,7 +100,7 @@ def test_check_in_due_false_right_after_logging_todays_check_in(client: TestClie
 def test_check_in_due_respects_custom_cadence_days(client: TestClient):
     token = _signup_and_login(client)
     # custom, every 5 days: 2 days in is not due yet.
-    recent_start = str(date.today() - timedelta(days=2))
+    recent_start = str(datetime.now(timezone.utc).date() - timedelta(days=2))
     experiment = _create_experiment(
         client, token, cadence_type="custom", cadence_days=5, start_date=recent_start
     )
@@ -113,7 +113,7 @@ def test_check_in_due_respects_custom_cadence_days(client: TestClient):
 
 def test_list_experiments_includes_check_in_due_per_experiment(client: TestClient):
     token = _signup_and_login(client)
-    old_start = str(date.today() - timedelta(days=2))
+    old_start = str(datetime.now(timezone.utc).date() - timedelta(days=2))
     due_experiment = _create_experiment(client, token, start_date=old_start, title="Due one")
     client.post(f"/experiments/{due_experiment['id']}/activate", cookies={"session_id": token})
     _create_experiment(client, token, title="Still backlog")

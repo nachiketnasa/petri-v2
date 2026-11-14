@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 import pytest
 from fastapi.testclient import TestClient
@@ -58,7 +58,7 @@ def _check_in_on(client: TestClient, token: str, experiment_id: str, on_date: da
 
 def test_streak_is_zero_for_a_brand_new_experiment_with_no_check_ins(client: TestClient):
     token = _signup_and_login(client)
-    old_start = str(date.today() - timedelta(days=5))
+    old_start = str(datetime.now(timezone.utc).date() - timedelta(days=5))
     experiment = _create_experiment(client, token, start_date=old_start)
     client.post(f"/experiments/{experiment['id']}/activate", cookies={"session_id": token})
 
@@ -69,7 +69,7 @@ def test_streak_is_zero_for_a_brand_new_experiment_with_no_check_ins(client: Tes
 
 def test_streak_counts_consecutive_on_time_daily_check_ins(client: TestClient):
     token = _signup_and_login(client)
-    start = date.today() - timedelta(days=4)
+    start = datetime.now(timezone.utc).date() - timedelta(days=4)
     experiment = _create_experiment(client, token, start_date=str(start))
     client.post(f"/experiments/{experiment['id']}/activate", cookies={"session_id": token})
 
@@ -84,7 +84,7 @@ def test_streak_counts_consecutive_on_time_daily_check_ins(client: TestClient):
 
 def test_streak_resets_to_zero_after_a_missed_period(client: TestClient):
     token = _signup_and_login(client)
-    start = date.today() - timedelta(days=4)
+    start = datetime.now(timezone.utc).date() - timedelta(days=4)
     experiment = _create_experiment(client, token, start_date=str(start))
     client.post(f"/experiments/{experiment['id']}/activate", cookies={"session_id": token})
 
@@ -102,7 +102,7 @@ def test_streak_counts_back_from_the_most_recent_elapsed_period_and_stops_at_a_g
     client: TestClient,
 ):
     token = _signup_and_login(client)
-    start = date.today() - timedelta(days=4)
+    start = datetime.now(timezone.utc).date() - timedelta(days=4)
     experiment = _create_experiment(client, token, start_date=str(start))
     client.post(f"/experiments/{experiment['id']}/activate", cookies={"session_id": token})
 
