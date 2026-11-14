@@ -1204,7 +1204,7 @@ Ref: `_docs/specs.md` → Tech stack (Infra, Hosting).
 
 ## order-13 · #18 — CI/CD pipeline: PR test gate, auto-deploy to dev, manual deploy to prod
 
-- **Status**: OPEN
+- **Status**: CLOSED
 - **Labels**: infra
 - **Link**: https://github.com/nachiketnasa/petri-v2/issues/18
 
