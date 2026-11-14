@@ -1,0 +1,81 @@
+name: Deploy to production
+
+# Manual only. `workflow_dispatch` is the ONLY trigger: no push, no merge, no
+# schedule can start a production deploy. Dev CD lives in ci.yml and is not
+# touched by this file.
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type deploy-prod to confirm a PRODUCTION deploy'
+        required: true
+        # Free text on purpose. A `choice` input with deploy-prod preselected
+        # could be submitted without reading it, which is not a confirmation.
+        type: string
+
+# Fixed group, and queued runs are NOT cancelled: two prod deploys line up
+# behind each other instead of one silently killing the other mid-flight.
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+jobs:
+  # The interlock, in its own job, on purpose:
+  #  - `environment:` gates a job before any step runs, so a confirm check
+  #    inside `deploy` would sit in "Waiting for review" on a typo instead of
+  #    failing — and the environment secrets would already be in scope.
+  #  - An `if:` on `deploy` would SKIP it on a typo, and a skipped job leaves
+  #    the run green: a failed prod deploy that looks like a success.
+  # So: a separate job, no `environment:`, no secrets, exits non-zero in
+  # seconds. Its failure paths are fully testable with no Render account and
+  # no reviewer click.
+  guard:
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Check confirmation and ref
+        env:
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          ok=1
+          if [ "$GITHUB_REPOSITORY" != "nachiketnasa/petri-v2" ]; then
+            echo "::error::This workflow deploys nachiketnasa/petri-v2's own Render services; a fork has none of its secrets. Point it at your own services first."
+            ok=0
+          fi
+          if [ "$CONFIRM" != "deploy-prod" ]; then
+            echo "::error::confirm input must be exactly 'deploy-prod'."
+            ok=0
+          fi
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "::error::production deploys only from main; got $GITHUB_REF."
+            ok=0
+          fi
+          [ "$ok" = 1 ] || exit 1
+          echo "Guard passed: confirmed deploy of main ($GITHUB_SHA)."
+
+  # No test run here by design: `main` is protected by a no-bypass ruleset, so
+  # every commit on it already passed backend+frontend on the PR, and ci.yml
+  # re-ran both against the merge commit before the dev deploy. The guard
+  # refusing any ref but main is what makes that argument hold.
+  #
+  # `environment: production` is the second layer: the two hook secrets are
+  # ENVIRONMENT secrets on `production` (not repository secrets), so no other
+  # job in any workflow can read them, and the required reviewer on that
+  # environment stops this job before any step runs.
+  deploy:
+    needs: [guard]
+    environment: production
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      # The hook URLs are bearer credentials in URL form: in via env, never
+      # echoed, no -v / -L / set -x. Only Render's JSON response (with the
+      # deploy id) is printed. --fail turns a non-2xx into a failed job.
+      - name: Trigger backend deploy
+        env:
+          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_BACKEND_PROD }}
+        run: curl --fail --silent --show-error -X POST "$HOOK"
+      - name: Trigger frontend deploy
+        env:
+          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_FRONTEND_PROD }}
+        run: curl --fail --silent --show-error -X POST "$HOOK"

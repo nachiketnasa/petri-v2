@@ -1,0 +1,99 @@
+name: CI
+
+# Merge gate on PRs, and on push to main the same two suites re-run against the
+# merge commit and gate the dev deploy. Only the `deploy` job reads secrets, so
+# PRs (including fork PRs) still run the full gate with none.
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: petri
+          POSTGRES_PASSWORD: petri
+          POSTGRES_DB: petri
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U petri -d petri"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      # Service containers get no /docker-entrypoint-initdb.d volume, so load the
+      # schema by hand. psql ships with the runner image.
+      - name: Apply schema
+        env:
+          PGPASSWORD: petri
+        run: psql -h localhost -U petri -d petri -v ON_ERROR_STOP=1 -f _docs/schema.sql
+      - name: pytest
+        working-directory: backend
+        env:
+          # Without this the Postgres integration tests skipif-skip silently.
+          DATABASE_URL: postgresql://petri:petri@localhost:5432/petri
+        # --locked, not --frozen: it asserts uv.lock agrees with pyproject.toml
+        # instead of just using whatever the lock says.
+        run: uv run --locked pytest
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          # README pins Node 24 LTS; frontend/Dockerfile still says node:22-slim — mismatch noted, not fixed here.
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: npm ci
+        working-directory: frontend
+        run: npm ci
+      - name: vitest
+        working-directory: frontend
+        run: npm test
+
+  # render.yaml sets autoDeploy off on both services, so this is the only thing
+  # that starts a dev deploy — and `needs:` means it cannot run until both
+  # suites are green on the merge commit. A red suite skips it entirely.
+  # The `github.repository` check keeps forks out: a clone or fork has none of
+  # this repo's secrets, so without it a fork's own merge to `main` would fire
+  # this job against an empty hook URL and go red for reasons that have nothing
+  # to do with the fork's code. The test-gate jobs above read no secrets at all
+  # and so run identically anywhere.
+  deploy:
+    needs: [backend, frontend]
+    if: >-
+      github.event_name == 'push'
+      && github.ref == 'refs/heads/main'
+      && github.repository == 'nachiketnasa/petri-v2'
+    runs-on: ubuntu-latest
+    steps:
+      # The hook URLs are bearer credentials in URL form: they go in via env,
+      # are never echoed, and only Render's JSON response (with the deploy id)
+      # is printed. --fail turns a non-2xx into a failed job.
+      - name: Trigger backend deploy
+        env:
+          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_BACKEND }}
+        run: curl --fail --silent --show-error -X POST "$HOOK"
+      - name: Trigger frontend deploy
+        env:
+          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_FRONTEND }}
+        run: curl --fail --silent --show-error -X POST "$HOOK"

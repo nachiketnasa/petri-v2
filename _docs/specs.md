@@ -323,16 +323,23 @@ moodboard/reference images pulled from other designers' work.
   repeated here.
 - **Infra**: Cloudflare in front for DDoS mitigation; Turnstile/reCAPTCHA on auth
   endpoints; Web Push via a service worker for Other task reminders.
-- **Hosting**: a single VPS — **Oracle Cloud's Always Free tier** first choice (a real
-  always-free instance, not a 12-month trial that starts billing, so it fits a fixed
-  "no surprise cost" budget indefinitely); **Hetzner Cloud** as the fallback if Oracle's
-  free-instance provisioning proves unreliable in practice. Frontend and backend run as
-  separate containers via Docker Compose (mirroring v1's `docker-compose.prod.yml`
-  shape), talking to each other over the compose network, with Postgres as a third
-  container. `petri.nachiketnasa.com` points at the VPS; since it's a VPS the domain
-  costs nothing extra either way. The backend being API-first (already the case for the
-  OpenAPI contract) is what keeps a later native mobile app possible without a backend
-  rewrite.
+- **Hosting**: **Render**, two environments (dev and production) declared in this repo's
+  [`render.yaml`](../render.yaml) blueprint. Per environment: the backend as a Docker web
+  service (built from `backend/Dockerfile`), the frontend as a static site (Vite build,
+  with an SPA rewrite so deep links work), and a Render managed Postgres instance.
+  Addresses are `*.onrender.com` (`petri-{backend,frontend}-{dev,prod}`). CI owns every
+  deploy trigger, not Render's deploy-on-push: dev deploys automatically when a merge to
+  `main` is green, production only from a manual `workflow_dispatch` run behind a typed
+  confirmation and an environment approval. See README.md's "Environments" section.
+  The backend being API-first (already the case for the OpenAPI contract) is what keeps a
+  later native mobile app possible without a backend rewrite.
+  **Superseded:** the earlier plan here was a single always-free VPS (Oracle Cloud, with
+  Hetzner as fallback) running frontend, backend and Postgres as Docker Compose
+  containers, with a custom domain pointed at it. Render replaces that for hosting. The
+  custom domain, the Cloudflare layer in front and Turnstile on auth endpoints are not
+  implemented and are tracked in
+  [#15](https://github.com/nachiketnasa/petri-v2/issues/15), whose VPS/Compose/domain
+  acceptance criteria this bullet supersedes for hosting.
 - **Session storage**, **email**, and **cookies**: see "Authentication" above.
 
 ## Technical plan
