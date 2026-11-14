@@ -93,12 +93,12 @@ project — nothing is shared between dev and prod. Everything is on free plans.
 
 | Environment | Frontend URL | Backend URL | Database | Deploy trigger |
 |---|---|---|---|---|
-| **dev** | <https://petri-frontend-dev.onrender.com> *(not live yet)* | <https://petri-backend-dev.onrender.com> *(not live yet)* | Neon project `petri-dev` (free) | **automatic, on green merge to `main`** — the `deploy` job in [`ci.yml`](.github/workflows/ci.yml) |
-| **prod** | <https://petri-frontend-prod.onrender.com> *(not live yet)* | <https://petri-backend-prod.onrender.com> *(not live yet)* | Neon project `petri-prod` (free) | **manual only — `workflow_dispatch`** in [`deploy-prod.yml`](.github/workflows/deploy-prod.yml) |
+| **dev** | <https://petri-frontend-dev-e9be.onrender.com> | <https://petri-backend-dev-vq9g.onrender.com> | Neon project `petri-dev` (free) | **automatic, on green merge to `main`** — the `deploy` job in [`ci.yml`](.github/workflows/ci.yml) |
+| **prod** | <https://petri-frontend-prod-iin7.onrender.com> | <https://petri-backend-prod-h3fe.onrender.com> | Neon project `petri-prod` (free) | **manual only — `workflow_dispatch`** in [`deploy-prod.yml`](.github/workflows/deploy-prod.yml) |
 
-Neither environment is synced to a Render account yet, so none of the four URLs resolve
-today; they are the names the blueprint will create, and Render appends a suffix if a
-name collides globally. Render's own auto-deploy is off on all four services
+All four URLs are live (Render appended the random suffixes on a global name
+collision). Each backend's `/health` returns `{"status":"ok"}`, and each frontend
+serves deep links such as `/sign-in` directly. Render's own auto-deploy is off on all four services
 (`autoDeployTrigger: "off"`), so the triggers in the table are the
 only things that start a deploy.
 
@@ -253,15 +253,15 @@ yourself:
 | 5 | Application | 2 / 2 | `docker compose up --build` runs frontend + backend + Postgres together; see [Running it locally](#running-it-locally-no-resend-account-needed) above. |
 | 6 | Testing | 2 / 2 | Backend, one command runs unit *and* integration tests (against real Postgres, see `backend/tests/test_repository_postgres.py`) together: `docker compose up -d postgres && cd backend && DATABASE_URL=postgresql://petri:petri@localhost:5432/petri uv run pytest` (210 passed, 0 skipped, verified). If port 5432 is already taken on your machine, set `POSTGRES_PORT` first, e.g. `POSTGRES_PORT=5433 docker compose up -d postgres` and point `DATABASE_URL` at that port instead — `docker-compose.yml`'s ports are all overridable this way (`POSTGRES_PORT`, `BACKEND_PORT`, `FRONTEND_PORT`), with the same defaults (5432/8000/5173) if left unset. A bare `uv run pytest` still works and stays green, but skips the Postgres-backed tests — pass `DATABASE_URL` to include them. Frontend: `cd frontend && npm test` (Vitest + React Testing Library). A handful of date-dependent tests briefly flaked on machines whose local timezone trails UTC (the tests used local `date.today()` while the backend anchors the same logic in UTC); fixed by anchoring the tests in UTC too, so this no longer depends on the evaluator's machine timezone. |
 | 7 | Containerization | 2 / 2 | Single `docker-compose.yml` for all three services. |
-| 8 | Deployment | 0 / 2 | Not yet live — **both** environments are **defined** but neither is synced. [`render.yaml`](render.yaml) declares four services (a Docker backend and a static frontend per environment, each environment on its own free Neon Postgres project, see [Environments](#environments)) and the pipelines deploy them, but the blueprint has not been synced to a Render account, so none of the four `*.onrender.com` URLs resolve. Once dev is up: frontend <https://petri-frontend-dev.onrender.com>, backend <https://petri-backend-dev.onrender.com> (`/health` → `{"status":"ok"}`). Follow [Deploying to Render (dev)](#deploying-to-render-dev) and [(production)](#deploying-to-render-production) to bring them up; this row only moves above 0 once a live URL actually answers. |
+| 8 | Deployment | 1 / 2 | **Both environments are live on free plans** — Render for the app, a separate Neon Postgres project per environment. Dev: frontend <https://petri-frontend-dev-e9be.onrender.com>, backend <https://petri-backend-dev-vq9g.onrender.com>. Prod: frontend <https://petri-frontend-prod-iin7.onrender.com>, backend <https://petri-backend-prod-h3fe.onrender.com>. Each backend's `/health` → `{"status":"ok"}`. Not 2 / 2 yet: signed-in flows do not work on `*.onrender.com` (cross-site session cookie and in-process sessions, [#41](https://github.com/nachiketnasa/petri-v2/issues/41)), so the deployed app is a public demo of the signed-out surface only. See [Environments](#environments). |
 | 9 | CI/CD | 3 / 3 | All three parts. **(a) PR merge gate:** [`ci.yml`](.github/workflows/ci.yml) runs backend `pytest` against a real Postgres + frontend `vitest`, both required status checks on `main`. **(b) CD to dev:** a merge to `main` re-runs both suites against the merge commit and only a green run POSTs the Render deploy hooks. **(c) Manual production deploy:** [`deploy-prod.yml`](.github/workflows/deploy-prod.yml), `workflow_dispatch` and nothing else, behind a typed `deploy-prod` confirmation, a `guard` job that hard-fails on a wrong confirmation or any ref but `main`, and a required reviewer on the `production` environment that holds the deploy-hook secrets — click path in [Deploying to Render (production)](#deploying-to-render-production). |
 | 10 | Observability | 0 / 2 | No metrics/traces/structured logs with request correlation yet. |
 | 11 | Alerting | 0 / 1 | None yet. |
 | 12 | On-call agent | 0 / 2 | None yet. |
-| | **Total** | **17 / 24** | Pass threshold is 10. |
+| | **Total** | **18 / 24** | Pass threshold is 10. |
 
-The remaining gap is entirely in the ops layer (deployment — both environments are
-defined but nothing is synced to a Render account yet — plus observability, alerting and
+The remaining gap is entirely in the ops layer (deployment — both environments are live
+but signed-in flows do not work there yet, #41 — plus observability, alerting and
 on-call) — nothing in the product, spec, testing, containerization or CI/CD rows above is
 partial credit.
 
