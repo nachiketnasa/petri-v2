@@ -326,7 +326,9 @@ moodboard/reference images pulled from other designers' work.
 - **Hosting**: **Render**, two environments (dev and production) declared in this repo's
   [`render.yaml`](../render.yaml) blueprint. Per environment: the backend as a Docker web
   service (built from `backend/Dockerfile`), the frontend as a static site (Vite build,
-  with an SPA rewrite so deep links work), and a Render managed Postgres instance.
+  with an SPA rewrite so deep links work), and its own Postgres database as a separate
+  project on Neon's free plan (Render's free tier allows only one Postgres per account
+  and expires it after 30 days).
   Addresses are `*.onrender.com` (`petri-{backend,frontend}-{dev,prod}`). CI owns every
   deploy trigger, not Render's deploy-on-push: dev deploys automatically when a merge to
   `main` is green, production only from a manual `workflow_dispatch` run behind a typed
