@@ -408,11 +408,11 @@ password (email sign-up requires a verification code, and gets a real forgot-pas
 flow). Only one account exists per email address, no matter which method it was
 created with. Explicit logout, and full account deletion on request. The site sits
 behind Cloudflare for DDoS mitigation, and auth forms are protected against bots.
-Two-factor authentication is optional, off by default, and uses a standard
-authenticator app of the user's choice (Google Authenticator, Authy, 1Password, and
-the like) rather than SMS, a genuinely free addition since TOTP is an open protocol
-with no carrier cost behind it. Turning it on shows a QR code and a set of one-time
-recovery codes. The only cookies the site sets are strictly necessary ones (sign-in,
+Two-factor authentication (TOTP, authenticator app rather than SMS) is implemented in
+the backend only: `POST /auth/2fa/enroll`, `/auth/2fa/confirm` and `/auth/2fa/disable`,
+one-time recovery codes, and a TOTP step at login, all covered by backend tests
+(`backend/tests/test_auth_2fa.py`). The frontend has no enrolment screen or sign-in
+code step yet, so 2FA cannot be turned on from the UI. The only cookies the site sets are strictly necessary ones (sign-in,
 security), disclosed with a simple notice rather than a cookie-category picker, since
 there's nothing optional to pick between.
 
@@ -420,8 +420,8 @@ there's nothing optional to pick between.
 Theme (a choice of four: Petri Light, Petri Dark, Solarized Light, Solarized Dark,
 applied across the whole app and saved to the account), a sound effects toggle (short
 tones on starting or finishing setup, logging a check-in, and pausing or removing a
-cadence), the Other tasks feature toggle, the landing-screen preference, two-factor
-authentication, and account deletion.
+cadence), the Other tasks feature toggle, the landing-screen preference, and account deletion. (No 2FA controls yet; see
+[Accounts](#accounts).)
 
 ## Expected behavior
 
@@ -474,12 +474,13 @@ criterion, and explicit non-goal, lives in [`_docs/specs.md`](_docs/specs.md). I
 
 ## Status
 
-Full-stack and functional: every feature in this document is built and running —
-signup/sign-in (email+password, TOTP 2FA), experiments and goals/milestones end to
+Full-stack and functional: every feature in this document is built and running,
+except that TOTP 2FA is backend-only for now (see [Accounts](#accounts)) —
+signup/sign-in (email+password), experiments and goals/milestones end to
 end (create, activate, check in, complete via retro or abandon), the calendar,
 sharing/likes/comments, Settings, and Other tasks. Backed by real integration tests
-against Postgres, not just the in-memory repository. Not yet done: a deployed public
-URL, CI/CD, and observability/alerting (see the evaluator table above for the exact
+against Postgres, not just the in-memory repository. Deployed on Render (dev and prod)
+with CI/CD; not yet done: observability/alerting (see the evaluator table above for the exact
 breakdown).
 
 ## Credits and disclaimers
