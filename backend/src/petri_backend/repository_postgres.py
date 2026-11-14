@@ -431,6 +431,47 @@ class PostgresRepository(Repository):
             row = cur.fetchone()
             return str(row[0]) if row else None
 
+    def create_session(
+        self, *, session_id: str, user_id: str, expires_at: datetime
+    ) -> None:
+        with self._connect() as conn, conn.cursor() as cur:
+            # Keeps dead rows bounded per user without a purge job.
+            cur.execute(
+                "delete from sessions where user_id = %s "
+                "and (expires_at <= now() or revoked_at is not null)",
+                (user_id,),
+            )
+            cur.execute(
+                "insert into sessions (id, user_id, expires_at) values (%s, %s, %s)",
+                (session_id, user_id, expires_at),
+            )
+
+    def get_session_user_id(self, *, session_id: str) -> str | None:
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute(
+                "select user_id from sessions "
+                "where id = %s and revoked_at is null and expires_at > now()",
+                (session_id,),
+            )
+            row = cur.fetchone()
+            return str(row[0]) if row else None
+
+    def revoke_session(self, *, session_id: str) -> None:
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute(
+                "update sessions set revoked_at = now() "
+                "where id = %s and revoked_at is null",
+                (session_id,),
+            )
+
+    def revoke_user_sessions(self, *, user_id: str) -> None:
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute(
+                "update sessions set revoked_at = now() "
+                "where user_id = %s and revoked_at is null",
+                (user_id,),
+            )
+
     def create_experiment(
         self,
         *,

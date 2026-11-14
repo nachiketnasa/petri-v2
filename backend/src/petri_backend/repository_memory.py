@@ -42,6 +42,8 @@ class InMemoryRepository(Repository):
         # one-time use: gone either way, same as the recovery codes above.
         self._email_verifications: dict[str, tuple[str, datetime]] = {}
         self._password_resets: dict[str, tuple[str, datetime]] = {}
+        # session_id -> (user_id, expires_at); revoke = pop.
+        self._sessions: dict[str, tuple[str, datetime]] = {}
         self._other_tasks: dict[str, OtherTask] = {}
         self._push_subscriptions: dict[str, PushSubscription] = {}
         self._shares: dict[str, Share] = {}
@@ -126,6 +128,29 @@ class InMemoryRepository(Repository):
             return None
         user_id, expires_at = entry
         return user_id if _utcnow() <= expires_at else None
+
+    def create_session(
+        self, *, session_id: str, user_id: str, expires_at: datetime
+    ) -> None:
+        self._sessions[session_id] = (user_id, expires_at)
+
+    def get_session_user_id(self, *, session_id: str) -> str | None:
+        entry = self._sessions.get(session_id)
+        if entry is None:
+            return None
+        user_id, expires_at = entry
+        if _utcnow() >= expires_at:
+            self._sessions.pop(session_id, None)
+            return None
+        return user_id
+
+    def revoke_session(self, *, session_id: str) -> None:
+        self._sessions.pop(session_id, None)
+
+    def revoke_user_sessions(self, *, user_id: str) -> None:
+        for session_id, (owner, _expires_at) in list(self._sessions.items()):
+            if owner == user_id:
+                del self._sessions[session_id]
 
     def create_experiment(
         self,

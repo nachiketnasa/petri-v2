@@ -231,6 +231,24 @@ class Repository(ABC):
         ...
 
     @abstractmethod
+    def create_session(
+        self, *, session_id: str, user_id: str, expires_at: datetime
+    ) -> None:
+        """session_id is derived from the cookie token (never the raw token)."""
+        ...
+
+    @abstractmethod
+    def get_session_user_id(self, *, session_id: str) -> str | None:
+        """user_id for a live session; None if missing, expired or revoked."""
+        ...
+
+    @abstractmethod
+    def revoke_session(self, *, session_id: str) -> None: ...
+
+    @abstractmethod
+    def revoke_user_sessions(self, *, user_id: str) -> None: ...
+
+    @abstractmethod
     def create_experiment(
         self,
         *,

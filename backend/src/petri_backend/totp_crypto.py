@@ -23,8 +23,7 @@ def _load_key() -> bytes:
     # key so the app still runs, rather than refusing to start. TOTP
     # secrets encrypted under it won't decrypt after a restart; set
     # PETRI_TOTP_KEY (a Fernet.generate_key() value) in any real
-    # deployment. Fine for in-memory MVP, same spirit as _sessions/
-    # _reset_tokens having no persistence either.
+    # deployment.
     generated = Fernet.generate_key()
     print(
         f"WARNING: {_KEY_ENV_VAR} not set -- using an ephemeral per-process key. "

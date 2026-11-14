@@ -3,16 +3,11 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from fastapi.testclient import TestClient
 
-from petri_backend.app import _sessions, app, get_repository
+from petri_backend.app import _session_id, app, get_repository
 from petri_backend.repository_memory import InMemoryRepository
 from petri_backend.security import hash_lookup_code
 
 from _email_capture import sent_reset_tokens
-
-
-@pytest.fixture(autouse=True)
-def _clear_module_state():
-    _sessions.clear()
 
 
 @pytest.fixture
@@ -89,7 +84,7 @@ def test_reset_password_with_valid_token_updates_password_and_invalidates_sessio
         "/auth/login", json={"email": "user@example.com", "password": "oldpassword"}
     )
     session_token = login_response.cookies["session_id"]
-    assert session_token in _sessions
+    assert repo.get_session_user_id(session_id=_session_id(session_token)) is not None
 
     client.post("/auth/forgot-password", json={"email": "user@example.com"})
     reset_token = sent_reset_tokens["user@example.com"]
@@ -114,7 +109,8 @@ def test_reset_password_with_valid_token_updates_password_and_invalidates_sessio
     assert new_login.status_code == 200
 
     # Old session is gone.
-    assert session_token not in _sessions
+    assert repo.get_session_user_id(session_id=_session_id(session_token)) is None
+    assert client.get("/auth/me", cookies={"session_id": session_token}).status_code == 401
 
 
 def test_reset_password_with_unknown_token_returns_generic_400(client: TestClient):

@@ -35,7 +35,7 @@ def _load_private_key() -> ec.EllipticCurvePrivateKey:
         private_value = int.from_bytes(_b64url_decode(raw), "big")
         return ec.derive_private_key(private_value, ec.SECP256R1())
     # ponytail: no key configured (local/dev) -- an ephemeral, process-only
-    # key, same spirit as totp_crypto.py/_sessions. Existing subscriptions
+    # key, same spirit as totp_crypto.py. Existing subscriptions
     # would need re-subscribing after a restart in a real deployment;
     # set VAPID_PRIVATE_KEY there.
     print(
