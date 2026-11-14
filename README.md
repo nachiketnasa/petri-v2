@@ -286,7 +286,7 @@ yourself:
 | | **Total** | **18 / 24** | Pass threshold is 10. |
 
 The remaining gap is entirely in the ops layer (deployment — both environments are live
-but signed-in flows do not work there yet, #41 — plus observability, alerting and
+but the browser end-to-end walkthrough on both, including Safari, is not yet verified, #41 line 5 — plus observability, alerting and
 on-call) — nothing in the product, spec, testing, containerization or CI/CD rows above is
 partial credit.
 
