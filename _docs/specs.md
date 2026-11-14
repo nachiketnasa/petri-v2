@@ -325,8 +325,11 @@ moodboard/reference images pulled from other designers' work.
   endpoints; Web Push via a service worker for Other task reminders.
 - **Hosting**: **Render**, two environments (dev and production) declared in this repo's
   [`render.yaml`](../render.yaml) blueprint. Per environment: the backend as a Docker web
-  service (built from `backend/Dockerfile`), the frontend as a static site (Vite build,
-  with an SPA rewrite so deep links work), and a Render managed Postgres instance.
+  service (built from `backend/Dockerfile`) and the frontend as a static site (Vite
+  build, with an SPA rewrite so deep links work). Only one Render managed Postgres
+  instance exists — Render's free tier allows one free database per account — and
+  production currently shares dev's; see README.md's "Environments" section for the
+  upgrade path to a dedicated production database.
   Addresses are `*.onrender.com` (`petri-{backend,frontend}-{dev,prod}`). CI owns every
   deploy trigger, not Render's deploy-on-push: dev deploys automatically when a merge to
   `main` is green, production only from a manual `workflow_dispatch` run behind a typed
