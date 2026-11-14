@@ -39,7 +39,7 @@ If any of those ports are already taken on your machine, override them before
 starting — `docker-compose.yml` reads `POSTGRES_PORT` / `BACKEND_PORT` /
 `FRONTEND_PORT` with those same defaults, e.g.:
 ```bash
-BACKEND_PORT=8001 FRONTEND_PORT=5174 docker compose up --build
+POSTGRES_PORT=5433 BACKEND_PORT=8001 FRONTEND_PORT=5174 docker compose up --build
 ```
 
 **Email, without a Resend API key.** The app sends real email (sign-up verification
@@ -272,8 +272,8 @@ Known limits of the production environment, in the same register as dev's: `/api
 proxied to the backend through the static site, so the session cookie is first-party,
 and sessions live in the `sessions` table. On 2026-11-15 the same full walkthrough
 passed here in Firefox, and Safari was checked for sign in, reload and sign out only
-([results](https://github.com/nachiketnasa/petri-v2/issues/41#issuecomment-6882653208), P1–P9). Chrome was not run, and neither a prod redeploy nor
-session survival across a cold start was checked. `PETRI_TOTP_KEY` and
+([results](https://github.com/nachiketnasa/petri-v2/issues/41#issuecomment-6882653208), P1–P6 and P8–P9; P7, a prod redeploy, was not run). Chrome was not run,
+and session survival across a cold start was not checked. `PETRI_TOTP_KEY` and
 `VAPID_PRIVATE_KEY` are set in the Render Dashboard. Free Render web services cold-start
 after inactivity, so the first request can take tens of seconds; Neon's free compute
 also scales to zero when idle and wakes on the next query.
